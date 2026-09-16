@@ -1,0 +1,114 @@
+import assert from 'node:assert/strict';
+import {writeFileSync} from 'node:fs';
+
+export async function verifyContractFinanceBrowser({cdpUrl,baseUrl,session,projectRef,contractId}){
+ const tabResponse=await fetch(`${cdpUrl}/json/new?about:blank`,{method:'PUT'});assert.equal(tabResponse.status,200);
+ const tab=await tabResponse.json(),socket=new WebSocket(tab.webSocketDebuggerUrl),pending=new Map(),errors=[],consoleErrors=[];let seq=0;
+ await new Promise((resolve,reject)=>{socket.addEventListener('open',resolve,{once:true});socket.addEventListener('error',()=>reject(new Error('Browser connection failed')),{once:true});});
+ socket.addEventListener('message',event=>{const result=JSON.parse(event.data);if(result.method==='Runtime.exceptionThrown')errors.push(result.params.exceptionDetails.exception?.description??result.params.exceptionDetails.text);if(result.method==='Runtime.consoleAPICalled'&&result.params.type==='error')consoleErrors.push(result.params.args.map(arg=>arg.description??arg.value??'').join(' '));if(result.id&&pending.has(result.id)){const job=pending.get(result.id);pending.delete(result.id);clearTimeout(job.timeout);if(result.error)job.reject(new Error(result.error.message));else job.resolve(result.result);}});
+ const send=(method,params={})=>new Promise((resolve,reject)=>{const id=++seq,timeout=setTimeout(()=>{pending.delete(id);reject(new Error('Browser timeout: '+method));},20000);pending.set(id,{resolve,reject,timeout});socket.send(JSON.stringify({id,method,params}));});
+ const evaluate=async expression=>{const result=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(result.exceptionDetails)throw new Error('Browser evaluation failed: '+(result.exceptionDetails.exception?.description??result.exceptionDetails.text));return result.result.value;};
+ const waitFor=async(expression,label)=>{const end=Date.now()+40000;while(Date.now()<end){if(await evaluate(`document.body && (${expression})`))return;await new Promise(resolve=>setTimeout(resolve,250));}const alerts=await evaluate("Array.from(document.querySelectorAll('[role=alert]')).map(e=>e.textContent).join(' | ')");throw new Error('Browser did not reach '+label+': '+alerts);};
+ const click=async(label,scope='document')=>{
+  assert.equal(await evaluate(`(()=>{const b=Array.from(${scope}.querySelectorAll('button')).find(e=>e.textContent.trim()===${JSON.stringify(label)}&&!e.disabled);if(!b)return false;b.scrollIntoView({block:'center',behavior:'instant'});b.focus();if(b.getAttribute('role')==='tab')b.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:0,ctrlKey:false}));b.click();return true;})()`),true,'Button: '+label);
+ };
+ const fill=async(selector,value)=>{
+  const currency=await evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e)throw Error('Missing input');if(e.type==='hidden'){const visible=e.previousElementSibling;if(!(visible instanceof HTMLInputElement))throw Error('Missing visible currency input');visible.focus();visible.select();return true;}const p=e instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(p,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event('input',{bubbles:true}));return false;})()`);
+  if(currency)await send('Input.insertText',{text:value});
+ };
+ const capture=async name=>{await new Promise(resolve=>setTimeout(resolve,200));const result=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});writeFileSync('.sites-runtime/finance/'+name+'.png',Buffer.from(result.data,'base64'));};
+ try{
+  await send('Page.enable');await send('Runtime.enable');
+  await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});
+  await send('Page.addScriptToEvaluateOnNewDocument',{source:`if(location.origin===${JSON.stringify(new URL(baseUrl).origin)})localStorage.setItem(${JSON.stringify(`sb-${projectRef}-auth-token`)},${JSON.stringify(JSON.stringify(session))});`});
+  await send('Page.navigate',{url:baseUrl+'/contratos?contrato='+encodeURIComponent(contractId)});
+  await waitFor("document.body.innerText.includes('USINA • CONTRATO DE VERIFICAÇÃO')",'contract without import errors');
+  await click('Financeiro');await waitFor("!!document.querySelector('.finance-balances')",'financial summary');
+  await fill('.finance-month input','2026-07');
+  await waitFor("document.querySelector('.finance-metric-pending').innerText.includes('999,25')",'month-specific balance');
+  await waitFor("!!document.querySelector('.finance-evolution-chart .recharts-surface')",'financial evolution chart');
+  await evaluate("document.querySelector('.finance-chart-toolbar button[aria-pressed=false]').click()");
+  await waitFor("document.querySelector('.finance-panel-heading h3').innerText.includes('Volume')",'volume and ATR chart');
+  await waitFor("!!document.querySelector('.finance-evolution-chart .recharts-line-curve')",'ATR series');
+  await evaluate('window.scrollTo(0,0)');await capture('finance-production-desktop');
+  await click('Financeiro',"document.querySelector('.finance-chart-toolbar')");
+  await click('Ago/2026',"document.querySelector('.finance-chart-footer')");
+  await waitFor("document.querySelector('.finance-metric-pending').innerText.includes('3.000,00')",'chart month updates KPIs');
+  await click('Geral do contrato',"document.querySelector('.finance-composition-filter')");
+  await waitFor("document.querySelector('.finance-donut-center strong').innerText.includes('3.000,75')",'overall receipt composition');
+  await click('Jul/2026',"document.querySelector('.finance-chart-footer')");
+  await click('Jul/2026',"document.querySelector('.finance-composition-filter')");
+  await evaluate('window.scrollTo(0,0)');
+  await capture('finance-desktop');
+  await click('Lançar recebimento');await waitFor("!!document.querySelector('.finance-form')",'receipt form');
+  await fill('.finance-form input[name=receivedAt]','2026-08-15');await fill('.finance-form input[name=amount]','250,75');await fill('.finance-form input[name=document]','REC-BROWSER');
+  await click('Lançar recebimento',"document.querySelector('.finance-form')");
+  await waitFor("!document.querySelector('.finance-form')&&document.body.innerText.includes('REC-BROWSER')",'receipt saved');
+  await waitFor("document.querySelector('.finance-metric-pending').innerText.includes('748,50')",'balance after receipt');
+  await click('Lançar adiantamento');await waitFor("!!document.querySelector('.finance-form')",'advance form');
+  await fill('.finance-form input[name=amount]','10,00');await fill('.finance-form input[name=document]','ADV-BROWSER');
+  await click('Lançar adiantamento',"document.querySelector('.finance-form')");
+  await waitFor("!document.querySelector('.finance-form')&&document.body.innerText.includes('ADV-BROWSER')",'advance saved');
+  await evaluate("Array.from(document.querySelectorAll('.finance-entry-list li')).find(e=>e.innerText.includes('ADV-BROWSER')).querySelector('button[aria-label^=Excluir]').click()");
+  await waitFor("!!document.querySelector('[role=alertdialog]')",'delete confirmation');
+  await click('Cancelar',"document.querySelector('[role=alertdialog]')");
+  await waitFor("!document.querySelector('[role=alertdialog]')",'cancelled confirmation closed');
+  assert.equal(await evaluate("document.body.innerText.includes('ADV-BROWSER')"),true,'Cancel keeps advance');
+  await evaluate("Array.from(document.querySelectorAll('.finance-entry-list li')).find(e=>e.innerText.includes('ADV-BROWSER')).querySelector('button[aria-label^=Excluir]').click()");
+  await waitFor("!!document.querySelector('[role=alertdialog]')",'delete confirmation again');
+  await click('Excluir adiantamento',"document.querySelector('[role=alertdialog]')");
+  await waitFor("!document.body.innerText.includes('ADV-BROWSER')",'advance removed');
+  await click('Adicionar desconto');await waitFor("!!document.querySelector('.finance-form input[name=ratePerTon]')",'discount form');
+  await fill('.finance-form input[name=title]','Acordo pelo navegador');await fill('.finance-form input[name=ratePerTon]','50');
+  await fill('.finance-form textarea[name=notes]','Transporte negociado.\nObservação completa do desconto no relatório.');
+  await evaluate("Array.from(document.querySelectorAll('.finance-month-options label')).find(e=>e.textContent.includes('Jul/2026')).querySelector('input').click()");
+  await evaluate("Array.from(document.querySelectorAll('.finance-month-options label')).find(e=>e.textContent.includes('Ago/2026')).querySelector('input').click()");
+  await fill('.finance-form input[aria-label="Outro mês para o desconto"]','2026-10');
+  await click('Incluir mês',"document.querySelector('.finance-form')");
+  await capture('finance-discount-form');
+  await click('Lançar desconto',"document.querySelector('.finance-form')");
+  await waitFor("!document.querySelector('.finance-form')&&document.body.innerText.includes('Acordo pelo navegador')",'discount saved');
+  await fill('.finance-month input','2026-08');
+  await waitFor("document.querySelector('.finance-metric-total').innerText.includes('2.000,00')",'August rate applied');
+  await waitFor("document.querySelectorAll('.finance-discount-monthly-table thead th[data-discount-id]').length===2",'two types in matrix columns');
+  assert.equal(await evaluate("document.querySelectorAll('.finance-discounts table').length"),1,'Adding a discount keeps one table');
+  const agreementScope="Array.from(document.querySelectorAll('.finance-discount-monthly-table thead th[data-discount-id]')).find(e=>e.innerText.includes('Acordo pelo navegador'))";
+  await evaluate(`${agreementScope}.querySelector('.finance-discount-notes summary').click()`);
+  assert.equal(await evaluate(`${agreementScope}.querySelector('.finance-discount-notes').innerText.includes('Observação completa do desconto no relatório.')`),true,'Observation is accessible in its column header');
+  assert.equal(await evaluate("Array.from(document.querySelectorAll('.finance-discount-monthly-table tbody tr')).some(row=>row.innerText.includes('Out/2026')&&row.innerText.includes('0,00 t')&&row.innerText.includes('0,00')&&row.innerText.includes('—'))"),true,'Matrix distinguishes selected zero-load months from unapplied discounts');
+  assert.equal(await evaluate("Array.from(document.querySelectorAll('.finance-discount-monthly-table tbody tr')).some(row=>row.innerText.includes('Ago/2026')&&row.innerText.includes('20,00 t')&&row.innerText.includes('1.000,00'))"),true,'Monthly overview shows server volume and discount');
+  assert.equal(await evaluate("getComputedStyle(document.querySelector('.finance-discount-column-green')).backgroundColor!==getComputedStyle(document.querySelector('.finance-discount-column-sand')).backgroundColor"),true,'Adjacent discount types use different column colors');
+  await evaluate("document.querySelector('.finance-discounts').scrollIntoView({block:'start',behavior:'instant'})");await capture('finance-discounts-monthly-desktop');
+  await click('Exportar');
+  await waitFor("!!document.querySelector('.contract-tab-pdf-preview iframe')",'complete financial PDF preview');
+  assert.equal(await evaluate("document.querySelector('.contract-tab-pdf-preview iframe').title.includes('Financeiro do contrato')"),true);
+  const pdf=await evaluate("(async()=>{const response=await fetch(document.querySelector('.contract-tab-pdf-preview').dataset.pdfUrl);const bytes=new Uint8Array(await response.arrayBuffer());return {header:new TextDecoder().decode(bytes.slice(0,4)),data:Array.from(bytes)};})()");
+  assert.equal(pdf.header,'%PDF');writeFileSync('.sites-runtime/finance/finance-discounts-report.pdf',Buffer.from(pdf.data));
+  await new Promise(resolve=>setTimeout(resolve,700));await capture('finance-discounts-report-preview');
+  await evaluate("document.querySelector('[data-slot=dialog-close]').click()");await waitFor("!document.querySelector('[role=dialog]')",'financial report closed');
+  await evaluate("document.querySelectorAll('[data-sonner-toast] [data-close-button]').forEach(button=>button.click())");
+  await waitFor("!document.querySelector('[data-sonner-toast]')",'notifications dismissed for mobile preview');
+  await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+  await new Promise(resolve=>setTimeout(resolve,350));
+  await evaluate('window.scrollTo(0,0)');await capture('finance-mobile');
+  assert.equal(await evaluate('document.documentElement.scrollWidth<=window.innerWidth+2'),true,'Mobile viewport contains layout');
+  await evaluate("document.querySelector('.finance-analytics').scrollIntoView({block:'start',behavior:'instant'})");
+  await capture('finance-charts-mobile');
+  await evaluate("document.querySelector('.finance-discounts').scrollIntoView({block:'start',behavior:'instant'})");await capture('finance-discounts-monthly-mobile');
+  assert.equal(await evaluate('document.documentElement.scrollWidth<=window.innerWidth+2'),true,'Discount tables fit the mobile viewport');
+  await click('Adicionar desconto');await waitFor("!!document.querySelector('.finance-form')",'mobile dialog');
+  assert.equal(await evaluate("document.querySelector('[role=dialog]').getBoundingClientRect().width<=window.innerWidth"),true,'Mobile dialog fits');
+  await capture('finance-discount-mobile');await click('Cancelar',"document.querySelector('.finance-form')");
+  assert.deepEqual(errors,[],'No runtime errors');
+  console.log('PASS: browser renders contract, filters finance month, saves receipt/advance/discount, confirms deletion, recalculates totals, desktop/mobile layout and no runtime exceptions.');
+ }catch(error){
+  await capture('finance-browser-failure').catch(()=>{});
+  const body=await evaluate('document.body?.innerText?.slice(0,5000)').catch(()=>'');
+  console.error('Browser page at failure:',body,'Runtime exceptions:',errors,'Console errors:',consoleErrors);
+  throw error;
+ }finally{
+  await evaluate(`localStorage.removeItem(${JSON.stringify(`sb-${projectRef}-auth-token`)})`).catch(()=>{});
+  socket.close();for(const job of pending.values()){clearTimeout(job.timeout);job.reject(new Error('Browser closed'));}
+  await fetch(`${cdpUrl}/json/close/${tab.id}`).catch(()=>{});
+ }
+}

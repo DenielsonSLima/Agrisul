@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import {readFileSync,readdirSync,mkdirSync} from 'node:fs';
+import {createRequire} from 'node:module';
+import {DatabaseSync} from 'node:sqlite';
+const require=createRequire(import.meta.url);const {build}=require(require.resolve('esbuild',{paths:[require.resolve('vite')]}));mkdirSync('.sites-runtime/tests',{recursive:true});
+await build({entryPoints:['app/api/contracts/route.ts'],outfile:'.sites-runtime/tests/contracts.mjs',bundle:true,platform:'node',format:'esm',plugins:[{name:'fixtures',setup(b){b.onResolve({filter:/^(cloudflare:workers|next\/headers|next\/navigation)$/},a=>({path:a.path,namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},a=>({contents:a.path==='cloudflare:workers'?'export const env=globalThis.contractEnv;':a.path==='next/headers'?'export async function headers(){return globalThis.contractHeaders;}':'export function redirect(){throw new Error("Unexpected redirect")}'}));}}]});
+const sqlite=new DatabaseSync(':memory:');sqlite.exec('PRAGMA foreign_keys=ON');for(const f of readdirSync('drizzle').filter(f=>f.endsWith('.sql')).sort())sqlite.exec(readFileSync('drizzle/'+f,'utf8'));
+let failWrite=false;const DB={prepare(sql){return{bind(...args){return{async first(){return sqlite.prepare(sql).get(...args)||null;},async all(){return{results:sqlite.prepare(sql).all(...args)};},async run(){if(failWrite)throw new Error('storage failure');const r=sqlite.prepare(sql).run(...args);return{meta:{changes:r.changes}};}};}};}};
+globalThis.contractEnv={DB};globalThis.contractHeaders=new Headers();const api=await import('../.sites-runtime/tests/contracts.mjs');
+const signIn=user=>{globalThis.contractHeaders=new Headers(user?{'oai-authenticated-user-id':user,'oai-authenticated-user-email':user+'@example.test'}:{});};
+const req=(method,data,origin='https://contracts.test')=>new Request('https://contracts.test/api/contracts',{method,headers:{'Content-Type':'application/json',origin},body:JSON.stringify(data)});
+const read=id=>api.GET(new Request('https://contracts.test/api/contracts'+(id?'?id='+id:'')));
+const stages=[{id:'s1',name:'Primeira etapa'},{id:'s2',name:'Segunda etapa'}];
+for(const owner of ['a','b']){sqlite.prepare('INSERT INTO clients(id,owner_id,legal_name,cnpj,created_at,updated_at) VALUES(?,?,?,?,?,?)').run('client-'+owner,owner,'Cliente '+owner,'12345678000199','now','now');sqlite.prepare('INSERT INTO contract_types(id,owner_id,name,name_key,stages_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)').run('type-'+owner,owner,'Contrato manual','manual',JSON.stringify(stages),'now','now');}
+sqlite.prepare('INSERT INTO companies(id,owner_id,name,created_at,updated_at) VALUES(?,?,?,?,?)').run('company-a','a','Empresa do sistema','now','now');
+sqlite.prepare('INSERT INTO contract_types(id,owner_id,name,name_key,stages_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)').run('type-other','a','Semimecanizado','semi','[]','now','now');
+const base={title:'Contrato de teste',clientId:'client-a',typeId:'type-a',status:'Rascunho',startDate:'2026-09-14',endDate:'2027-09-14',value:'12345,67',notes:'Observação de teste.'};
+assert.equal((await read()).status,401);assert.equal((await api.POST(req('POST',base))).status,401);
+signIn('a');assert.deepEqual((await(await read()).json()).contracts,[]);let response=await api.POST(req('POST',{...base,owner_id:'b',stages:[]}));assert.equal(response.status,201);const contract=(await response.json()).contract;assert.equal(contract.value,'12345.67');assert.equal(contract.clientName,'Cliente a');assert.deepEqual(contract.stages,stages);assert.equal((await read()).headers.get('cache-control'),'no-store');assert.equal((await(await read(contract.id)).json()).contract.notes,base.notes);
+sqlite.prepare('UPDATE contract_types SET name=?,stages_json=? WHERE id=?').run('Manual atualizado','[]','type-a');
+response=await api.PATCH(req('PATCH',{...base,id:contract.id,title:'Contrato editado',status:'Ativo',value:'0'}));assert.equal(response.status,200);let updated=(await response.json()).contract;assert.equal(updated.value,'0.00');assert.deepEqual(updated.stages,stages);assert.equal(updated.typeName,'Contrato manual');assert.equal(updated.createdAt,contract.createdAt);
+response=await api.PATCH(req('PATCH',{...base,id:contract.id,typeId:'type-other'}));assert.equal(response.status,200);updated=(await response.json()).contract;assert.equal(updated.typeName,'Semimecanizado');assert.deepEqual(updated.stages,[]);
+for(const bad of [{clientId:'client-b'},{clientId:'company-a'},{typeId:'type-b'},{typeId:'missing'},{clientId:'missing'}]){assert.equal((await api.POST(req('POST',{...base,...bad}))).status,400);assert.equal((await api.PATCH(req('PATCH',{...base,id:contract.id,...bad}))).status,400);}
+signIn('b');assert.deepEqual((await(await read()).json()).contracts,[]);assert.equal((await read(contract.id)).status,404);assert.equal((await api.PATCH(req('PATCH',{...base,id:contract.id,clientId:'client-b',typeId:'type-b'}))).status,404);assert.equal((await api.POST(req('POST',{...base,clientId:'client-b',typeId:'type-b'}))).status,201);
+signIn('a');
+for(const bad of [{title:''},{status:'Assinado'},{value:'-1'},{value:'1.001'},{value:'1e5'},{value:'9999999999999'},{startDate:'2026-02-30'},{endDate:'2026-01-01'},{notes:'x'.repeat(4001)}])assert.equal((await api.POST(req('POST',{...base,...bad}))).status,400,JSON.stringify(bad));
+assert.equal((await api.POST(req('POST',{...base,startDate:'',endDate:'',value:'',notes:''}))).status,201);
+assert.equal((await api.POST(req('POST',{...base,startDate:'2028-02-29',endDate:'2028-02-29'}))).status,201);
+assert.equal((await api.POST(req('POST',base,'https://other.test'))).status,403);
+assert.equal((await api.POST(req('POST',null))).status,400);
+failWrite=true;assert.equal((await api.PATCH(req('PATCH',{...base,id:contract.id,title:'Falha'}))).status,503);assert.notEqual((await(await read(contract.id)).json()).contract.title,'Falha');
+sqlite.close();console.log('Passed: contract persistence, client/type ownership, company separation, stage snapshots and type replacement, optional fields, exact values, date validation and recoverable errors.');

@@ -1,0 +1,13 @@
+export const contractsHref='/contratos';
+export const contractHref=(id:string)=>contractsHref+'?contrato='+encodeURIComponent(id);
+export const formatContractValue=(value:string)=>value?new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(value)):'Valor não informado';
+export const formatContractBilling=(value:string,pending=false)=>pending?'Pendente':new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(value||0));
+export const formatContractLoadAmount=(value:string|undefined,pending=false)=>formatContractBilling(value??'',pending||value===undefined||value==='');
+export const formatContractVolume=(value:string)=>new Intl.NumberFormat('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value||0))+' t';
+export const formatAtr=(value:string)=>value?new Intl.NumberFormat('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:4}).format(Number(value)):'—';
+export const formatAtrQuote=(value:string)=>value?new Intl.NumberFormat('pt-BR',{minimumFractionDigits:4,maximumFractionDigits:6}).format(Number(value)):'Pendente';
+export const formatAtrCriterion=(priceType:'gross'|'net',periodType:'monthly'|'accumulated')=>`${priceType==='gross'?'Bruto':'Líquido'} · ${periodType==='monthly'?'Mensal':'Acumulado'}`;
+export const formatContractMonth=(month:string)=>{const [year,value]=month.split('-');const names=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];return `${names[Number(value)-1]??value}/${year}`;};
+export const formatContractDate=(date:string)=>date?date.split('-').reverse().join('/'):'Não informada';
+export const contractPeriod=(start:string,end:string)=>start&&end?formatContractDate(start)+' – '+formatContractDate(end):start?'Desde '+formatContractDate(start):end?'Até '+formatContractDate(end):'Período não informado';
+export const statusClass=(status:string)=>({'Ativo':'active','Concluído':'completed','Cancelado':'cancelled'}[status]||'active');

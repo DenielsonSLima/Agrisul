@@ -1,0 +1,3 @@
+import Link from 'next/link';
+import {Loader2,RefreshCw} from 'lucide-react';
+export function ContractLoadState({loading,error,status,onRetry}:{loading:boolean;error:string;status:number;onRetry:()=>void}){if(loading)return <div className="client-loading" role="status"><Loader2 size={20} className="animate-spin"/>Carregando contratos…</div>;return <div className="company-empty" role="alert"><h3>{status===401?'Acesse seus contratos':status===404?'Contrato não encontrado':'Não foi possível carregar'}</h3><p>{error}</p>{status===401?<Link className="btn company-primary" href="/login?returnTo=%2Fcontratos" target="_top">Entrar</Link>:status!==404&&<button className="btn" onClick={onRetry}><RefreshCw size={16}/>Tentar novamente</button>}</div>;}

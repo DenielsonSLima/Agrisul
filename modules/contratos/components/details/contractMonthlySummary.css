@@ -1,0 +1,22 @@
+.contract-summary-finance{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:20px 0 0}
+.contract-summary-finance>div{min-width:0;padding:16px;border:1px solid #e2ebe5;border-radius:10px;background:#f8fbf9}
+.contract-summary-finance dt{font-size:11px;color:#71877a}
+.contract-summary-finance dd{margin:7px 0 4px;color:#305940;font-size:20px;font-weight:650;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.contract-summary-finance small{font-size:10px;color:#8b9b91}
+.contract-summary-finance .contract-summary-finance-discount{background:#fcfaf6;border-color:#eee7da}
+.contract-summary-finance-discount dd,.contract-summary-finance-pending dd{color:#96743f}
+.contract-summary-finance-note{margin:10px 0 0;color:#819389;font-size:10px;line-height:1.6}
+.contract-monthly-table{min-width:1140px}
+.contract-monthly-table td{white-space:nowrap;font-variant-numeric:tabular-nums}
+.contract-monthly-table-wrap:focus-visible{outline:2px solid #39815a;outline-offset:3px}
+.contract-monthly-report-finance{grid-template-columns:repeat(4,minmax(0,1fr))}
+.contract-monthly-report-finance strong{font-size:8pt}
+.contract-monthly-report-body .contract-monthly-report-values th{width:12%}
+.contract-monthly-report-values th:nth-child(1){width:10%}
+.contract-monthly-report-values th:nth-child(2){width:11%}
+.contract-monthly-report-values th:nth-child(3){width:8%}
+.contract-monthly-report-values th:nth-child(4){width:10%}
+.contract-monthly-report-values th:nth-child(5){width:13%}
+.contract-monthly-report-body .contract-monthly-report-values td{white-space:normal;overflow-wrap:anywhere}
+@media(max-width:900px){.contract-summary-finance{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:450px){.contract-summary-finance{gap:8px}.contract-summary-finance>div{padding:12px}.contract-summary-finance dd{font-size:17px}}

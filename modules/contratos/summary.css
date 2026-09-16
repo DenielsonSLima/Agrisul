@@ -1,0 +1,53 @@
+.contracts-overview{margin:0 0 24px;border:1px solid #dce7e0;border-radius:14px;background:linear-gradient(110deg,#fff 45%,#f5faf7);box-shadow:0 3px 14px #183b2405;overflow:hidden}
+.contracts-overview-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid #e7eee9}
+.contracts-overview-heading h3{display:flex;align-items:center;gap:8px;margin:0;font-size:12px;font-weight:600;color:#456350}
+.contracts-overview-heading h3 svg{color:#26855e}
+.contracts-overview-heading>span{display:flex;align-items:center;gap:7px;color:#809187;font-size:11px}
+.contracts-overview-heading i{width:4px;height:4px;border-radius:50%;background:#9fb7a8}
+.contracts-overview-scroll{overflow-x:auto;scrollbar-width:thin;scrollbar-color:#b9d1c3 transparent}
+.contracts-overview-scroll:focus-visible{outline:2px solid #23845a;outline-offset:-3px}
+.contracts-overview-metrics{display:grid;grid-template-columns:repeat(7,minmax(max-content,1fr));margin:0;padding:6px}
+.contracts-overview-item{position:relative;min-width:132px;margin:0;padding:16px 13px;border-radius:8px}
+.contracts-overview-item+.contracts-overview-item:before{position:absolute;left:0;top:21px;bottom:21px;width:1px;background:#e2ebe5;content:''}
+.contracts-overview-item dt{display:flex;align-items:center;gap:6px;color:#74867b;font-size:11px;white-space:nowrap}
+.contracts-overview-item dt svg{color:#8ea99a;flex-shrink:0}
+.contracts-overview-item dd{margin:10px 0 5px;font-size:clamp(17px,1.13vw,22px);line-height:1.25;font-weight:650;letter-spacing:-.6px;color:#2b4234;font-variant-numeric:tabular-nums;white-space:nowrap}
+.contracts-overview-item>span{font-size:10px;color:#92a096;white-space:nowrap}
+.contracts-overview-net{background:#eaf4ee}
+.contracts-overview-net dd,.contracts-overview-received dd{color:#187449}
+.contracts-overview-net:before,.contracts-overview-received:before{display:none}
+.contracts-overview-pending dd{color:#9b752c}
+.contracts-overview-note{margin:0;padding:10px 18px;border-top:1px solid #e7eee9;color:#987a43;font-size:11px;line-height:1.5;background:#fcfaf4}
+.contracts-overview-skeleton>span{display:block;height:12px;width:90px;background:#edf2ef;border-radius:4px}
+.contracts-overview-skeleton>span:nth-child(2){height:23px;width:108px;margin:10px 0 5px}
+.contracts-overview-skeleton>span:last-child{width:80px;height:10px}
+.contracts-list-report-modal{width:min(1280px,calc(100vw - 40px))!important;max-width:min(1280px,calc(100vw - 40px))!important}
+.contracts-list-report-modal .farm-report-preview-stage{background:#f1f5ed}
+.contracts-list-report-modal .farm-report-actions .company-primary{background:#006b2d;border-color:#006b2d;color:#fff}
+.contracts-list-report-modal .farm-report-actions .company-primary:hover{background:#004f20;border-color:#004f20}
+.contract-report-body.contract-list-report>p{margin-bottom:4mm;overflow-wrap:anywhere;color:#53614c}
+.contract-report-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2mm;margin:0 0 4mm}
+.contract-report-summary>div{padding:2.5mm;border:1px solid #cfdec4;border-top:.6mm solid var(--metric-accent);border-radius:1.5mm;background:var(--metric-background);min-width:0;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+.contract-report-summary dt{font-size:7pt;color:#365b2d;white-space:nowrap;font-weight:600}
+.contract-report-summary dd{margin:1.5mm 0 1mm;font-size:10pt;font-weight:750;color:var(--metric-text);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.contract-report-summary small{display:block;font-size:6pt;line-height:1.3;color:#53614c}
+.contract-list-report-landscape .contract-report-summary{grid-template-columns:repeat(7,minmax(0,1fr))}
+.contract-list-report-landscape .contract-report-summary dd{font-size:9pt}
+.contract-report-body.contract-list-report>.contract-report-pending{font-size:7pt;color:#365b2d;margin-bottom:3mm}
+.contract-report-body.contract-list-report>.contract-report-legend{margin:0 0 3mm;font-size:7pt;line-height:1.4;color:#53614c}
+.contract-report-body.contract-list-report .contracts-list-report-table th,.contract-report-body.contract-list-report .contracts-list-report-table td{width:auto;padding:2.5mm 1.5mm;font-size:7.5pt;line-height:1.35;white-space:pre-line;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;vertical-align:middle;border:1px solid #b9cda9;font-variant-numeric:tabular-nums}
+.contract-report-body.contract-list-report .contracts-list-report-table thead th{background:#e2ecd9;color:#004f20;font-size:7pt;font-weight:700;white-space:pre-line;text-align:right}
+.contract-report-body.contract-list-report .contracts-list-report-table thead th:first-child{text-align:left}
+.contracts-report-group{break-inside:avoid;background:#fff;border-bottom:.65mm solid #86a575;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+.contracts-report-group:nth-of-type(even){background:#f4f8ee}
+.contract-report-body.contract-list-report .contracts-report-group .contracts-report-client{background:transparent;text-align:left;border-left:1mm solid #006b2d;padding:3mm}
+.contracts-report-client strong{display:block;font-size:8.5pt;font-weight:750;line-height:1.4;color:#004f20}
+.contracts-report-client span{display:block;margin-top:2mm;font-size:7pt;font-weight:400;color:#53614c}
+.contract-report-body.contract-list-report .contracts-report-quantities td{text-align:right;color:var(--metric-text)}
+.contracts-report-quantities strong{font-weight:650}
+.contracts-report-quantities small{display:block;margin-top:1mm;font-size:6.5pt;color:#53614c}
+.contract-report-body.contract-list-report .contracts-report-financial td{background:var(--metric-background);color:var(--metric-text);vertical-align:top}
+.contracts-report-financial dl{margin:0}
+.contracts-report-financial dt{font-size:6.5pt;line-height:1.3;font-weight:500;margin-bottom:1.5mm}
+.contracts-report-financial dd{margin:0;text-align:right;font-size:7.5pt;font-weight:750;line-height:1.35}
+@media(max-width:650px){.contracts-overview-heading{padding:12px;align-items:flex-start}.contracts-overview-heading>span{font-size:10px}.contracts-overview-heading h3{font-size:11px}.contracts-overview-item{padding:14px 12px;min-width:148px}.contracts-overview-item dd{font-size:19px}}

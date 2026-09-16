@@ -1,0 +1,1 @@
+import {Settings} from "@/shared/types";export function validateSettings(data:Settings){if(!data.name.trim()||!data.company.trim())throw new Error("Preencha seu nome e o nome do espaço.");return {...data,name:data.name.trim(),company:data.company.trim()}}

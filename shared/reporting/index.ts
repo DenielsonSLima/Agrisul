@@ -1,0 +1,10 @@
+export {ReportDocument} from "./ReportDocument";
+export {ReportHeader} from "./ReportHeader";
+export {ReportWatermark} from "./ReportWatermark";
+export {ReportFooter} from "./ReportFooter";
+export {formatReportCnpj,formatReportPhone,formatReportZipCode,getReportCompanyDetails} from './companyBrand';
+export {drawReportPdfHeader} from './pdfHeader';
+export type {ReportPdfImage} from './pdfHeader';
+export {drawReportPdfWatermark} from './pdfWatermark';
+export {getReportHeaderMetrics,getReportOpacity,getReportPageSize,getReportWatermarkFrame,REPORT_HEADER_METRICS,REPORT_MARGIN_MM} from './reportLayout';
+export type * from "./types";

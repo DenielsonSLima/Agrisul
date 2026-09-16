@@ -1,0 +1,1 @@
+import {Event} from "@/shared/types";export const todayEvents=(events:Event[])=>events.filter(x=>x.date==="2026-09-14").sort((a,b)=>a.time.localeCompare(b.time));

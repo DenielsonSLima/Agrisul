@@ -1,0 +1,43 @@
+import {useCallback,useEffect,useRef,useState} from 'react';
+import '../loads.css';
+import './details/contractMonthlySummary.css';
+import {Check,FileDown,Pencil} from 'lucide-react';
+import {Tabs,TabsContent,TabsList,TabsTrigger} from '@/components/ui/tabs';
+import {ModuleLink,useModuleNavigation} from '@/shared/navigation/ModuleNavigation';
+import {useContracts} from '../hooks/useContracts';
+import {defaultLoadFilters,useContractLoads} from '../hooks/useContractLoads';
+import {contractHref} from '../utils/contractFormat';
+import {ContractBreadcrumb} from './ContractBreadcrumb';
+import {ContractLoadState} from './ContractLoadState';
+import {ContractForm} from '../forms/ContractForm';
+import {ContractSummaryTab} from './details/ContractSummaryTab';
+import {ContractFinancialTab} from './details/ContractFinancialTab';
+import {ContractLoadsTab} from './details/ContractLoadsTab';
+import {ContractMonthlyReportDialog} from './ContractMonthlyReportDialog';
+import {ContractTabReportDialog} from './ContractTabReportDialog';
+import {financialReportModel,loadsReportModel,type ContractTabReport} from '../reporting/contractTabPdf';
+import type {BillingContract} from '../types';
+
+export function ContractDetail({id,editing,saved}:{id:string;editing:boolean;saved:boolean}){
+ const m=useContracts(id),c=m.contract,loadedId=c?.id;const [busy,setBusy]=useState(false),[reportOpen,setReportOpen]=useState(false);const titleRef=useRef<HTMLHeadingElement>(null);
+ const {searchParams,navigate}=useModuleNavigation();
+ const requestedTab=searchParams.get('aba')??'summary';
+ const tab=['summary','financial','loads'].includes(requestedTab)?requestedTab:'summary';
+ const setTab=(value:string)=>{const params=new URLSearchParams(searchParams);params.set('aba',value);navigate('/contratos?'+params.toString());};
+ const [loadFilters,setLoadFilters]=useState(defaultLoadFilters);
+ const loads=useContractLoads(id,loadFilters,!editing&&tab==='loads');
+ const [tabReport,setTabReport]=useState<{contract:BillingContract;model:ContractTabReport}|null>(null);
+ const exportCurrent=()=>{if(!c)return;if(tab==='loads'){if(loads.data&&!loads.loading&&!loads.error)setTabReport({contract:c,model:loadsReportModel(loads.data)});}else if(tab==='financial')setTabReport({contract:c,model:financialReportModel(c)});else setReportOpen(true);};
+ const onBusy=useCallback((value:boolean)=>setBusy(value),[]);
+ useEffect(()=>{if(loadedId)titleRef.current?.focus();},[loadedId,editing]);
+ if(m.loading||m.error||!c)return <section className="contract-detail-page"><ContractBreadcrumb name="Detalhes do contrato"/><ContractLoadState {...m} onRetry={m.reload}/></section>;
+ return <section className="contract-detail-page">
+  <ContractBreadcrumb name={editing?'Editar':c.clientName} parent={editing?{name:c.clientName,href:contractHref(c.id)}:undefined} back={editing?contractHref(c.id):undefined} backLabel={editing?'Voltar para o contrato':'Voltar para contratos'}/>
+  <div className="companies-heading contract-detail-heading"><div><h2 ref={titleRef} tabIndex={-1}>{editing?'Editar contrato':c.clientName}</h2><p>{c.typeName} · {c.companyName}{c.contractNumber?` · Nº ${c.contractNumber}`:''}</p></div>{!editing&&<div className="contract-detail-actions"><button type="button" className="btn" disabled={busy||tab==='loads'&&(loads.loading||!!loads.error||!loads.data)} title={tab==='loads'?'Exportar carregamentos com os filtros selecionados':tab==='financial'?'Exportar financeiro':'Exportar resumo do contrato'} onClick={exportCurrent}><FileDown size={15}/>Exportar</button><ModuleLink className="btn" href={contractHref(id)+'&editar=1'}><Pencil size={15}/>Editar</ModuleLink></div>}</div>
+  {saved&&<p className="company-saved" role="status"><Check size={16}/>Contrato salvo.</p>}
+  {editing?<ContractForm contract={c} onBusy={onBusy}/>:<Tabs value={tab} onValueChange={setTab} className="contract-detail-tabs"><TabsList variant="line" aria-label="Áreas do contrato"><TabsTrigger disabled={busy} value="summary">Resumo</TabsTrigger><TabsTrigger disabled={busy} value="financial">Financeiro</TabsTrigger><TabsTrigger disabled={busy} value="loads">Carregamentos</TabsTrigger></TabsList><TabsContent value="summary"><ContractSummaryTab key={c.id+':'+c.notes} contract={c} onBusy={onBusy}/></TabsContent><TabsContent value="financial"><ContractFinancialTab contract={c} onBusy={onBusy}/></TabsContent><TabsContent value="loads"><ContractLoadsTab contract={c} filters={loadFilters} onFilters={setLoadFilters} query={loads}/></TabsContent></Tabs>}
+  {reportOpen&&<ContractMonthlyReportDialog open onOpenChange={setReportOpen} contract={c}/>}
+  {tabReport&&<ContractTabReportDialog contract={tabReport.contract} model={tabReport.model} onClose={()=>setTabReport(null)}/>}
+ </section>;
+}
+

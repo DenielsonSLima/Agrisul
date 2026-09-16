@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+import {readFileSync,readdirSync,mkdirSync} from 'node:fs';
+import {createRequire} from 'node:module';
+import {DatabaseSync} from 'node:sqlite';
+const require=createRequire(import.meta.url);const {build}=require(require.resolve('esbuild',{paths:[require.resolve('vite')]}));
+mkdirSync('.sites-runtime/tests',{recursive:true});
+const plugins=[{name:'fixtures',setup(b){b.onResolve({filter:/^(cloudflare:workers|next\/headers|next\/navigation)$/},a=>({path:a.path,namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},a=>({contents:a.path==='cloudflare:workers'?'export const env=globalThis.clientsTestEnv;':a.path==='next/headers'?'export async function headers(){return globalThis.clientsHeaders;}':'export function redirect(){throw new Error("Unexpected redirect")}'}));}}];
+await build({entryPoints:['app/api/clients/route.ts'],outfile:'.sites-runtime/tests/clients.mjs',bundle:true,platform:'node',format:'esm',plugins});
+await build({entryPoints:['app/api/clients/lookup/route.ts'],outfile:'.sites-runtime/tests/clients-lookup.mjs',bundle:true,platform:'node',format:'esm',plugins});
+const sqlite=new DatabaseSync(':memory:');for(const f of readdirSync('drizzle').filter(f=>f.endsWith('.sql')).sort())sqlite.exec(readFileSync('drizzle/'+f,'utf8'));
+let failWrite=false;const DB={prepare(sql){return{bind(...args){return{async first(){return sqlite.prepare(sql).get(...args)||null;},async all(){return{results:sqlite.prepare(sql).all(...args)};},async run(){if(failWrite)throw new Error('db unavailable');return sqlite.prepare(sql).run(...args);}};}};}};
+globalThis.clientsTestEnv={DB};globalThis.clientsHeaders=new Headers();
+const api=await import('../.sites-runtime/tests/clients.mjs');const lookup=await import('../.sites-runtime/tests/clients-lookup.mjs');
+const signIn=user=>{globalThis.clientsHeaders=new Headers(user?{'oai-authenticated-user-id':user,'oai-authenticated-user-email':user+'@example.test'}:{});};
+const base={legalName:'Cliente parceiro',tradeName:'Parceiro',cnpj:'19131243000197',street:'Rua Um',number:'25',complement:'Sala 3',district:'Centro',city:'Japoatã',state:'SE',zipCode:'49950000',phone:'79999999999',email:'parceiro@example.test'};
+const get=id=>new Request('https://clients.test/api/clients'+(id?'?id='+id:''));
+const request=(method,data,origin='https://clients.test')=>new Request('https://clients.test/api/clients',{method,headers:{'Content-Type':'application/json',origin},body:JSON.stringify(data)});
+assert.equal((await api.GET(get())).status,401);assert.equal((await api.POST(request('POST',base))).status,401);assert.equal((await lookup.GET(new Request('https://clients.test/api/clients/lookup?cnpj='+base.cnpj))).status,401);
+signIn('owner-a');let response=await api.POST(request('POST',base));assert.equal(response.status,201);const {client}=await response.json();
+let stored=(await (await api.GET(get(client.id))).json()).client;for(const k of Object.keys(base))assert.equal(stored[k],base[k]);assert.equal((await (await api.GET(get())).json()).clients.length,1);assert.equal(sqlite.prepare('SELECT count(*) AS n FROM companies').get().n,0);
+sqlite.prepare('INSERT INTO companies(id,owner_id,name,cnpj,is_primary,created_at,updated_at) VALUES(?,?,?,?,?,?,?)').run('system-company','owner-a','Organização do sistema',base.cnpj,1,'now','now');
+assert.equal((await api.POST(request('POST',{...base,cnpj:'19.131.243/0001-97'}))).status,409);
+signIn('owner-b');assert.equal((await api.GET(get(client.id))).status,404);assert.equal((await api.PATCH(request('PATCH',{...base,id:client.id}))).status,404);assert.equal((await (await api.GET(get())).json()).clients.length,0);assert.equal((await api.POST(request('POST',base))).status,201);
+signIn('owner-a');response=await api.PATCH(request('PATCH',{...base,id:client.id,city:'Aracaju'}));assert.equal(response.status,200);assert.equal((await (await api.GET(get(client.id))).json()).client.city,'Aracaju');
+assert.equal((await api.POST(request('POST',{...base,cnpj:''}))).status,400);assert.equal((await api.POST(request('POST',{...base,email:'bad'}))).status,400);assert.equal((await api.POST(request('POST',base,'https://other.test'))).status,403);
+failWrite=true;assert.equal((await api.PATCH(request('PATCH',{...base,id:client.id,city:'Should not save'}))).status,503);assert.equal((await (await api.GET(get(client.id))).json()).client.city,'Aracaju');failWrite=false;
+const realFetch=globalThis.fetch;try{globalThis.fetch=async url=>{assert.equal(url,'https://brasilapi.com.br/api/cnpj/v1/'+base.cnpj);return Response.json({cnpj:base.cnpj,razao_social:base.legalName,nome_fantasia:base.tradeName,municipio:base.city,uf:base.state,email:null,ddd_telefone_1:base.phone});};response=await lookup.GET(new Request('https://clients.test/api/clients/lookup?cnpj=19.131.243/0001-97'));assert.equal(response.status,200);const data=await response.json();assert.equal(data.details.legalName,base.legalName);assert.equal(data.details.email,'');assert.equal(sqlite.prepare('SELECT count(*) AS n FROM clients').get().n,2);assert.equal(sqlite.prepare('SELECT count(*) AS n FROM companies').get().n,1);const company=sqlite.prepare('SELECT name,is_primary FROM companies WHERE id=?').get('system-company');assert.equal(company.name,'Organização do sistema');assert.equal(company.is_primary,1);}finally{globalThis.fetch=realFetch;}
+sqlite.close();console.log('Passed: client persistence, details/edit, ownership, duplicate CNPJ, validation, storage errors, lookup mapping and isolation from system companies.');

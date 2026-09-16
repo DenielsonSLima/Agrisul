@@ -1,0 +1,5 @@
+import {ArrowUpRight,ArrowLeft} from "lucide-react";
+import {ModuleLink,useModuleNavigation} from "@/shared/navigation/ModuleNavigation";
+import {configuracoesSections} from "../sections";
+export function ConfiguracoesPage(){const{searchParams}=useModuleNavigation();const selected=configuracoesSections.find(x=>x.id===searchParams.get("secao"));if(selected){const Page=selected.component;return <div className="config-workspace">{selected.id!=="empresas"&&<ModuleLink href="/configuracoes" className="config-back"><ArrowLeft size={15}/>Configurações</ModuleLink>}<Page/></div>}
+ return <div className="config-workspace"><div className="page-heading"><div><div className="eyebrow">ADMINISTRAÇÃO</div><h1>Configurações</h1><p>Organize seu sistema.</p></div></div><div className="config-card-grid">{configuracoesSections.map(section=><ModuleLink href={"/configuracoes?secao="+section.id} className="config-section-card" key={section.id}><span className="config-section-icon"><section.icon size={20} strokeWidth={1.7}/></span><ArrowUpRight size={16} className="config-card-arrow"/><h2>{section.title}</h2><p>{section.description}</p></ModuleLink>)}</div></div>}

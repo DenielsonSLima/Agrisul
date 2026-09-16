@@ -1,0 +1,78 @@
+import assert from 'node:assert/strict';
+import {mkdirSync,writeFileSync,readdirSync,statSync} from 'node:fs';
+import {resolve} from 'node:path';
+
+export async function verifyAgendaBrowser({session,otherSession,projectRef,onRemoteLoad,baseUrl='http://localhost:5173',cdpUrl='http://localhost:9224'}) {
+ const output=resolve('.sites-runtime/agenda-validation');mkdirSync(output,{recursive:true});
+ const tab=await (await fetch(`${cdpUrl}/json/new?about:blank`,{method:'PUT'})).json();
+ const socket=new WebSocket(tab.webSocketDebuggerUrl),pending=new Map(),errors=[];let seq=0;
+ await new Promise((resolve,reject)=>{socket.addEventListener('open',resolve,{once:true});socket.addEventListener('error',reject,{once:true});});
+ socket.addEventListener('message',event=>{const message=JSON.parse(event.data);if(message.method==='Runtime.exceptionThrown')errors.push(message.params.exceptionDetails.exception?.description??message.params.exceptionDetails.text);if(message.id&&pending.has(message.id)){const job=pending.get(message.id);pending.delete(message.id);clearTimeout(job.timer);if(message.error)job.reject(Error(message.error.message));else job.resolve(message.result);}});
+ const send=(method,params={})=>new Promise((resolve,reject)=>{const id=++seq,timer=setTimeout(()=>{pending.delete(id);reject(Error('CDP timeout: '+method));},20000);pending.set(id,{resolve,reject,timer});socket.send(JSON.stringify({id,method,params}));});
+ const evaluate=async expression=>{const r=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description??r.exceptionDetails.text);return r.result.value;};
+ const waitFor=async(expression,label)=>{const end=Date.now()+35000;while(Date.now()<end){if(await evaluate(`!!document.body && !!(${expression})`))return;await new Promise(resolve=>setTimeout(resolve,200));}throw Error('Browser did not reach '+label+': '+await evaluate('document.body.innerText.slice(-1800)'));};
+ const click=label=>evaluate(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===${JSON.stringify(label)}&&!b.disabled);if(!b)throw Error('Button missing: '+${JSON.stringify(label)});b.click();})()`);
+ const capture=async name=>{const result=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});writeFileSync(resolve(output,name+'.png'),Buffer.from(result.data,'base64'));};
+ const go=async path=>{await send('Page.navigate',{url:baseUrl+path});};
+ const seedSession=async value=>send('Page.addScriptToEvaluateOnNewDocument',{source:`if(location.origin===${JSON.stringify(new URL(baseUrl).origin)})localStorage.setItem(${JSON.stringify(`sb-${projectRef}-auth-token`)},${JSON.stringify(JSON.stringify(value))});`});
+ try {
+  await send('Page.enable');await send('Runtime.enable');
+  await send('Emulation.setDeviceMetricsOverride',{width:1700,height:1100,deviceScaleFactor:1,mobile:false});
+  await seedSession(session);await go('/agenda?dia=2026-09-10');
+  await waitFor("document.querySelectorAll('.agenda-day').length===30",'30 days of September');
+  assert.equal(await evaluate("document.querySelector('.agenda-day').querySelector('.agenda-day-number').textContent"),'1');
+  assert.equal(await evaluate("[...document.querySelectorAll('.agenda-day')].at(-1).querySelector('.agenda-day-number').textContent"),'30');
+  assert.equal(await evaluate("(()=>{const a=document.querySelector('.agenda-calendar').getBoundingClientRect();const b=document.querySelector('.agenda-legend-panel').getBoundingClientRect();return b.left>=a.right&&Math.abs(a.top-b.top)<3;})()"),true,'Legend must be next to the calendar');
+  assert.equal(await evaluate("document.querySelector('.agenda-day.selected').innerText.includes('1 carregamento')&&document.querySelector('.agenda-day.selected').innerText.includes('10,00 t')"),true,'A daily summary must appear directly inside the date cell');
+  assert.equal(await evaluate("[...document.querySelectorAll('.main-nav a')].some(a=>/Acompanhamento/.test(a.textContent))"),false);
+  assert.equal(await evaluate("[...document.querySelectorAll('.main-nav a')].some(a=>a.textContent.includes('Planejamento')&&a.getAttribute('href')==='/planejamento')"),true);
+  await capture('agenda-desktop');
+  await click('Carregamento');await waitFor("document.querySelectorAll('.agenda-day').length===30&&document.querySelector('.agenda-legend [aria-pressed=true]')?.innerText==='Carregamento'",'legend filter');
+  assert.equal(await evaluate("document.querySelector('.agenda-grid').innerText.includes('recebimento')"),false);
+  await click('Exportar PDF');await waitFor("document.querySelector('.agenda-pdf-preview')",'agenda export modal');
+  assert.equal(await evaluate("document.querySelector('.pdf-export-actions').textContent.includes('A4 · Retrato · 1 página(s)')"),true,'The calendar and one filtered load must fit on the same portrait sheet');
+  assert.equal(await evaluate("document.querySelector('[role=dialog]').innerText.includes('Carregamento')&&document.querySelector('[role=dialog]').innerText.includes('setembro de 2026')"),true,'Modal must show the captured month and filter');
+  await capture('agenda-export-modal');
+  await send('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:output});
+  const agendaFile=resolve(output,'agenda-2026-09-load.pdf');
+  const priorAgenda=readdirSync(output).includes('agenda-2026-09-load.pdf')?statSync(agendaFile).mtimeMs:0;
+  await click('Baixar PDF');
+  const agendaDownloaded=()=>readdirSync(output).includes('agenda-2026-09-load.pdf')&&statSync(agendaFile).mtimeMs>priorAgenda;
+  const agendaDeadline=Date.now()+15000;while(!agendaDownloaded()&&Date.now()<agendaDeadline)await new Promise(resolve=>setTimeout(resolve,200));
+  assert.ok(agendaDownloaded(),'Filtered agenda PDF must finish downloading');
+  await evaluate('window.__agendaOriginalOpen=window.open;window.open=()=>null');await click('Imprimir');
+  await waitFor("document.body.innerText.includes('Permita pop-ups para imprimir o relatório.')",'blocked print feedback');
+  await evaluate('window.open=window.__agendaOriginalOpen;delete window.__agendaOriginalOpen');
+  await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+  await waitFor("!document.querySelector('[role=dialog]')",'closed agenda export modal');
+  await click('Todos os eventos');await waitFor("document.querySelector('.agenda-grid')?.innerText.includes('recebimento')",'all events');
+  if(onRemoteLoad){await onRemoteLoad();await waitFor("document.querySelector('.agenda-day.selected')?.innerText.includes('2 carregamentos')&&document.querySelector('.agenda-day.selected')?.innerText.includes('15,00 t')",'independent Realtime daily summary');}
+  await evaluate("document.querySelector('.agenda-detail a[href*=loads]').click()");
+  await waitFor("document.querySelector('[role=tab][data-state=active]')?.textContent==='Carregamentos'",'event links to contract loads tab');
+  await go('/resumo');await waitFor("document.querySelector('.summary-highlight-volume')?.innerText.includes('15,00')",'monthly summary');await capture('resumo-desktop');
+  await evaluate("document.querySelector('a[href*=\"tipo=financial\"]').click()");
+  await waitFor("document.querySelector('.reports-table')?.textContent.includes('AG-LIVE')",'financial report');await capture('relatorios-desktop');
+  await click('Exportar PDF');await waitFor("document.querySelector('.reports-pdf-preview')",'report preview');
+  assert.equal(await evaluate("document.querySelector('.pdf-export-actions').textContent.includes('A4 · Paisagem')"),true,'Other reports must keep their landscape format');
+  await send('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:output});
+  const before=new Map(readdirSync(output).filter(name=>name.endsWith('.pdf')).map(name=>[name,statSync(resolve(output,name)).mtimeMs]));
+  await click('Baixar PDF');await waitFor("document.body.innerText.includes('O relatório foi baixado em PDF.')",'PDF saved');
+  const downloaded=()=>readdirSync(output).some(name=>name.endsWith('.pdf')&&statSync(resolve(output,name)).mtimeMs>(before.get(name)??0));
+  const downloadDeadline=Date.now()+15000;
+  while(!downloaded()&&Date.now()<downloadDeadline)await new Promise(resolve=>setTimeout(resolve,200));
+  assert.ok(downloaded(),'PDF download must finish');
+  await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+  await go('/agenda?dia=2026-02-01');await waitFor("document.querySelectorAll('.agenda-day').length===28",'28 days in February');
+  await go('/agenda?dia=2028-02-01');await waitFor("document.querySelectorAll('.agenda-day').length===29",'29 days in leap February');
+  await go('/agenda?dia=2026-12-01');await waitFor("document.querySelectorAll('.agenda-day').length===31",'31 days in December');
+  await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+  await go('/agenda?dia=2026-09-10');await waitFor("document.querySelectorAll('.agenda-day').length===30",'mobile calendar');
+  assert.equal(await evaluate('document.documentElement.scrollWidth<=window.innerWidth+1'),true,'Mobile page cannot overflow');await capture('agenda-mobile');
+  await go('/relatorios?tipo=loads&mes=2026-09');await waitFor("document.querySelector('.reports-table')",'mobile report');
+  assert.equal(await evaluate('document.documentElement.scrollWidth<=window.innerWidth+1'),true);await capture('relatorios-mobile');
+  await seedSession(otherSession);await go('/agenda');await waitFor("document.body.innerText.includes('Cadastre sua empresa para começar')",'new account clears previous data');
+  assert.equal(await evaluate("document.body.innerText.includes('Cliente Teste Agenda')||!!document.querySelector('[role=dialog]')"),false);
+  assert.deepEqual(errors,[]);
+  console.log('PASS: browser month-only calendar, daily summaries, side legend, filtering, contract links, realtime, summary, report/PDF, 28/29/30/31 days, mobile and account change.');
+ } finally {socket.close();await fetch(`${cdpUrl}/json/close/${tab.id}`);}
+}

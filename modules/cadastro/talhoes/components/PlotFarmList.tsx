@@ -1,0 +1,9 @@
+import Link from 'next/link';
+import {Loader2,Tractor,RefreshCw} from 'lucide-react';
+import {ModuleLink,useModuleNavigation} from '@/shared/navigation/ModuleNavigation';
+import {useFarms} from '@/modules/cadastro/fazenda/hooks/useFarms';
+import {FarmCard} from '@/modules/cadastro/fazenda/components/FarmCard';
+import {PlotBreadcrumb,plotsHref} from './PlotBreadcrumb';
+export function PlotFarmList(){const m=useFarms();const {navigate}=useModuleNavigation();return <section><PlotBreadcrumb/><div className="companies-heading"><div><h2>Talhões</h2><p>Selecione uma fazenda para organizar suas áreas.</p></div></div>
+  {m.loading?<div className="client-loading" role="status"><Loader2 size={20} className="animate-spin"/>Carregando fazendas…</div>:m.authRequired?<div className="company-empty"><h3>Acesse suas fazendas e talhões</h3><p>Entre para consultar os cadastros da sua conta.</p><Link className="btn company-primary" href="/login?returnTo=%2Fcadastro%3Fsecao%3Dfazenda" target="_top">Entrar</Link></div>:m.error?<div className="company-empty" role="alert"><h3>Não foi possível carregar</h3><p>{m.error}</p><button className="btn" onClick={m.reload}><RefreshCw size={16}/>Tentar novamente</button></div>:!m.farms.length?<div className="company-empty"><span className="company-empty-icon"><Tractor size={25}/></span><h3>Cadastre uma fazenda primeiro</h3><p>Os talhões serão vinculados às fazendas cadastradas.</p><ModuleLink href="/cadastro?secao=fazenda" className="btn company-primary">Ir para Fazendas</ModuleLink></div>:<><p className="farm-count">{m.farms.length} fazenda{m.farms.length!==1?'s':''}</p><div className="farm-grid">{m.farms.map(farm=><FarmCard key={farm.id} farm={farm} onOpen={()=>navigate(plotsHref+'&fazenda='+encodeURIComponent(farm.id))} onEdit={()=>navigate('/cadastro?secao=fazenda')}/>)}</div></>}
+</section>;}

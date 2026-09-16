@@ -1,0 +1,1 @@
+import {Customer} from "@/shared/types";import {normalize} from "@/shared/utils/format";export const filterCustomers=(items:Customer[],q:string,type:string)=>items.filter(x=>(type==="Todos"||x.type===type)&&normalize(x.name+" "+x.email).includes(normalize(q)));

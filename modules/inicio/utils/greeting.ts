@@ -1,0 +1,1 @@
+export const workspaceDate="Segunda-feira, 14 de setembro de 2026";

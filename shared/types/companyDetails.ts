@@ -1,0 +1,1 @@
+export type CompanyDetails={cnpj:string;legalName:string;tradeName:string;street:string;number:string;complement:string;district:string;city:string;state:string;zipCode:string;phone:string;email:string};
