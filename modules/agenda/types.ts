@@ -1,4 +1,4 @@
-export type AgendaKind = 'contract' | 'start' | 'end' | 'load' | 'receipt' | 'advance';
+export type AgendaKind = 'contract' | 'start' | 'end' | 'load' | 'receipt' | 'advance' | 'refund';
 export type AgendaEvent = {
   id: string; date: string; kind: AgendaKind; title: string; detail: string;
   contractId: string; contractNumber: string; amount: string; volume: string; status: string;
@@ -14,4 +14,5 @@ export const agendaKinds: {id: AgendaKind; label: string}[] = [
   {id: 'contract', label: 'Contrato cadastrado'}, {id: 'start', label: 'Início de contrato'},
   {id: 'end', label: 'Término previsto'}, {id: 'load', label: 'Carregamento'},
   {id: 'receipt', label: 'Recebimento'}, {id: 'advance', label: 'Adiantamento'},
+  {id: 'refund', label: 'Estorno'},
 ];

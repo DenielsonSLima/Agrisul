@@ -26,6 +26,7 @@ async function withImageUrls(value:Partial<WatermarkSettings>,signal?:AbortSigna
  if(signal?.aborted)throw new DOMException('Consulta cancelada','AbortError');
  if(error)throw new Error('Não foi possível carregar as imagens da marca d’água. Tente novamente.');
  const urls=new Map((data??[]).filter(item=>!item.error&&item.signedUrl).map(item=>[item.path,item.signedUrl]));
+ if(paths.some(path=>!urls.get(path)))throw new Error('Não foi possível carregar as imagens da marca d’água. Tente novamente.');
  return {...settings,portraitImageUrl:settings.portraitImageKey?urls.get(settings.portraitImageKey)??null:null,landscapeImageUrl:settings.landscapeImageKey?urls.get(settings.landscapeImageKey)??null:null};
 }
 export async function fetchWatermark(signal?:AbortSignal){

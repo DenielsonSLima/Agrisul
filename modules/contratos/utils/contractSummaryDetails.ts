@@ -3,20 +3,21 @@ import {contractMonthlyPresentation} from './contractMonthlyPresentation';
 import {formatDiscountRate} from './contractDiscountPresentation';
 import {contractPeriod,formatAtr,formatAtrCriterion,formatAtrQuote,formatContractBilling,formatContractDate,formatContractMonth,formatContractVolume} from './contractFormat';
 
-export const summaryReceivedNote='O total recebido inclui adiantamentos e recebimentos. Os saldos mensais consideram o mês de referência de cada lançamento; o saldo geral é o do contrato inteiro.';
+export const summaryReceivedNote='O total recebido considera adiantamentos e recebimentos, menos os estornos. Os saldos mensais usam o mês de referência de cada lançamento; o saldo geral é o do contrato inteiro.';
 export const summaryPendingNote='Há entregas sem ATR medido ou cotação. Faturamento, líquido, saldo a receber e crédito aguardam o cálculo completo. Os valores recebidos continuam disponíveis.';
 export const summaryUnavailableNote='Os dados financeiros não estão disponíveis neste resumo. Atualize o contrato para consultar recebimentos, descontos e saldos.';
 
 // Presentation only: amounts, aggregates and balances are supplied by the RPC.
 export function summaryFinancialItems(finance?:ContractFinancialMetrics){
- const amount=(key:keyof ContractFinancialMetrics,pending=false)=>finance?formatContractBilling(String(finance[key]),pending&&finance.billingPending):'—';
+ const amount=(key:keyof ContractFinancialMetrics,pending=false)=>finance?formatContractBilling(String(finance[key]??''),pending&&finance.billingPending):'—';
  return [
   {key:'gross',label:'Faturado bruto',value:amount('grossAmount',true),hint:'Valor das entregas, antes dos descontos'},
   {key:'discount',label:'Descontos',value:amount('discountAmount'),hint:'Acordos aplicados às entregas'},
   {key:'net',label:'Valor líquido',value:amount('netAmount',true),hint:'Faturamento após descontos'},
   {key:'advance',label:'Adiantamentos',value:amount('advanceAmount'),hint:'Antecipações já recebidas'},
   {key:'receipt',label:'Recebimentos',value:amount('receiptAmount'),hint:'Pagamentos além dos adiantamentos'},
-  {key:'received',label:'Total recebido',value:amount('receivedAmount'),hint:'Adiantamentos + recebimentos'},
+  {key:'refund',label:'Estornos',value:amount('refundedAmount'),hint:'Adiantamento excedente devolvido'},
+  {key:'received',label:'Total recebido',value:amount('receivedAmount'),hint:'Entradas menos estornos'},
   {key:'pending',label:'Saldo a receber',value:amount('pendingAmount',true),hint:'Saldo geral após as entradas'},
   {key:'credit',label:'Crédito do contrato',value:amount('creditAmount',true),hint:'Recebido além do valor líquido'},
  ] as const;
@@ -31,7 +32,7 @@ export function contractSummaryDetails(contract:BillingContract){
  const finances=new Map(financial?.months.map(item=>[item.month,item]));
  // Use the financial calendar, including months with payments or agreed discounts.
  // The RPC also includes the current month; an entirely empty contract stays empty.
- const hasRecords=!!(production.size||financial?.payments.length||financial?.discounts.length);
+ const hasRecords=!!(production.size||financial?.payments.length||financial?.refunds?.length||financial?.discounts.length);
  const months=hasRecords?[...new Set([...production.keys(),...finances.keys()])].sort():[];
  const rows=months.map(month=>({month,production:production.get(month),finance:finances.get(month)}));
  const finance=presentation.totals.finance;
@@ -48,13 +49,14 @@ export function contractSummaryDetails(contract:BillingContract){
  };
  const balanceTable:SummaryTable={
   title:'Entradas e saldos por mês',description:summaryReceivedNote,
-  columns:['Mês','Adiantamentos','Recebimentos','Total recebido','Saldo a receber','Crédito'],widths:[.10,.18,.18,.18,.18,.18],
-  rows:rows.map(entry=>[formatContractMonth(entry.month),monthlyMoney(entry,'advanceAmount'),monthlyMoney(entry,'receiptAmount'),monthlyMoney(entry,'receivedAmount'),monthlyMoney(entry,'pendingAmount',true),monthlyMoney(entry,'creditAmount',true)]),empty:'Nenhuma movimentação lançada.',
+  columns:['Mês','Adiantamentos','Recebimentos','Estornos','Total recebido','Saldo a receber','Crédito'],widths:[.10,.15,.15,.15,.15,.15,.15],
+  rows:rows.map(entry=>[formatContractMonth(entry.month),monthlyMoney(entry,'advanceAmount'),monthlyMoney(entry,'receiptAmount'),monthlyMoney(entry,'refundedAmount'),monthlyMoney(entry,'receivedAmount'),monthlyMoney(entry,'pendingAmount',true),monthlyMoney(entry,'creditAmount',true)]),empty:'Nenhuma movimentação lançada.',
  };
+ const financialEntries=[...(financial?.payments??[]).map(entry=>({date:entry.receivedAt,referenceMonth:entry.referenceMonth,type:entry.kind==='advance'?'Adiantamento':'Recebimento',amount:entry.amount,document:entry.document,notes:entry.notes})),...(financial?.refunds??[]).map(entry=>({date:entry.refundedAt,referenceMonth:entry.referenceMonth,type:'Estorno',amount:entry.amount,document:entry.document,notes:entry.notes}))].sort((a,b)=>b.date.localeCompare(a.date));
  const payments:SummaryTable={
-  title:'Histórico de adiantamentos e recebimentos',description:'Data de entrada, referência no contrato e comprovantes dos valores recebidos.',
-  columns:['Recebido em','Referência','Tipo','Valor','Documento / observações'],widths:[.14,.13,.17,.20,.36],
-  rows:(financial?.payments??[]).map(entry=>[formatContractDate(entry.receivedAt),formatContractMonth(entry.referenceMonth),entry.kind==='advance'?'Adiantamento':'Recebimento',formatContractBilling(entry.amount),[entry.document,entry.notes].filter(Boolean).join('\n')||'—']),empty:financial?'Nenhum adiantamento ou recebimento lançado.':'Histórico financeiro indisponível.',
+  title:'Histórico de entradas e estornos',description:'Datas, referências no contrato e comprovantes dos valores recebidos ou devolvidos.',
+  columns:['Data','Referência','Tipo','Valor','Documento / observações'],widths:[.14,.13,.17,.20,.36],
+  rows:financialEntries.map(entry=>[formatContractDate(entry.date),formatContractMonth(entry.referenceMonth),entry.type,formatContractBilling(entry.amount),[entry.document,entry.notes].filter(Boolean).join('\n')||'—']),empty:financial?'Nenhum adiantamento, recebimento ou estorno lançado.':'Histórico financeiro indisponível.',
  };
  const discounts:SummaryTable={
   title:'Acordos de desconto',description:'Valores por tonelada e meses aos quais cada acordo se aplica.',

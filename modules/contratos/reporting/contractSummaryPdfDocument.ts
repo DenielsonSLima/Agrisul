@@ -22,7 +22,7 @@ async function loadImage(url:string|null):Promise<ReportPdfImage|null>{
 
 // Arithmetic measures page and chart geometry. Financial results come from the RPC.
 export async function createContractSummaryDocument(contract:BillingContract,brand:ContractMonthlyReportBrand){
- const {jsPDF}=await import('jspdf');
+ const {jsPDF}=await import('@/shared/reporting/jsPdfRuntime');
  const doc=new jsPDF({orientation:brand.orientation,unit:'mm',format:'a4',compress:true});
  const summary=contractSummaryDetails(contract),margin=REPORT_MARGIN_MM;
  const width=doc.internal.pageSize.getWidth(),height=doc.internal.pageSize.getHeight(),content=width-margin*2,bottom=height-margin-10;
@@ -128,7 +128,7 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
   y+=heroHeight+6;
  };
  const financialOverview=()=>{
-  const items=summary.financialItems.filter(item=>item.key!=='received'&&item.key!=='pending'&&item.key!=='credit'),gap=2.2,padding=4,cardWidth=(content-padding*2-gap*4)/5;
+  const items=summary.financialItems.filter(item=>item.key!=='received'&&item.key!=='pending'&&item.key!=='credit'),gap=2.2,padding=4,cardWidth=(content-padding*2-gap*(items.length-1))/items.length;
   const cards=items.map(item=>{const label=lines(item.label,7,cardWidth-5),hint=lines(item.hint,5.9,cardWidth-5),size=fitValue(item.value,cardWidth-5,10.2),value=lines(item.value,size,cardWidth-5,true);return {item,label,hint,size,value};});
   const cardHeight=Math.max(...cards.map(card=>8+card.label.length*3.1+card.value.length*card.size*.4+card.hint.length*2.6));
   const note=lines(summaryReceivedNote,6.5,content-padding*2),notice=summary.notice?lines(summary.notice,6.5,content-padding*2-6):[];

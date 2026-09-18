@@ -11,7 +11,7 @@ export function contractMonthlyPresentation(contract:BillingContract){
  const loads=new Map(production?.months.map(item=>[item.month,item]));
  const finances=new Map(financial?.months.map(item=>[item.month,item]));
  // Include payment-only months, without adding empty months from scheduled discounts.
- const months=[...new Set([...loads.keys(),...(financial?.payments.map(item=>item.referenceMonth)??[])])].sort();
+ const months=[...new Set([...loads.keys(),...(financial?.payments.map(item=>item.referenceMonth)??[]),...(financial?.refunds?.map(item=>item.referenceMonth)??[])])].sort();
  const rows:ContractSummaryMonth[]=months.map(month=>{
   const load=loads.get(month),finance=finances.get(month);
   return {
@@ -37,7 +37,7 @@ export function contractMonthlyFinanceItems(finance?:ContractFinancialMetrics){
  return [
   {key:'discount',label:'Descontos',value:finance?formatContractBilling(finance.discountAmount):'—',hint:'Acordos por tonelada',pending:false},
   {key:'net',label:'Líquido',value:finance?formatContractBilling(finance.netAmount,finance.billingPending):'—',hint:'Após os descontos',pending:!!finance?.billingPending},
-  {key:'received',label:'Recebido',value:finance?formatContractBilling(finance.receivedAmount):'—',hint:'Inclui adiantamentos',pending:false},
+  {key:'received',label:'Recebido',value:finance?formatContractBilling(finance.receivedAmount):'—',hint:'Entradas menos estornos',pending:false},
   {key:'pending',label:'Pendente',value:finance?formatContractBilling(finance.pendingAmount,finance.billingPending):'—',hint:'Saldo a receber',pending:!!finance?.billingPending},
  ] as const;
 }

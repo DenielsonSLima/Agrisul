@@ -33,7 +33,7 @@ const emitted=(date:Date)=>new Intl.DateTimeFormat('pt-BR',{dateStyle:'short',ti
 const safeFileName=(date:Date)=>`resumo-fazendas-${date.toISOString().slice(0,10)}.pdf`;
 
 export async function createFarmSummaryPdf(farms:FarmSummary[],summary:FarmPortfolioSummary,brand:FarmReportBrand){
- const {jsPDF}=await import('jspdf');
+ const {jsPDF}=await import('@/shared/reporting/jsPdfRuntime');
  const doc=new jsPDF({orientation:brand.orientation,unit:'mm',format:'a4',compress:true});
  const pageWidth=doc.internal.pageSize.getWidth(),pageHeight=doc.internal.pageSize.getHeight();
  const margin=REPORT_MARGIN_MM,contentWidth=pageWidth-margin*2;

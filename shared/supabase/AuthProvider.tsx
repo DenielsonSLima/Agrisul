@@ -1,91 +1,103 @@
 'use client';
-import {Fragment, createContext, useContext, useEffect, useRef, useState, type FormEvent, type ReactNode} from 'react';
-import type {Session, User} from '@supabase/supabase-js';
+import {createContext,useCallback,useContext,useEffect,useRef,useState,type ReactNode} from 'react';
+import type {Session,User} from '@supabase/supabase-js';
 import {useQueryClient} from '@tanstack/react-query';
-import {ReceiptText} from 'lucide-react';
+import {AlertTriangle,Clock3,LogOut,RefreshCw} from 'lucide-react';
 import {getSupabaseBrowserClient,getSupabaseConfig} from './client';
+import {AuthExperience} from './AuthExperience';
 import {Button} from '@/components/ui/button';
-import {Input} from '@/components/ui/input';
-import {Label} from '@/components/ui/label';
 
-type AuthState = {user: User|null; session: Session|null; ready: boolean; error: string; signOut: () => Promise<void>};
-const AuthContext = createContext<AuthState|null>(null);
-export function useAuth() {const value=useContext(AuthContext);if(!value)throw new Error('AuthProvider necessário.');return value;}
-export function AuthProvider({children}: {children: ReactNode}) {
-  const queryClient=useQueryClient();
-  const [session,setSession]=useState<Session|null>(null);
-  const [error]=useState(()=>{try{getSupabaseConfig();return '';}catch(e){return (e as Error).message;}});
-  const [ready,setReady]=useState(!!error);
-  const identity=useRef<string|null>(null);
-  useEffect(()=>{
-    let active=true;
-    if(error)return;
-    const client=getSupabaseBrowserClient();
-    const update=(next:Session|null)=>{
-      if(!active)return;
-      if(identity.current!== (next?.user.id??null)) {
-        void queryClient.cancelQueries();
-        queryClient.clear();
-        identity.current=next?.user.id??null;
-      }
-      setSession(next);setReady(true);
-    };
-    const {data:{subscription}}=client.auth.onAuthStateChange((_event,next)=>update(next));
-    client.auth.getSession().then(({data,error})=>{
-      if(!active)return;
-      if(error){update(null);return;}
-      update(data.session);
-    }).catch(()=>{if(active)update(null);});
-    return()=>{active=false;subscription.unsubscribe();};
-  },[queryClient,error]);
-  async function signOut(){
-    const {error}=await getSupabaseBrowserClient().auth.signOut();
-    if(error)throw error;
-    await queryClient.cancelQueries();queryClient.clear();
-    setSession(null);identity.current=null;
-  }
-  return <AuthContext.Provider value={{session,user:session?.user??null,ready,error,signOut}}>{children}</AuthContext.Provider>;
+export type WorkspaceAccess='checking'|'ready'|'invite'|'disabled'|'removed'|'invalid'|'error';
+type AuthState={user:User|null;session:Session|null;ready:boolean;error:string;access:WorkspaceAccess;signOut:()=>Promise<void>;refreshAccess:()=>Promise<WorkspaceAccess>};
+const AuthContext=createContext<AuthState|null>(null);
+const IDLE_MS=30*60*1000;
+const ACTIVITY_WRITE_MS=15000;
+
+export function useAuth(){const value=useContext(AuthContext);if(!value)throw new Error('AuthProvider necessário.');return value;}
+
+export function AuthProvider({children}:{children:ReactNode}){
+ const queryClient=useQueryClient();
+ const [session,setSession]=useState<Session|null>(null);
+ const [access,setAccess]=useState<WorkspaceAccess>('checking');
+ const [error]=useState(()=>{try{getSupabaseConfig();return '';}catch(caught){return(caught as Error).message;}});
+ const [ready,setReady]=useState(!!error);
+ const identity=useRef<string|null>(null);
+ const mounted=useRef(true);
+
+ const refreshAccess=useCallback(async():Promise<WorkspaceAccess>=>{
+  const client=getSupabaseBrowserClient();
+  const {data:{session:current}}=await client.auth.getSession();
+  if(!current){if(mounted.current)setAccess('ready');return'ready';}
+  if(mounted.current)setAccess('checking');
+  const {data,error:rpcError}=await client.rpc('billing_rpc',{p_resource:'onboarding',p_action:'inspect',p_payload:{}});
+  const status=rpcError?'error':(['ready','invite','disabled','removed','invalid'].includes(data?.status)?data.status:'error') as WorkspaceAccess;
+  if(mounted.current&&identity.current===current.user.id)setAccess(status);
+  return status;
+ },[]);
+
+ useEffect(()=>{
+  mounted.current=true;let active=true;
+  if(error)return()=>{mounted.current=false;};
+  const client=getSupabaseBrowserClient();
+  const update=(next:Session|null)=>{
+   if(!active)return;
+   const nextId=next?.user.id??null;
+   if(identity.current!==nextId){void queryClient.cancelQueries();queryClient.clear();identity.current=nextId;}
+   setSession(next);setReady(true);
+   if(next){setAccess('checking');setTimeout(()=>{if(active)void refreshAccess();},0);}else setAccess('ready');
+  };
+  const {data:{subscription}}=client.auth.onAuthStateChange((_event,next)=>update(next));
+  client.auth.getSession().then(({data,error:sessionError})=>{if(active)update(sessionError?null:data.session);}).catch(()=>{if(active)update(null);});
+  return()=>{active=false;mounted.current=false;subscription.unsubscribe();};
+ },[queryClient,error,refreshAccess]);
+
+ const signOut=useCallback(async()=>{
+  const currentId=identity.current;
+  const {error:signOutError}=await getSupabaseBrowserClient().auth.signOut({scope:'local'});
+  await queryClient.cancelQueries();queryClient.clear();setSession(null);setAccess('ready');identity.current=null;
+  if(currentId){try{localStorage.removeItem(`billing:last-activity:${currentId}`);}catch{}}
+  if(signOutError)throw signOutError;
+ },[queryClient]);
+
+ useEffect(()=>{
+  const userId=session?.user.id;if(!userId)return;
+  const key=`billing:last-activity:${userId}`;const logoutKey='billing:idle-logout';let lastWrite=0;let ending=false;
+  const read=()=>{try{return Number(localStorage.getItem(key))||0;}catch{return 0;}};
+  const write=(force=false)=>{const now=Date.now();if(!force&&now-lastWrite<ACTIVITY_WRITE_MS)return;lastWrite=now;try{localStorage.setItem(key,String(now));}catch{}};
+  if(!read())write(true);
+  const endIdleSession=()=>{if(ending)return;ending=true;try{sessionStorage.setItem('billing:session-notice','idle');}catch{}void signOut().catch(()=>{});};
+  const check=()=>{const last=read()||lastWrite;if(!ending&&Date.now()-last>=IDLE_MS){try{localStorage.setItem(logoutKey,JSON.stringify({userId,at:Date.now()}));}catch{}endIdleSession();}};
+  const activity=()=>write();
+  const visible=()=>{if(document.visibilityState==='visible'){check();if(!ending)write();}};
+  const storage=(event:StorageEvent)=>{if(event.key!==logoutKey||!event.newValue)return;try{if((JSON.parse(event.newValue) as {userId?:string}).userId===userId)endIdleSession();}catch{}};
+  window.addEventListener('pointerdown',activity,{passive:true});window.addEventListener('pointermove',activity,{passive:true});window.addEventListener('keydown',activity);window.addEventListener('touchstart',activity,{passive:true});window.addEventListener('focus',check);window.addEventListener('storage',storage);document.addEventListener('visibilitychange',visible);
+  const timer=window.setInterval(check,15000);check();
+  return()=>{window.clearInterval(timer);window.removeEventListener('pointerdown',activity);window.removeEventListener('pointermove',activity);window.removeEventListener('keydown',activity);window.removeEventListener('touchstart',activity);window.removeEventListener('focus',check);window.removeEventListener('storage',storage);document.removeEventListener('visibilitychange',visible);};
+ },[session?.user.id,signOut]);
+
+ return <AuthContext.Provider value={{session,user:session?.user??null,ready,error,access,signOut,refreshAccess}}>{children}</AuthContext.Provider>;
 }
-function authMessage(message:string) {
-  if(/invalid login credentials/i.test(message))return 'E-mail ou senha incorretos.';
-  if(/email not confirmed/i.test(message))return 'Confirme seu e-mail antes de entrar.';
-  if(/already registered/i.test(message))return 'Este e-mail já está cadastrado. Use Entrar.';
-  if(/rate limit/i.test(message))return 'Aguarde alguns minutos antes de tentar novamente.';
-  return 'Não foi possível concluir. Confira os dados e tente novamente.';
+
+function AccessBlocked({kind}:{kind:'disabled'|'removed'|'invalid'}){
+ const {signOut}=useAuth();const [pending,setPending]=useState(false);
+ const content=kind==='disabled'?{title:'Seu acesso está inativo',text:'Um responsável pelo espaço desativou este acesso. Entre em contato com a administração para solicitar a reativação.'}:kind==='removed'?{title:'Acesso excluído',text:'Seu acesso a este espaço foi removido permanentemente. Os registros históricos foram preservados.'}:{title:'Convite indisponível',text:'Este convite foi cancelado, expirou ou já não pode ser utilizado. Solicite um novo convite à administração.'};
+ return <main className="auth-screen"><section className="auth-blocked"><span><AlertTriangle/></span><p className="auth-kicker">Controle de Faturamento</p><h1>{content.title}</h1><p>{content.text}</p><Button disabled={pending} onClick={()=>{setPending(true);void signOut().catch(()=>setPending(false));}}><LogOut/>{pending?'Saindo…':'Voltar ao login'}</Button></section></main>;
 }
-export function AuthGate({children}:{children:ReactNode}) {
-  const {user,ready,error:configurationError}=useAuth();
-  const [mode,setMode]=useState<'login'|'signup'>('login');
-  const [email,setEmail]=useState('');const [password,setPassword]=useState('');
-  const [name,setName]=useState('');const [pending,setPending]=useState(false);
-  const [error,setError]=useState('');const [notice,setNotice]=useState('');
-  async function submit(event:FormEvent){
-    event.preventDefault();setPending(true);setError('');setNotice('');
-    try{
-      const auth=getSupabaseBrowserClient().auth;
-      const result=mode==='login'
-        ? await auth.signInWithPassword({email:email.trim(),password})
-        : await auth.signUp({email:email.trim(),password,options:{data:{display_name:name.trim()},emailRedirectTo:window.location.origin+'/login'}});
-      if(result.error){setError(authMessage(result.error.message));return;}
-      if(mode==='signup'&&!result.data.session)setNotice('Conta criada. Confira seu e-mail para confirmar o cadastro e entrar.');
-      setPassword('');
-    }catch{setError('Não foi possível conectar. Verifique sua internet e tente novamente.');}
-    finally{setPending(false);}
-  }
-  if(!ready)return <div className="auth-screen" role="status">Carregando sua sessão...</div>;
-  if(user)return <Fragment key={user.id}>{children}</Fragment>;
-  return <main className="auth-screen"><section className="auth-panel">
-    <div className="auth-brand"><ReceiptText size={28}/><strong>Controle de Faturamento</strong></div>
-    <h1>{mode==='login'?'Entre no seu espaço':'Crie sua conta'}</h1>
-    <p>Acesse seus cadastros e configurações com sua conta.</p>
-    <form onSubmit={submit}>
-      {mode==='signup'&&<div className="auth-field"><Label htmlFor="auth-name">Nome</Label><Input id="auth-name" autoComplete="name" value={name} onChange={e=>setName(e.target.value)} required/></div>}
-      <div className="auth-field"><Label htmlFor="auth-email">E-mail</Label><Input id="auth-email" type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} required/></div>
-      <div className="auth-field"><Label htmlFor="auth-password">Senha</Label><Input id="auth-password" type="password" autoComplete={mode==='login'?'current-password':'new-password'} value={password} onChange={e=>setPassword(e.target.value)} minLength={mode==='signup'?8:undefined} required/></div>
-      {(error||configurationError)&&<p role="alert" className="auth-error">{error||configurationError}</p>}
-      {notice&&<p role="status">{notice}</p>}
-      <Button type="submit" disabled={pending||!!configurationError} className="auth-submit">{pending?'Aguarde...':mode==='login'?'Entrar':'Criar conta'}</Button>
-      <Button type="button" variant="ghost" disabled={pending} onClick={()=>{setMode(mode==='login'?'signup':'login');setError('');setNotice('');}}>{mode==='login'?'Criar uma conta':'Já tenho uma conta'}</Button>
-    </form>
-  </section></main>;
+
+export function AuthGate({children}:{children:ReactNode}){
+ const auth=useAuth();const [,rerender]=useState(0);
+ useEffect(()=>{const sync=()=>rerender(value=>value+1);window.addEventListener('popstate',sync);return()=>window.removeEventListener('popstate',sync);},[]);
+ const path=typeof window==='undefined'?'':window.location.pathname;
+ const mode=typeof window==='undefined'?null:new URLSearchParams(window.location.search).get('mode');
+ if(path.startsWith('/auth/confirm'))return <>{children}</>;
+ if(!auth.ready)return <main className="auth-screen"><div className="auth-loading"><Clock3/><span>Carregando sua sessão…</span></div></main>;
+ if(auth.user){
+  if(mode==='recovery')return <AuthExperience initialMode="recovery"/>;
+  if(auth.access==='checking')return <main className="auth-screen"><div className="auth-loading"><Clock3/><span>Validando seu acesso…</span></div></main>;
+  if(auth.access==='invite')return <AuthExperience initialMode="invite"/>;
+  if(auth.access==='disabled'||auth.access==='removed'||auth.access==='invalid')return <AccessBlocked kind={auth.access}/>;
+  if(auth.access==='error')return <main className="auth-screen"><section className="auth-blocked"><span><AlertTriangle/></span><h1>Não foi possível validar o acesso</h1><p>Confira sua conexão e tente novamente.</p><Button onClick={()=>void auth.refreshAccess()}><RefreshCw/>Tentar novamente</Button></section></main>;
+  return <>{children}</>;
+ }
+ return <AuthExperience initialMode={mode==='forgot'?'forgot':'login'} configurationError={auth.error}/>;
 }

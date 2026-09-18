@@ -27,7 +27,7 @@ test('each menu destination updates the same snapshot consumed by screen and act
   let selected='/',screen='/';
   nav.subscribe(()=>{selected=new URL(nav.getSnapshot(),host.location.origin).pathname});
   nav.subscribe(()=>{screen=new URL(nav.getSnapshot(),host.location.origin).pathname});
-  for(const path of ['/cadastro','/contratos','/planejamento','/resumo','/agenda','/relatorios','/configuracoes','/']) {
+  for(const path of ['/cadastro','/solicitacoes','/contratos','/planejamento','/resumo','/agenda','/relatorios','/configuracoes','/']) {
     nav.navigate(path);
     assert.equal(screen,path);assert.equal(selected,path);assert.equal(host.location.pathname,path);
   }

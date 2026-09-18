@@ -1,0 +1,13 @@
+.request-attachment-modal{display:flex!important;flex-direction:column;width:min(1100px,calc(100vw - 40px))!important;max-width:none!important;height:min(92dvh,1000px);max-height:92dvh;padding:0!important;gap:0!important;overflow:hidden;border-radius:14px}
+.request-attachment-modal>[data-slot=dialog-header]{padding:24px 52px 20px 24px;text-align:left;border-bottom:1px solid #e1e9e3;flex:none}
+.request-attachment-modal [data-slot=dialog-title]{color:#234d38;font-size:18px;line-height:1.5}
+.request-attachment-modal [data-slot=dialog-description]{font-size:12px;line-height:1.6;color:#738578}
+.request-attachment-selector{padding:14px 22px 0;display:flex;align-items:center;gap:14px;flex:none;min-width:0;background:#f8faf9}
+.request-attachment-selector label{font-size:12px;color:#61786b;white-space:nowrap}
+.request-attachment-selector select{flex:1;min-width:0;height:38px;padding:0 12px;border:1px solid #d9e4dd;border-radius:7px;background:white;color:#244632;font-size:12px}
+.request-attachment-tools{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 22px;background:#f8faf9;flex:none;border-bottom:1px solid #dce5df}
+.request-attachment-tools>span{color:#778b7e;font-size:11px}.request-attachment-tools>.btn{font-size:11px;min-height:34px;padding:7px 10px}
+.request-attachment-stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:auto;background:#e9eeeb}
+.request-attachment-stage iframe{width:100%;height:100%;border:0;display:block}.request-attachment-stage img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.request-attachment-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;min-height:180px;padding:24px;text-align:center;font-size:13px;color:#61786b}
+@media(max-width:640px){.request-attachment-modal{width:calc(100vw - 16px)!important;height:94dvh;max-height:94dvh}.request-attachment-modal>[data-slot=dialog-header]{padding:20px 42px 16px 16px}.request-attachment-modal [data-slot=dialog-title]{font-size:16px}.request-attachment-selector{padding:12px 14px 0;flex-direction:column;align-items:stretch;gap:6px}.request-attachment-selector select{flex:none;width:100%}.request-attachment-tools{padding:12px 14px}}

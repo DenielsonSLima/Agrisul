@@ -1,7 +1,7 @@
 import type {ReportColumn, ReportKind} from './types';
 export const reportCatalog: {id: ReportKind; title: string; description: string}[] = [
   {id: 'contracts', title: 'Contratos', description: 'Clientes, vigência, situação e volume contratado.'},
-  {id: 'loads', title: 'Carregamentos', description: 'Entregas do mês, origem, documentos e ATR medido.'},
+  {id: 'loads', title: 'Carregamentos', description: 'Entregas por período, origem, faturamento e descontos.'},
   {id: 'financial', title: 'Financeiro', description: 'Faturamento, descontos, recebimentos e saldos do mês.'},
   {id: 'farms', title: 'Fazendas e áreas', description: 'Áreas cadastradas, talhões e área disponível.'},
 ];
@@ -13,7 +13,7 @@ export const reportColumns: Record<ReportKind, ReportColumn[]> = {
 };
 export const reportMetricColumns: Record<ReportKind, ReportColumn[]> = {
   contracts: [{key:'contractCount',label:'Contratos',width:1},{key:'activeCount',label:'Ativos',width:1}],
-  loads: [{key:'loadCount',label:'Carregamentos',width:1},{key:'volume',label:'Quantidade (t)',format:'decimal',width:1},{key:'averageAtr',label:'ATR médio ponderado',format:'decimal',width:1}],
+  loads: [{key:'loadCount',label:'Carregamentos',width:1},{key:'volume',label:'Quantidade (t)',format:'decimal',width:1},{key:'averageAtr',label:'ATR médio ponderado',format:'decimal',width:1},{key:'grossAmount',label:'Faturamento bruto',format:'money',width:1},{key:'discountAmount',label:'Descontos',format:'money',width:1},{key:'netAmount',label:'Valor líquido',format:'money',width:1}],
   financial: [{key:'grossAmount',label:'Faturamento bruto',format:'money',width:1},{key:'discountAmount',label:'Descontos',format:'money',width:1},{key:'netAmount',label:'Valor líquido',format:'money',width:1},{key:'receivedAmount',label:'Recebido',format:'money',width:1},{key:'pendingAmount',label:'Pendente',format:'money',width:1},{key:'creditAmount',label:'Crédito',format:'money',width:1}],
   farms: [{key:'farmCount',label:'Fazendas',width:1},{key:'totalHa',label:'Área total (ha)',format:'decimal',width:1},{key:'usedHa',label:'Em talhões (ha)',format:'decimal',width:1},{key:'preservedHa',label:'Disponível (ha)',format:'decimal',width:1}],
 };

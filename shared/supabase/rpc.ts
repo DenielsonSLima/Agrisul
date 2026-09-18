@@ -35,3 +35,15 @@ export async function authenticatedFetch(input: RequestInfo | URL, init: Request
   headers.set('Authorization', `Bearer ${session.access_token}`);
   return fetch(input, {...init, headers});
 }
+
+export async function functionRequest<T>(name:string,body:Record<string,unknown>):Promise<T>{
+  const client=getSupabaseBrowserClient();
+  const {data,error}=await client.functions.invoke(name,{body});
+  if(error){
+    let message='Não foi possível concluir a operação.';
+    const context=(error as {context?:Response}).context;
+    if(context){try{const payload=await context.clone().json() as {error?:string};if(payload.error)message=payload.error;}catch{}}
+    throw new RpcError(message,context?.status??503,(error as {code?:string}).code);
+  }
+  return data as T;
+}

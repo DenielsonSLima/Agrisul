@@ -10,7 +10,7 @@ const short=(doc:JsPdf,value:string,width:number)=>doc.splitTextToSize(value||'â
 const safeName=(value:string)=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,70)||'safra';
 
 export async function createPlanningDiaryPdf(snapshot:PlanningExportSnapshot,brand:ReportPdfBrand){
- const {jsPDF}=await import('jspdf');
+ const {jsPDF}=await import('@/shared/reporting/jsPdfRuntime');
  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4',compress:true});
  const {data,period}=snapshot;const summary=data.diaryPeriodSummary;const margin=REPORT_MARGIN_MM,width=doc.internal.pageSize.getWidth(),height=doc.internal.pageSize.getHeight();
  const content=width-margin*2,bottom=height-margin-9;

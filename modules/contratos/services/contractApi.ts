@@ -13,6 +13,9 @@ export async function fetchContract(id:string,companyId:string,signal?:AbortSign
 export async function persistContract(input:ContractInput,id?:string){
   return (await rpcRequest<{contract:BillingContract}>('contracts','save',{...input,id})).contract;
 }
+export async function closeContract(contractId:string,companyId:string){
+ return (await rpcRequest<{contract:BillingContract}>('contracts','close',{contractId,companyId})).contract;
+}
 export async function persistContractLoad(contractId:string,companyId:string,input:ContractLoadInput,id?:string){
  return (await rpcRequest<{load:ContractLoad}>('contracts','save-load',{...input,contractId,companyId,...(id?{id}:{})})).load;
 }

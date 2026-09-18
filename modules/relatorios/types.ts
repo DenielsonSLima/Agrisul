@@ -1,7 +1,15 @@
 import type {ReportPdfBrand} from '@/shared/reporting';
 export type ReportKind = 'contracts' | 'loads' | 'financial' | 'farms';
 export type ReportValue = string | number | boolean | null;
-export type ReportData = {kind: ReportKind; scope: 'company' | 'workspace'; month?: string; total: number; rows: Record<string, ReportValue>[]; totals: Record<string, ReportValue>};
+export type LoadReportFilters = {search: string; from: string; to: string; farmId: string; plotId: string; farmName?: string; plotName?: string};
+export type LoadReportOrigin = {id: string; name: string; plots: {id: string; name: string}[]};
+export type LoadReportTotals = Record<string, ReportValue> & {loadCount: number; volume: string; averageAtr: string; grossAmount: string; discountAmount: string; netAmount: string; billingPending: boolean; pendingLoadCount: number};
+export type LoadReportRow = {id: string; contractId: string; farmId: string; plotId: string; loadedAt: string; farmName: string; plotName: string; document: string; notes: string; volume: string; atr: string; atrReferenceMonth: string; atrQuote: string; grossAmount: string; discountAmount: string; netAmount: string; billingPending: boolean};
+export type LoadReportGroup = {contractId: string; contractNumber: string; contractTitle: string; clientName: string; totals: LoadReportTotals; loads: LoadReportRow[]};
+export type LoadReportData = {kind: 'loads'; scope: 'company'; period: {from: string; to: string}; filters: LoadReportFilters; origins: LoadReportOrigin[]; total: number; totals: LoadReportTotals; groups: LoadReportGroup[]};
+export type GenericReportData = {kind: Exclude<ReportKind, 'loads'>; scope: 'company' | 'workspace'; month?: string; total: number; rows: Record<string, ReportValue>[]; totals: Record<string, ReportValue>};
+export type ReportData = GenericReportData | LoadReportData;
 export type ReportColumn = {key: string; label: string; format?: 'money' | 'decimal' | 'date'; width: number};
 export type ReportSnapshot = {data: ReportData; month: string; companyId: string};
+export type ReportQuery = {month: string; loadFilters: LoadReportFilters};
 export type ReportBrand = ReportPdfBrand;

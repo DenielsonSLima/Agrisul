@@ -5,3 +5,4 @@
 @media(max-width:950px){.agenda-layout{grid-template-columns:minmax(0,1fr)}.agenda-side{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}.agenda-legend-panel{padding:18px}}
 @media(max-width:600px){.agenda-side{grid-template-columns:minmax(0,1fr)}.agenda-legend-panel .agenda-legend{flex-direction:row;flex-wrap:wrap}.agenda-day{min-height:128px;padding:9px 7px}.agenda-weekdays,.agenda-grid{min-width:700px}.agenda-day-number{font-size:13px}.agenda-calendar-footer{font-size:11px;padding:12px}.agenda-legend-panel .agenda-legend button{font-size:11px;padding:7px}}
 .agenda-heading-actions{display:flex;align-items:center;justify-content:flex-end;gap:18px;flex-wrap:wrap}.agenda-heading-actions>.btn{flex-shrink:0}@media(max-width:700px){.agenda-page>.companies-heading{flex-wrap:wrap;gap:16px}.agenda-heading-actions{justify-content:flex-start}}
+.agenda-refund{background:#a36e55}.agenda-entry-refund{background:#fbf0eb;color:#8f604b}

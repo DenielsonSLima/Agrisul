@@ -1,0 +1,34 @@
+'use client';
+import {useState} from 'react';
+import {ArrowLeft, ArrowUpRight, Building2, ChevronRight, Loader2, Mail, MapPin, Pencil, Phone, Plus, Search, UserRound, Wrench} from 'lucide-react';
+import {LocalSearch} from '@/shared/components/Common';
+import {ModuleLink, useModuleNavigation} from '@/shared/navigation/ModuleNavigation';
+import {useAuth} from '@/shared/supabase/AuthProvider';
+import {normalize} from '@/shared/utils/format';
+import {useProvider, useProviders} from '../hooks/useProviders';
+import {ProviderForm} from '../forms/ProviderForm';
+import {providerDocument, providerHref, providersHref} from '../presentation';
+import '../styles.css';
+
+function Breadcrumb({name}: {name?: string}) {return <div className="client-navigation"><nav className="client-breadcrumb" aria-label="Caminho de navegação"><ModuleLink href="/cadastro">Cadastros</ModuleLink><ChevronRight size={13}/>{name ? <><ModuleLink href={providersHref}>Prestador</ModuleLink><ChevronRight size={13}/><span aria-current="page">{name}</span></> : <span aria-current="page">Prestador</span>}</nav><ModuleLink className="client-back" href={name ? providersHref : '/cadastro'}><ArrowLeft size={15}/>{name ? 'Voltar para prestadores' : 'Voltar aos cadastros'}</ModuleLink></div>;}
+function LoadState({loading, error, reload}: {loading: boolean; error: string; reload: () => Promise<void>}) {return <div className="client-loading" role={error ? 'alert' : 'status'}>{loading ? <><Loader2 size={20} className="animate-spin"/>Carregando prestadores…</> : <><p>{error || 'Prestador não encontrado.'}</p><button type="button" className="btn" onClick={() => void reload()}>Tentar novamente</button></>}</div>;}
+
+export function PrestadoresPage() {const {user} = useAuth();return <Workspace key={user?.id ?? 'anonymous'}/>;}
+function Workspace() {const {searchParams} = useModuleNavigation();const id = searchParams.get('prestador');return id ? <Detail key={id} id={id}/> : <Listing/>;}
+function Listing() {
+  const model = useProviders(), [query, setQuery] = useState(''), [creating, setCreating] = useState(false);
+  const {navigate} = useModuleNavigation();
+  const providers = model.data?.providers ?? [], q = normalize(query), normalizedDocument = query.replace(/[./\s-]/g, '').toUpperCase();
+  const filtered = providers.filter(p => normalize([p.legalName, p.tradeName, p.document, p.city, p.state, p.phone, p.email].join(' ')).includes(q) || normalizedDocument.length > 2 && p.document.includes(normalizedDocument));
+  const add = <button className="btn company-primary" type="button" onClick={() => setCreating(true)}><Plus size={17}/>Novo prestador</button>;
+  return <section className="clients-workspace"><Breadcrumb/><div className="companies-heading"><div><h2>Prestador</h2><p>Cadastre e consulte as pessoas e empresas que executam seus serviços.</p></div>{model.data?.canManage && add}</div>
+    {model.loading || model.error ? <LoadState {...model}/> : !providers.length ? <div className="company-empty"><span className="company-empty-icon"><Wrench size={25}/></span><h3>Nenhum prestador cadastrado</h3><p>Cadastre com CPF ou CNPJ. Para empresas, consulte o CNPJ para preencher os dados.</p>{model.data?.canManage && add}</div> : <><div className="companies-toolbar"><LocalSearch value={query} onChange={setQuery} placeholder="Buscar nome, CPF, CNPJ ou cidade"/><span>{filtered.length} de {providers.length} prestadores</span></div><div className="client-grid">{filtered.map(p => <ModuleLink key={p.id} href={providerHref(p.id)} className="client-card" aria-label={`Abrir prestador ${p.legalName}`}><div className="client-card-top"><span className="client-card-icon">{p.documentType === 'CPF' ? <UserRound size={20}/> : <Building2 size={20}/>}</span><ArrowUpRight size={16}/></div><h3 title={p.legalName}>{p.legalName}</h3><p className="client-card-cnpj">{p.documentType}: {providerDocument(p)}</p><div className="client-card-address"><div className="client-card-line"><MapPin size={14}/><strong>{[p.city, p.state].filter(Boolean).join(' / ') || 'Cidade / UF não informadas'}</strong></div><p title={p.address}>{p.address || 'Endereço não informado'}</p></div><div className="client-card-contact"><div className="client-card-line"><Phone size={13}/><span>{p.phone || 'Telefone não informado'}</span></div><div className="client-card-line"><Mail size={13}/><span>{p.email || 'E-mail não informado'}</span></div></div></ModuleLink>)}</div>{!filtered.length && <div className="client-loading"><Search size={19}/>Nenhum prestador encontrado.</div>}</>}
+    {creating && model.data?.canManage && <ProviderForm onClose={() => setCreating(false)} onSaved={provider => {setCreating(false);navigate(providerHref(provider.id));}}/>}
+  </section>;
+}
+function Detail({id}: {id: string}) {
+  const model = useProvider(id), [editing, setEditing] = useState(false), provider = model.data?.provider;
+  if (model.loading || model.error || !provider) return <section className="clients-workspace"><Breadcrumb name="Detalhes do prestador"/><LoadState {...model}/></section>;
+  const value = (label: string, text: string) => <div className="client-detail-field"><dt>{label}</dt><dd>{text || 'Não informado'}</dd></div>;
+  return <section className="clients-workspace"><Breadcrumb name={provider.legalName}/><div className="companies-heading client-detail-heading"><div><h2>{provider.legalName}</h2><p>{provider.documentType}: {providerDocument(provider)}</p></div>{model.data?.canManage && <button className="btn" type="button" onClick={() => setEditing(true)}><Pencil size={16}/>Editar cadastro</button>}</div><div className="client-detail-grid"><section className="client-detail-panel"><h3><Building2 size={18}/>Identificação</h3><dl>{value(provider.documentType === 'CPF' ? 'Nome completo' : 'Razão social', provider.legalName)}{value(provider.documentType === 'CPF' ? 'Nome profissional / apelido' : 'Nome fantasia', provider.tradeName)}{value(provider.documentType, providerDocument(provider))}</dl></section><section className="client-detail-panel"><h3><MapPin size={18}/>Endereço</h3><dl>{value('Cidade / UF', [provider.city, provider.state].filter(Boolean).join(' / '))}{value('Endereço completo', provider.address)}{value('CEP', provider.zipCode)}</dl></section><section className="client-detail-panel"><h3><Phone size={18}/>Contato</h3><dl>{value('Telefone', provider.phone)}{value('E-mail', provider.email)}</dl></section></div>{editing && <ProviderForm provider={provider} onClose={() => setEditing(false)} onSaved={() => setEditing(false)}/>}</section>;
+}

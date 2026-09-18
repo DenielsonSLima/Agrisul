@@ -1,15 +1,22 @@
 // Mutations refresh projections even when Realtime is unavailable.
 export const derivedResources: Record<string, readonly string[]> = {
-  contracts: ['agenda', 'summary', 'reports', 'planning'],
-  companies: ['agenda', 'summary', 'reports'],
-  clients: ['agenda', 'summary', 'reports'],
-  atr: ['summary', 'reports'],
-  farms: ['agenda', 'reports', 'planning'],
-  plots: ['agenda', 'reports', 'planning'],
-  cultures: ['planning'],
-  'cultural-practices': ['planning'],
-  planning: ['farms', 'plots'],
-  'contract-types': ['summary', 'reports'],
+  signatures: ['service-requests'],
+  'service-providers': ['service-requests', 'home'],
+  'document-templates': ['service-requests'],
+  contracts: ['agenda', 'summary', 'reports', 'planning', 'home'],
+  companies: ['agenda', 'summary', 'reports', 'service-requests', 'home'],
+  'report-headers': ['service-requests'],
+  clients: ['agenda', 'summary', 'reports', 'home'],
+  atr: ['summary', 'reports', 'home'],
+  farms: ['agenda', 'summary', 'reports', 'planning', 'home'],
+  plots: ['agenda', 'summary', 'reports', 'planning', 'home'],
+  cultures: ['planning', 'home'],
+  'cultural-practices': ['planning', 'home'],
+  planning: ['farms', 'plots', 'summary', 'home'],
+  'contract-types': ['summary', 'reports', 'home'],
+  'service-requests': ['home'],
+  'access-profiles': ['home'],
+  users: ['home'],
 };
 export function mutationResources(resource: string, related: readonly string[] = []) {
   return [...new Set([resource, ...related].flatMap(key => [key, ...(derivedResources[key] ?? [])]))];

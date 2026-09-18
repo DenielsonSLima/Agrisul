@@ -11,7 +11,7 @@ try{
  const output=join(temporary,'services.mjs');
  await build({stdin:{contents:`export * from './modules/configuracoes/empresas/services/companyApi'; export * from './modules/configuracoes/services/settingsService'; export * from './modules/configuracoes/marca-dagua/services/watermarkApi'; export * from './modules/configuracoes/usuarios/services/usersApi'; export * from './modules/configuracoes/perfis-acesso/services/accessProfilesApi'; export * from './modules/configuracoes/cabecalho-relatorios/services/reportHeaderApi'; export * from './shared/reporting/companyBrand';`,resolveDir:process.cwd()},outfile:output,bundle:true,platform:'node',format:'esm',plugins:[{name:'supabase-fixtures',setup(builder){
   builder.onResolve({filter:/^@\/shared\/supabase\/(rpc|client)$/},args=>({path:args.path,namespace:'fixture'}));
-  builder.onLoad({filter:/.*/,namespace:'fixture'},args=>({contents:args.path.endsWith('/rpc')?'export class RpcError extends Error{constructor(message,status=400){super(message);this.status=status}};export const rpcRequest=(...args)=>globalThis.configRpc(...args);':'export const getSupabaseBrowserClient=()=>globalThis.configClient;'}));
+  builder.onLoad({filter:/.*/,namespace:'fixture'},args=>({contents:args.path.endsWith('/rpc')?'export class RpcError extends Error{constructor(message,status=400){super(message);this.status=status}};export const rpcRequest=(...args)=>globalThis.configRpc(...args);export const functionRequest=(...args)=>globalThis.configFunction(...args);':'export const getSupabaseBrowserClient=()=>globalThis.configClient;'}));
  }}]});
  const api=await import(pathToFileURL(output));
  const workspaceId='11111111-1111-4111-8111-111111111111';
@@ -26,6 +26,7 @@ try{
   if(resource==='report-headers')return{settings:{orientation:payload.orientation??'portrait',defaultCompanyId:payload.defaultCompanyId??null,portrait:payload.portrait??{variant:'detailed',logoAlignment:'left',showCnpj:true,showContact:true},landscape:payload.landscape??{variant:'compact',logoAlignment:'left',showCnpj:true,showContact:true},updatedAt:null}};
   return{settings:{orientation:'portrait',opacity:15,size:60,portraitImageKey:workspaceId+'/portrait-existing.png',portraitImageName:'retrato.png',landscapeImageKey:workspaceId+'/landscape-existing.png',landscapeImageName:'paisagem.png',...payload}};
  };
+ globalThis.configFunction=async(name,body)=>{calls.push({functionName:name,body});return{user:{id:'invite-a',name:'',email:body.email,status:'pending',accessProfileId:body.accessProfileId,accessProfileName:'Operador',isOwner:false}};};
  const controller=new AbortController();
  assert.deepEqual(await api.fetchCompanies(controller.signal),[{id:'company-a',logoKey:workspaceId+'/companies/existing.png',logoName:'Empresa.png',logoUrl:'https://signed.example.test/'+workspaceId+'/companies/existing.png'}]);
  assert.equal(calls.at(-1).signal,controller.signal);
@@ -37,8 +38,10 @@ try{
  await api.persistSettings({name:'Nome',company:'Empresa',compact:true,email:'forged@example.test'});
  assert.deepEqual(calls.at(-1).payload,{name:'Nome',company:'Empresa',compact:true});
  const members=await api.fetchUsers(controller.signal);assert.equal(members[0].isOwner,true);assert.equal(calls.at(-1).resource,'users');
- await api.inviteUser({email:' MEMBER@EXAMPLE.TEST ',accessProfileId:'profile-a'});assert.deepEqual(calls.at(-1).payload,{email:'member@example.test',accessProfileId:'profile-a'});
+ await api.inviteUser({email:' MEMBER@EXAMPLE.TEST ',accessProfileId:'profile-a'});assert.equal(calls.at(-1).functionName,'billing-user-invite');assert.equal(calls.at(-1).body.email,'member@example.test');assert.equal(calls.at(-1).body.accessProfileId,'profile-a');assert.match(calls.at(-1).body.requestId,/^[0-9a-f-]{36}$/);
  const disabled=await api.setUserEnabled('membership-a',false);assert.equal(disabled.status,'inactive');assert.equal(calls.at(-1).action,'disable');
+ await api.cancelUserInvite('invite-a');assert.equal(calls.at(-1).action,'cancel-invite');
+ await api.removeUser('membership-a');assert.equal(calls.at(-1).action,'remove');
  const profiles=await api.fetchAccessProfiles(controller.signal);assert.equal(profiles[0].permissions[0],'companies.read');
  await api.persistAccessProfile({name:'Financeiro',description:'Consulta',permissions:['contracts.read']});assert.equal(calls.at(-1).resource,'access-profiles');assert.equal(calls.at(-1).action,'save');
  const report=await api.fetchReportHeader(controller.signal);assert.equal(report.portrait.variant,'detailed');assert.equal(report.landscape.variant,'compact');
@@ -52,6 +55,10 @@ try{
  assert.equal(existing.portraitImageUrl,'https://signed.example.test/'+workspaceId+'/portrait-existing.png');
  assert.equal(existing.landscapeImageUrl,'https://signed.example.test/'+workspaceId+'/landscape-existing.png');
  assert.equal(signs.at(-1).seconds,3600);
+ const storageFrom=globalThis.configClient.storage.from;
+ globalThis.configClient.storage.from=bucket=>({...storageFrom(bucket),createSignedUrls:async paths=>({data:paths.map(path=>({path,signedUrl:null,error:'Object not found'})),error:null})});
+ await assert.rejects(api.fetchWatermark(),/Não foi possível carregar as imagens/, 'A missing private file must not silently remove the configured watermark');
+ globalThis.configClient.storage.from=storageFrom;
  const portraitFile=new File(['portrait-content'],'novo-retrato.png',{type:'image/png'});
  const landscapeFile=new File(['landscape-content'],'nova-paisagem.jpg',{type:'image/jpeg'});
  const saved=await api.persistWatermark(existing,{portrait:portraitFile,landscape:landscapeFile},{portrait:false,landscape:false});
@@ -76,4 +83,4 @@ try{
  globalThis.configRpc=async()=>{throw new Error('Validação do servidor');};
  await assert.rejects(api.persistSettings({name:'',company:'',compact:false,email:''}),/Validação do servidor/);
  console.log('Passed: configuration RPC envelopes, company logo signing/upload/cleanup, auth-derived email, private images, explicit removal, authentication and server errors.');
-}finally{await rm(temporary,{recursive:true,force:true});delete globalThis.configRpc;delete globalThis.configClient;}
+}finally{await rm(temporary,{recursive:true,force:true});delete globalThis.configRpc;delete globalThis.configFunction;delete globalThis.configClient;}

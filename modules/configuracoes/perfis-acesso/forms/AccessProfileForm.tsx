@@ -13,6 +13,7 @@ export function AccessProfileForm({profile,onSave,onClose,onBusy}:{profile?:Acce
     const requiredReads:Record<string,string[]>= {
       'companies.write':['companies.read'],'registrations.write':['registrations.read'],
       'contracts.write':['contracts.read'],'watermarks.write':['watermarks.read'],
+      'requests.write':['requests.read'],'requests.approve':['requests.read'],
       'report-headers.write':['report-headers.read','companies.read','watermarks.read'],
       'report-headers.read':['companies.read','watermarks.read'],
     };
@@ -20,6 +21,7 @@ export function AccessProfileForm({profile,onSave,onClose,onBusy}:{profile?:Acce
     if(checked){next.add(key);requiredReads[key]?.forEach(permission=>next.add(permission));}
     else{
       next.delete(key);const dependent=writeForRead[key];if(dependent)next.delete(dependent);
+      if(key==='requests.read'){next.delete('requests.write');next.delete('requests.approve');}
       if(key==='companies.read'||key==='watermarks.read'){next.delete('report-headers.read');next.delete('report-headers.write');}
     }
     return next;

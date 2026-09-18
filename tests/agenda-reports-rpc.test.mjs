@@ -28,11 +28,15 @@ try {
  const controller=new AbortController();
  await modules[0].fetchAgenda('company-a','2026-09','load',controller.signal);
  await modules[1].fetchSummary('company-a','2026-09',controller.signal);
- const report=await modules[2].fetchReport('company-a','financial','2026-09',controller.signal);
+ const loadFilters={search:'ROM',from:'2026-09-15',to:'2026-09-15',farmId:'farm-a',plotId:'plot-a'};
+ const query={month:'2026-09',loadFilters};
+ const report=await modules[2].fetchReport('company-a','financial',query,controller.signal);
+ await modules[2].fetchReport('company-a','loads',query,controller.signal);
  assert.deepEqual(calls.map(([resource,action,payload,signal])=>({resource,action,payload,signal})),[
   {resource:'agenda',action:'list',payload:{companyId:'company-a',month:'2026-09',kind:'load'},signal:controller.signal},
   {resource:'summary',action:'list',payload:{companyId:'company-a',month:'2026-09'},signal:controller.signal},
   {resource:'reports',action:'list',payload:{companyId:'company-a',kind:'financial',month:'2026-09'},signal:controller.signal},
+  {resource:'reports',action:'list',payload:{companyId:'company-a',kind:'loads',...loadFilters},signal:controller.signal},
  ]);
  assert.equal(report.totals.netAmount,'123456789.123456','RPC decimal text must not be recomputed');
  const failure=new Error('permission denied');globalThis.__overviewRpc=async()=>{throw failure;};
@@ -65,6 +69,14 @@ try {
   {company:null,header:{variant:'compact',logoAlignment:'left',showCnpj:true,showContact:true},watermark:{imageUrl:null,opacity:15,size:60},issuer:{id:'a',name:'Teste',email:''},issuedAt:new Date('2026-09-16T12:00:00Z')});
  assert.ok(doc.getNumberOfPages()>1);
  const pdf=doc.internal.pages.slice(1).flat().join('\n');assert.ok(pdf.includes('REPORT-84'));assert.ok(pdf.includes('FINAL-ROW'));assert.ok(pdf.includes('765,00'));
+ const loads=Array.from({length:45},(_,index)=>({id:String(index),contractId:'contract-a',farmId:'farm-a',plotId:'plot-a',loadedAt:'2026-09-15',farmName:index%2?'Fazenda B':'Fazenda A',plotName:'Talhão 01',document:`DOC-${index}`,notes:index===44?'OBSERVACAO-FINAL '.repeat(40):'',volume:'10',atr:'150',atrReferenceMonth:'2026-08',atrQuote:'1.2',grossAmount:'1800',discountAmount:'20',netAmount:'1780',billingPending:false}));
+ const loadTotals={loadCount:45,volume:'450',averageAtr:'150',grossAmount:'81000',discountAmount:'900',netAmount:'80100',billingPending:false,pendingLoadCount:0};
+ const loadData={kind:'loads',scope:'company',period:{from:'2026-09-15',to:'2026-09-15'},filters:{...loadFilters,farmName:'Fazenda A',plotName:'Talhão 01'},origins:[],total:45,totals:loadTotals,groups:[{contractId:'contract-a',contractNumber:'CTR-LOAD',contractTitle:'Safra',clientName:'Cliente PDF',totals:loadTotals,loads}]};
+ const loadResult=await createReportPdf({data:loadData,month:'2026-09',companyId:'a'},
+  {company:null,header:{variant:'compact',logoAlignment:'left',showCnpj:true,showContact:true},watermark:{imageUrl:null,opacity:15,size:60},issuer:{id:'a',name:'Teste',email:''},issuedAt:new Date('2026-09-16T12:00:00Z')});
+ assert.ok(loadResult.doc.getNumberOfPages()>1);
+ const loadPdf=loadResult.doc.internal.pages.slice(1).flat().join('\n');
+ assert.ok(loadPdf.includes('DOC-44'));assert.ok(loadPdf.includes('OBSERVACAO-FINAL'));assert.ok(loadPdf.includes('Subtotal'));assert.ok(loadPdf.includes('CTR-LOAD'));
  console.log('PASS: RPC contracts, decimal transport, cancellation, error propagation, mutation/Realtime invalidation, account isolation, removed navigation and multipage PDF.');
 } finally {
  client.clear();delete globalThis.__overviewRpc;

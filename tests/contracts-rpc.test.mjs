@@ -37,6 +37,9 @@ try{
   assert.equal(calls.at(-1).signal,controller.signal);
   assert.deepEqual(await api.fetchContract('contract-id','company-id',controller.signal),snapshot);
   assert.deepEqual(calls.at(-1).payload,{id:'contract-id',companyId:'company-id'});
+  assert.deepEqual(await api.closeContract('contract-id','company-id'),snapshot);
+  assert.equal(calls.at(-1).action,'close');
+  assert.deepEqual(calls.at(-1).payload,{contractId:'contract-id',companyId:'company-id'});
   const input={title:'Safra',contractNumber:'CTR-123/2026',companyId:'company-id',clientId:'client-id',typeId:'type-id',status:'Ativo',startDate:'2026-09-01',endDate:'2026-10-01',contractedVolume:'25000,125',atrPriceType:'net',atrPeriodType:'accumulated',value:'1200,30',notes:''};
   assert.deepEqual(await api.persistContract(input,'contract-id'),snapshot);
   assert.deepEqual(calls.at(-1).payload,{...input,id:'contract-id'});
@@ -48,7 +51,7 @@ try{
   assert.deepEqual(calls.at(-1).payload,{contractId:'contract-id',companyId:'company-id',id:'load-id'});
   failure=new api.ContractApiError('Cliente não encontrado.',404);
   await assert.rejects(api.persistContract(input),error=>error===failure);
-  console.log('Passed: contracts RPC filters/get/save/load/delete, cancellation, exact decimal input, server snapshot and errors.');
+  console.log('Passed: contracts RPC filters/get/save/close/load/delete, cancellation, exact decimal input, server snapshot and errors.');
 }finally{
   delete globalThis.contractsRpcFixture;
   await rm(directory,{recursive:true,force:true});

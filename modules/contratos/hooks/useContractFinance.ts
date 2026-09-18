@@ -4,12 +4,13 @@ import {useWorkspaceCompany} from '@/shared/state/WorkspaceCompanyProvider';
 import {useQueryClient} from '@tanstack/react-query';
 import {useAuth} from '@/shared/supabase/AuthProvider';
 import {billingKeys} from '@/shared/query/keys';
-import type {ContractDiscountInput,ContractPaymentInput} from '../types';
+import type {ContractDiscountInput,ContractPaymentInput,ContractRefundInput} from '../types';
 
 type FinanceChange=
  |{action:'save-payment';input:ContractPaymentInput;id?:string;expectedRevision?:number}
  |{action:'save-discount';input:ContractDiscountInput;id?:string;expectedRevision?:number}
- |{action:'delete-payment'|'delete-discount';id:string;expectedRevision:number};
+ |{action:'save-refund';input:ContractRefundInput;id?:string;expectedRevision?:number}
+ |{action:'delete-payment'|'delete-discount'|'delete-refund';id:string;expectedRevision:number};
 
 export function useContractFinance(contractId:string){
  const {activeCompanyId}=useWorkspaceCompany();

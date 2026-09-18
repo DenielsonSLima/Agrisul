@@ -1,8 +1,8 @@
 import {useEffect,useRef,useState} from 'react';
-import {ArrowDownLeft,ArrowUpRight,Banknote,CalendarDays,ChartNoAxesCombined,ChevronLeft,ChevronRight,CircleDollarSign,Clock3,FlaskConical,Info,Pencil,Plus,ReceiptText,Scissors,Trash2,Truck} from 'lucide-react';
+import {ArrowDownLeft,ArrowUpRight,Banknote,CalendarDays,ChartNoAxesCombined,ChevronLeft,ChevronRight,CircleDollarSign,Clock3,FlaskConical,Info,Pencil,Plus,ReceiptText,RotateCcw,Scissors,Trash2,Truck} from 'lucide-react';
 import {notifications,useConfirmation} from '@/shared/feedback';
 import {useContractFinance} from '../../hooks/useContractFinance';
-import type {BillingContract,ContractDiscount,ContractPayment,ContractPaymentKind} from '../../types';
+import type {BillingContract,ContractDiscount,ContractPayment,ContractPaymentKind,ContractRefund} from '../../types';
 import {formatAtr,formatAtrCriterion,formatContractBilling as money,formatContractDate,formatContractMonth,formatContractVolume} from '../../utils/contractFormat';
 import {ContractFinanceDialog,type FinanceDraft,financeToday} from './ContractFinanceDialog';
 import {ContractFinanceCharts} from './ContractFinanceCharts';
@@ -16,26 +16,30 @@ export function ContractFinancialTab({contract:c,onBusy}:{contract:BillingContra
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
  useEffect(()=>{onBusy?.(mutation.isPending);return()=>onBusy?.(false);},[mutation.isPending,onBusy]);
  if(!summary)return <div className="contract-tab-empty" role="status"><CircleDollarSign/><h3>Financeiro indisponível</h3><p>Atualize o contrato para carregar os dados financeiros.</p></div>;
- const selected=summary.months.find(item=>item.month===month)??summary.emptyMonth,total=summary.totals;
+ const selected=summary.months.find(item=>item.month===month)??summary.emptyMonth,total=summary.totals,refunds=summary.refunds??[];
+ const canRefund=c.status==='Concluído'&&!total.billingPending&&Number(total.refundableAmount)>0;
  const open=(value:FinanceDraft)=>{trigger.current=document.activeElement as HTMLElement;setError('');setDraft(value);};
  const newPayment=(kind:ContractPaymentKind)=>open({type:'payment',input:{requestId:crypto.randomUUID(),kind,receivedAt:financeToday(),referenceMonth:month,amount:'',document:'',notes:''}});
+ const newRefund=()=>open({type:'refund',input:{requestId:crypto.randomUUID(),refundedAt:financeToday(),referenceMonth:month,amount:total.refundableAmount,document:'',notes:''}});
  const editPayment=(payment:ContractPayment)=>open({type:'payment',id:payment.id,revision:payment.revision,input:{requestId:payment.requestId,kind:payment.kind,receivedAt:payment.receivedAt,referenceMonth:payment.referenceMonth,amount:payment.amount,document:payment.document,notes:payment.notes}});
+ const editRefund=(refund:ContractRefund)=>open({type:'refund',id:refund.id,revision:refund.revision,input:{requestId:refund.requestId,refundedAt:refund.refundedAt,referenceMonth:refund.referenceMonth,amount:refund.amount,document:refund.document,notes:refund.notes}});
  const editDiscount=(discount:ContractDiscount)=>open({type:'discount',id:discount.id,revision:discount.revision,input:{requestId:discount.requestId,title:discount.title,ratePerTon:discount.ratePerTon,months:discount.months,notes:discount.notes}});
  const save=async(value:FinanceDraft)=>{
   if(inFlight.current)return;inFlight.current=true;setError('');
   try{
    if(value.type==='payment')await mutation.mutateAsync({action:'save-payment',input:value.input,id:value.id,expectedRevision:value.revision});
+   else if(value.type==='refund')await mutation.mutateAsync({action:'save-refund',input:value.input,id:value.id,expectedRevision:value.revision});
    else await mutation.mutateAsync({action:'save-discount',input:value.input,id:value.id,expectedRevision:value.revision});
    if(mounted.current){setDraft(null);(value.id?notifications.updated:notifications.created)('O lançamento foi salvo e os totais do contrato foram atualizados.');}
   }catch(reason){if(mounted.current){const message=(reason as Error).message;setError(message);notifications.error(message);}}
   finally{inFlight.current=false;}
  };
- const remove=async(type:'payment'|'discount',entry:ContractPayment|ContractDiscount)=>{
+ const remove=async(type:'payment'|'refund'|'discount',entry:ContractPayment|ContractRefund|ContractDiscount)=>{
   if(inFlight.current)return;
-  const label=type==='discount'?'desconto':('kind' in entry&&entry.kind==='advance'?'adiantamento':'recebimento');
-  if(!await confirm({title:`Excluir ${label}?`,description:type==='discount'?'O desconto deixará de ser aplicado aos meses selecionados. O total e o saldo pendente serão recalculados.':`O valor de ${money((entry as ContractPayment).amount)} será removido dos valores recebidos. O saldo pendente será recalculado.`,confirmLabel:`Excluir ${label}`,tone:'destructive'}))return;
+  const label=type==='discount'?'desconto':type==='refund'?'estorno':('kind' in entry&&entry.kind==='advance'?'adiantamento':'recebimento');
+  if(!await confirm({title:`Excluir ${label}?`,description:type==='discount'?'O desconto deixará de ser aplicado aos meses selecionados. O total e o saldo pendente serão recalculados.':type==='refund'?`A devolução de ${money((entry as ContractRefund).amount)} será removida e voltará a compor o crédito estornável.`:`O valor de ${money((entry as ContractPayment).amount)} será removido dos valores recebidos. O saldo pendente será recalculado.`,confirmLabel:`Excluir ${label}`,tone:'destructive'}))return;
   if(!mounted.current||inFlight.current)return;inFlight.current=true;
-  try{await mutation.mutateAsync({action:type==='payment'?'delete-payment':'delete-discount',id:entry.id,expectedRevision:entry.revision});if(mounted.current){setError('');notifications.deleted('O lançamento foi excluído e os totais foram atualizados.');}}
+  try{await mutation.mutateAsync({action:type==='payment'?'delete-payment':type==='refund'?'delete-refund':'delete-discount',id:entry.id,expectedRevision:entry.revision});if(mounted.current){setError('');notifications.deleted('O lançamento foi excluído e os totais foram atualizados.');}}
   catch(reason){if(mounted.current){const message=(reason as Error).message;setError(message);notifications.error(message);}}
   finally{inFlight.current=false;}
  };
@@ -47,10 +51,10 @@ export function ContractFinancialTab({contract:c,onBusy}:{contract:BillingContra
   </div>
   <section className="finance-balances" aria-label="Total, recebido e pendente">
    <Metric icon={<ReceiptText/>} label="Total após descontos" value={money(selected.netAmount,selected.billingPending)} overall={money(total.netAmount,total.billingPending)} month={month} tone="total" note="Valor líquido das entregas"/>
-   <Metric icon={<ArrowDownLeft/>} label="Total recebido" value={money(selected.receivedAmount)} overall={money(total.receivedAmount)} month={month} tone="received" note="Adiantamentos + recebimentos"/>
+   <Metric icon={<ArrowDownLeft/>} label="Total recebido" value={money(selected.receivedAmount)} overall={money(total.receivedAmount)} month={month} tone="received" note="Entradas menos estornos"/>
    <Metric icon={<Clock3/>} label="Pendente de receber" value={money(selected.pendingAmount,selected.billingPending)} overall={money(total.pendingAmount,total.billingPending)} month={month} tone="pending" note="Saldo após os valores recebidos"/>
   </section>
-  {(total.creditAmount!==''&&total.creditAmount!=='0'||selected.creditAmount!==''&&selected.creditAmount!=='0')&&<p className="finance-credit"><ArrowUpRight size={16}/>Valor recebido além do total: <strong>{money(selected.creditAmount,selected.billingPending)}</strong> no mês · <strong>{money(total.creditAmount,total.billingPending)}</strong> no contrato.</p>}
+  {(total.creditAmount!==''&&total.creditAmount!=='0'||selected.creditAmount!==''&&selected.creditAmount!=='0')&&<div className="finance-credit"><span><ArrowUpRight size={16}/>Valor recebido além do total: <strong>{money(selected.creditAmount,selected.billingPending)}</strong> no mês · <strong>{money(total.creditAmount,total.billingPending)}</strong> no contrato.</span>{canRefund?<button type="button" className="btn" disabled={mutation.isPending} onClick={newRefund}><RotateCcw size={15}/>Estornar saldo</button>:c.status==='Ativo'&&<small>Encerre o contrato para liberar o estorno do saldo excedente.</small>}</div>}
   {total.billingPending&&<p className="finance-notice" role="status">Há entregas sem o ATR medido ou sem a cotação do mês anterior, conforme o tipo selecionado no contrato. O valor entregue, o total e o pendente ficam em aberto até informar o ATR e cadastrar a cotação correspondente. Adiantamentos e recebimentos continuam disponíveis.</p>}
   <ContractFinanceCharts summary={summary} month={month} onMonth={setMonth}/>
   <section className="finance-deliveries" aria-label="Entregas no mês e no contrato">
@@ -72,11 +76,17 @@ export function ContractFinancialTab({contract:c,onBusy}:{contract:BillingContra
     </section>;
    })}
   </div>
+  {(c.status==='Concluído'||refunds.length>0)&&<section className="finance-card finance-refund-card" aria-label="Estornos de adiantamento">
+   <header><div className="finance-card-title"><RotateCcw size={19}/><div><h3>Estornos de adiantamento</h3><span>Devoluções do saldo excedente</span></div></div><button type="button" className="btn" disabled={mutation.isPending||!canRefund} title={canRefund?'Registrar devolução do crédito disponível':'Não há saldo de adiantamento disponível para estorno'} onClick={newRefund}><Plus size={15}/>Registrar estorno</button></header>
+   <div className="finance-card-amount"><strong>{money(selected.refundedAmount)}</strong><span>em {formatContractMonth(month)} · Geral: {money(total.refundedAmount)}</span></div>
+   <p className="finance-card-hint">Disponível para estorno no contrato: <strong>{money(total.refundableAmount,total.billingPending)}</strong>. O valor nunca pode ultrapassar o adiantamento excedente.</p>
+   {refunds.filter(refund=>refund.referenceMonth===month).length?<ul className="finance-entry-list">{refunds.filter(refund=>refund.referenceMonth===month).map(refund=><li key={refund.id}><span className="finance-entry-icon"><RotateCcw size={15}/></span><div><strong>{money(refund.amount)}</strong><span>Estornado em {formatContractDate(refund.refundedAt)}{refund.document?' · '+refund.document:''}</span>{refund.notes&&<p>{refund.notes}</p>}</div><div className="finance-entry-actions"><button type="button" aria-label={`Editar estorno de ${money(refund.amount)}`} disabled={mutation.isPending} onClick={()=>editRefund(refund)}><Pencil size={15}/></button><button type="button" aria-label={`Excluir estorno de ${money(refund.amount)}`} disabled={mutation.isPending} onClick={()=>{void remove('refund',refund);}}><Trash2 size={15}/></button></div></li>)}</ul>:<div className="finance-empty"><span><RotateCcw size={21}/></span><strong>Nenhum estorno neste mês</strong><p>As devoluções registradas para {formatContractMonth(month)} aparecerão aqui.</p></div>}
+  </section>}
   <section className="finance-card finance-discounts" aria-label="Descontos por tonelada">
    <header><div className="finance-card-title"><Scissors size={19}/><div><h3>Descontos por tonelada</h3><span>Toneladas carregadas e descontos, mês a mês</span></div></div><button type="button" className="btn" disabled={mutation.isPending} onClick={()=>open({type:'discount',input:{requestId:crypto.randomUUID(),title:'',ratePerTon:'',months:[month],notes:''}})}><Plus size={15}/>Adicionar desconto</button></header>
    {summary.discounts.length?<ContractDiscountTables summary={summary} month={month} busy={mutation.isPending} onMonth={setMonth} onEdit={editDiscount} onRemove={entry=>{void remove('discount',entry);}}/>:<p className="finance-empty">Nenhum desconto cadastrado. Adicione um acordo, informe o valor por tonelada e escolha os meses de aplicação.</p>}
   </section>
-  <section className="finance-card finance-monthly" aria-label="Histórico financeiro mensal"><header><div><h3>Histórico mensal</h3><p className="finance-card-hint">Selecione um mês para consultar seus lançamentos acima. O saldo de cada mês usa os pagamentos atribuídos àquela referência.</p></div></header><div className="contract-table-wrap"><table className="contract-table"><thead><tr><th>Mês</th><th>Entregue (t)</th><th>ATR médio</th><th>Valor entregue</th><th>Descontos</th><th>Total</th><th>Adiantamentos</th><th>Recebimentos</th><th>Pendente</th></tr></thead><tbody>{summary.months.map(item=><tr key={item.month} className={item.month===month?'finance-selected-row':''}><td><button type="button" onClick={()=>setMonth(item.month)} aria-pressed={item.month===month}>{formatContractMonth(item.month)}</button></td><td>{formatContractVolume(item.loadedVolume)}</td><td>{formatAtr(item.averageAtr)}</td><td>{money(item.grossAmount,item.billingPending)}</td><td>{money(item.discountAmount)}</td><td>{money(item.netAmount,item.billingPending)}</td><td>{money(item.advanceAmount)}</td><td>{money(item.receiptAmount)}</td><td>{money(item.pendingAmount,item.billingPending)}</td></tr>)}</tbody><tfoot><tr><th>Geral do contrato</th><td>{formatContractVolume(total.loadedVolume)}</td><td>{formatAtr(total.averageAtr)}</td><td>{money(total.grossAmount,total.billingPending)}</td><td>{money(total.discountAmount)}</td><td>{money(total.netAmount,total.billingPending)}</td><td>{money(total.advanceAmount)}</td><td>{money(total.receiptAmount)}</td><td>{money(total.pendingAmount,total.billingPending)}</td></tr></tfoot></table></div></section>
+  <section className="finance-card finance-monthly" aria-label="Histórico financeiro mensal"><header><div><h3>Histórico mensal</h3><p className="finance-card-hint">Selecione um mês para consultar seus lançamentos acima. O saldo de cada mês usa os pagamentos e estornos atribuídos àquela referência.</p></div></header><div className="contract-table-wrap"><table className="contract-table"><thead><tr><th>Mês</th><th>Entregue (t)</th><th>ATR médio</th><th>Valor entregue</th><th>Descontos</th><th>Total</th><th>Adiantamentos</th><th>Recebimentos</th><th>Estornos</th><th>Pendente</th></tr></thead><tbody>{summary.months.map(item=><tr key={item.month} className={item.month===month?'finance-selected-row':''}><td><button type="button" onClick={()=>setMonth(item.month)} aria-pressed={item.month===month}>{formatContractMonth(item.month)}</button></td><td>{formatContractVolume(item.loadedVolume)}</td><td>{formatAtr(item.averageAtr)}</td><td>{money(item.grossAmount,item.billingPending)}</td><td>{money(item.discountAmount)}</td><td>{money(item.netAmount,item.billingPending)}</td><td>{money(item.advanceAmount)}</td><td>{money(item.receiptAmount)}</td><td>{money(item.refundedAmount)}</td><td>{money(item.pendingAmount,item.billingPending)}</td></tr>)}</tbody><tfoot><tr><th>Geral do contrato</th><td>{formatContractVolume(total.loadedVolume)}</td><td>{formatAtr(total.averageAtr)}</td><td>{money(total.grossAmount,total.billingPending)}</td><td>{money(total.discountAmount)}</td><td>{money(total.netAmount,total.billingPending)}</td><td>{money(total.advanceAmount)}</td><td>{money(total.receiptAmount)}</td><td>{money(total.refundedAmount)}</td><td>{money(total.pendingAmount,total.billingPending)}</td></tr></tfoot></table></div></section>
   {draft&&<ContractFinanceDialog draft={draft} knownMonths={summary.months.map(item=>item.month)} busy={mutation.isPending} error={error} onSave={save} onClose={()=>{if(!inFlight.current)setDraft(null);}} onRestoreFocus={()=>{if(trigger.current?.isConnected)trigger.current.focus();}}/>}
  </div>;
 }

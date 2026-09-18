@@ -13,7 +13,7 @@ const emitted=(date:Date)=>new Intl.DateTimeFormat('pt-BR',{dateStyle:'short',ti
 const fileName=(date:Date,bucket:ContractBucket)=>`contratos-${bucket==='open'?'em-aberto':'finalizados'}-${date.toISOString().slice(0,10)}.pdf`;
 
 export async function createContractsPdf({contracts,summary,total}:ContractsReportData,filters:ContractsReportFilters,brand:ContractsReportBrand){
- const {jsPDF}=await import('jspdf');const doc=new jsPDF({orientation:contractsReportOrientation,unit:'mm',format:'a4',compress:true});
+ const {jsPDF}=await import('@/shared/reporting/jsPdfRuntime');const doc=new jsPDF({orientation:contractsReportOrientation,unit:'mm',format:'a4',compress:true});
  const pageWidth=doc.internal.pageSize.getWidth(),pageHeight=doc.internal.pageSize.getHeight(),margin=REPORT_MARGIN_MM,contentWidth=pageWidth-margin*2;
  const [logo,watermark]=await Promise.all([loadImage(brand.company?.logoUrl??null),loadImage(brand.watermark.imageUrl)]);
  if(brand.watermark.imageUrl&&!watermark)throw new Error('Não foi possível carregar a marca d’água configurada. Atualize a página e tente novamente.');

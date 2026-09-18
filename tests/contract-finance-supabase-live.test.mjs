@@ -84,7 +84,34 @@ try{
  assert.equal(edits.filter(r=>r.status==='fulfilled').length,1,'Only one revision can win');
  financial=await detail();const advance=financial.payments.find(p=>p.id===retries[0].id);
  await rpc(a.client,'contracts','save-payment',{...payment,id:advance.id,expectedRevision:advance.revision});
- console.log('PASS: finance live RPC, exact balances, selective monthly discounts, concurrent retries/revisions, account/company isolation, DML denial, independent Realtime for both tables.');
+
+ const closureInput={title:'Contrato 100 por 80',companyId:company.id,clientId:partner.id,typeId:type.id,status:'Ativo',contractNumber:`ENC-${randomUUID().slice(0,8)}`,startDate:'2026-09-01',endDate:'',contractedVolume:'100',atrPriceType:'gross',atrPeriodType:'monthly',value:'',notes:''};
+ const closureContract=(await rpc(a.client,'contracts','save',closureInput)).contract;
+ const closureScope={companyId:company.id,contractId:closureContract.id};
+ await rpc(a.client,'contracts','save-load',{...closureScope,loadedAt:'2026-09-10',volume:'80',atr:'1',farmId:farm.id,plotId:plot.id,document:'LOAD-80',notes:''});
+ const closureAdvance={...closureScope,requestId:randomUUID(),kind:'advance',receivedAt:'2026-09-01',referenceMonth:'2026-09',amount:'100',document:'ADV-100',notes:''};
+ const closureAdvanceId=(await rpc(a.client,'contracts','save-payment',closureAdvance)).id;
+ const refund={...closureScope,requestId:randomUUID(),refundedAt:'2026-09-20',referenceMonth:'2026-09',amount:'20',document:'PIX-20',notes:'Saldo devolvido'};
+ let closureSummary=(await rpc(a.client,'contracts','get',{id:closureContract.id,companyId:company.id})).contract.financialSummary;
+ assert.equal(closureSummary.totals.netAmount,'80');assert.equal(closureSummary.totals.advanceAmount,'100');assert.equal(closureSummary.totals.refundableAmount,'20');
+ await assert.rejects(rpc(a.client,'contracts','save-refund',refund));
+ await assert.rejects(rpc(a.client,'contracts','save',{...closureInput,id:closureContract.id,status:'Concluído'}));
+ assert.equal((await rpc(a.client,'contracts','close',closureScope)).contract.status,'Concluído');
+ assert.equal((await rpc(a.client,'contracts','close',closureScope)).contract.status,'Concluído');
+ await assert.rejects(rpc(a.client,'contracts','save-refund',{...refund,requestId:randomUUID(),amount:'20.01'}));
+ const refundId=(await rpc(a.client,'contracts','save-refund',refund)).id;
+ assert.equal((await rpc(a.client,'contracts','save-refund',refund)).id,refundId);
+ closureSummary=(await rpc(a.client,'contracts','get',{id:closureContract.id,companyId:company.id})).contract.financialSummary;
+ assert.equal(closureSummary.totals.advanceAmount,'100');assert.equal(closureSummary.totals.refundedAmount,'20');assert.equal(closureSummary.totals.receivedAmount,'80');assert.equal(closureSummary.totals.creditAmount,'0');assert.equal(closureSummary.totals.refundableAmount,'0');
+ assert.equal(closureSummary.payments.length,1);assert.equal(closureSummary.refunds.length,1);assert.equal(closureSummary.refunds[0].amount,'20');
+ await assert.rejects(rpc(a.client,'contracts','save-payment',{...closureAdvance,id:closureAdvanceId,expectedRevision:1,amount:'90'}));
+ await assert.rejects(rpc(b.client,'contracts','save-refund',{...refund,requestId:randomUUID(),amount:'1'}));
+ await assert.rejects(rpc(anon,'contracts','save-refund',{...refund,requestId:randomUUID(),amount:'1'}));
+ assert.equal((await b.client.from('billing_contract_payments').select('id').eq('contract_id',closureContract.id)).data.length,0);
+ const refundAgenda=await rpc(a.client,'agenda','list',{companyId:company.id,month:'2026-09',kind:'refund'});
+ const refundEvent=refundAgenda.days.flatMap(day=>day.events).find(event=>event.kind==='refund');
+ assert.equal(refundAgenda.eventCount,1);assert.equal(refundEvent?.title,'Estorno de adiantamento');assert.equal(refundEvent?.amount,'20');
+ console.log('PASS: finance live RPC, contract closure/refund 100/80, exact balances, selective monthly discounts, concurrent retries/revisions, account/company isolation, DML denial, independent Realtime for both tables.');
  }
  if(process.env.BILLING_BROWSER_CDP){
   const {verifyContractFinanceBrowser}=await import('./contract-finance-browser.mjs');

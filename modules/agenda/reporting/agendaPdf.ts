@@ -9,7 +9,7 @@ import {drawAgendaPdfDetails} from './agendaPdfDetails';
 // Business values are read from the RPC snapshot. The PDF modules only format
 // text and calculate page geometry; they never derive totals from event rows.
 export async function createAgendaPdf(snapshot: AgendaSnapshot, brand: ReportPdfBrand) {
-  const {jsPDF} = await import('jspdf');
+  const {jsPDF} = await import('@/shared/reporting/jsPdfRuntime');
   const doc = new jsPDF({orientation:'portrait', unit:'mm', format:'a4', compress:true});
   const {data, kind} = snapshot;
   const margin = REPORT_MARGIN_MM, width = doc.internal.pageSize.getWidth(), height = doc.internal.pageSize.getHeight();

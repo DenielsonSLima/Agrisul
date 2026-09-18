@@ -23,9 +23,9 @@ export function loadsReportModel(data:ContractLoadsData):ContractTabReport{
 export function financialReportModel(contract:BillingContract):ContractTabReport{
  if(contract.financialSummary){const summary=contract.financialSummary;
   return {kind:'financial',title:'Financeiro do contrato',criteria:`Todo o período · ATR ${formatAtrCriterion(contract.atrPriceType,contract.atrPeriodType)}`,
-   metrics:[{label:'Valor líquido',value:formatContractBilling(summary.totals.netAmount,summary.totals.billingPending)},{label:'Descontos',value:formatContractBilling(summary.totals.discountAmount)},{label:'Total recebido',value:formatContractBilling(summary.totals.receivedAmount)},{label:'Saldo pendente',value:formatContractBilling(summary.totals.pendingAmount,summary.totals.billingPending)}],
-   columns:['Mês','Quantidade','Bruto','Descontos','Líquido','Recebido','Pendente'],widths:[.10,.14,.15,.15,.15,.15,.16],
-   groups:[{title:'Movimento financeiro mensal',subtitle:'Valores do contrato, incluindo adiantamentos, recebimentos e descontos.',rows:summary.months.map(month=>[formatContractMonth(month.month),formatContractVolume(month.loadedVolume),formatContractBilling(month.grossAmount,month.billingPending),formatContractBilling(month.discountAmount),formatContractBilling(month.netAmount,month.billingPending),formatContractBilling(month.receivedAmount),formatContractBilling(month.pendingAmount,month.billingPending)])},
+   metrics:[{label:'Valor líquido',value:formatContractBilling(summary.totals.netAmount,summary.totals.billingPending)},{label:'Descontos',value:formatContractBilling(summary.totals.discountAmount)},{label:'Estornos',value:formatContractBilling(summary.totals.refundedAmount)},{label:'Total recebido',value:formatContractBilling(summary.totals.receivedAmount)},{label:'Saldo pendente',value:formatContractBilling(summary.totals.pendingAmount,summary.totals.billingPending)}],
+   columns:['Mês','Quantidade','Bruto','Descontos','Líquido','Estornos','Recebido','Pendente'],widths:[.09,.13,.14,.13,.14,.11,.13,.13],
+   groups:[{title:'Movimento financeiro mensal',subtitle:'Valores do contrato, incluindo adiantamentos, recebimentos, estornos e descontos.',rows:summary.months.map(month=>[formatContractMonth(month.month),formatContractVolume(month.loadedVolume),formatContractBilling(month.grossAmount,month.billingPending),formatContractBilling(month.discountAmount),formatContractBilling(month.netAmount,month.billingPending),formatContractBilling(month.refundedAmount),formatContractBilling(month.receivedAmount),formatContractBilling(month.pendingAmount,month.billingPending)])},
     ...(summary.discounts.length?[{
      title:'Descontos por tonelada — resumo mensal',
      subtitle:'Cada coluna identifica um tipo de desconto. — indica que o desconto não se aplica ao mês.',
@@ -53,7 +53,7 @@ async function loadImage(url:string|null):Promise<ReportPdfImage|null>{
 
 // Arithmetic below measures page geometry only. All quantities come from RPCs.
 export async function createContractTabPdf(contract:BillingContract,model:ContractTabReport,brand:ContractsReportBrand){
- const {jsPDF}=await import('jspdf');const doc=new jsPDF({orientation:contractTabReportOrientation,unit:'mm',format:'a4',compress:true});
+ const {jsPDF}=await import('@/shared/reporting/jsPdfRuntime');const doc=new jsPDF({orientation:contractTabReportOrientation,unit:'mm',format:'a4',compress:true});
  const width=doc.internal.pageSize.getWidth(),height=doc.internal.pageSize.getHeight(),margin=REPORT_MARGIN_MM,content=width-margin*2,bottom=height-margin-10;
  const [logo,watermark]=await Promise.all([loadImage(brand.company?.logoUrl??null),loadImage(brand.watermark.imageUrl)]);
  let y=0;

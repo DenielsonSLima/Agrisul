@@ -3,10 +3,12 @@ import {loadReportImage} from '@/shared/reporting/loadReportImage';
 import {reportCatalog, reportColumns, reportMetricColumns} from '../catalog';
 import {reportCell, reportPeriod} from './reportPresentation';
 import type {ReportBrand, ReportSnapshot} from '../types';
+import {createLoadsReportPdf} from './loadsReportPdf';
 
 // Arithmetic is restricted to PDF page and text geometry.
 export async function createReportPdf(snapshot: ReportSnapshot, brand: ReportBrand) {
-  const {jsPDF} = await import('jspdf');
+  if(snapshot.data.kind==='loads')return createLoadsReportPdf(snapshot,brand);
+  const {jsPDF} = await import('@/shared/reporting/jsPdfRuntime');
   const doc = new jsPDF({orientation:'landscape', unit:'mm', format:'a4', compress:true});
   const {data, month} = snapshot;
   const title = reportCatalog.find(item => item.id === data.kind)!.title;

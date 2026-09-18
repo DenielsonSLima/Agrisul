@@ -107,4 +107,88 @@ try {
  await db.exec(readFileSync(new URL('./planning_season_daily_dashboard.sql',import.meta.url),'utf8'));
  console.log('Planning periods, planted baselines, allocations, management, remanagement and history passed');
 } catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
+try {
+ await db.exec(readFileSync(new URL('../migrations/20260917112621_harden_user_invites_and_onboarding.sql',import.meta.url),'utf8'));
+ console.log('Secure invitations and onboarding migration compiled successfully');
+} catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
+try {
+ await db.exec(readFileSync(new URL('./user_access_lifecycle.sql',import.meta.url),'utf8'));
+ console.log('User invitations, onboarding, inactivity states and hierarchy passed');
+} catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
+try {
+ await db.exec(readFileSync(new URL('../migrations/20260917121117_executive_summary_dashboard.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260917121327_general_load_report_financial_groups.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260917122127_contract_closure_refunds.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260917140943_executive_summary_operational_intelligence.sql',import.meta.url),'utf8'));
+ console.log('Executive summary, operational intelligence and detailed load report migrations compiled successfully');
+ await db.exec(readFileSync(new URL('./contract_closure_refunds.sql',import.meta.url),'utf8'));
+ console.log('Contract closure and advance refunds passed');
+ await db.exec(readFileSync(new URL('./executive_summary_dashboard.sql',import.meta.url),'utf8'));
+ console.log('Executive summary: inclusive dates, finance, planning focus, defaults, decimals and isolation passed');
+ await db.exec(readFileSync(new URL('./load_report_filters.sql',import.meta.url),'utf8'));
+ console.log('Load report: inclusive filters, origins, financial KPIs, contract subtotals and isolation passed');
+} catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
+try {
+ await db.exec(readFileSync(new URL('../migrations/20260917150546_service_requests_signatures.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260917152024_service_requests_action_validation.sql',import.meta.url),'utf8'));
+ console.log('Service requests and signatures migration compiled successfully');
+ await db.exec(readFileSync(new URL('./service_requests.sql',import.meta.url),'utf8'));
+ console.log('Service requests: signatures, immutable files, decisions, retries, filters, permissions and workspace isolation passed');
+} catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
+try {
+ await db.exec(readFileSync(new URL('./service_request_people_before.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260917155919_service_request_people_and_operators.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./service_request_people.sql',import.meta.url),'utf8'));
+ console.log('Requester people: legacy snapshots, people without accounts, operator audit, manager identity, selection, retries and isolation passed');
+} catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
+try {
+ // Previous fixture deliberately rolls back its migration. Recreate legacy rows
+ // and apply the people migration before checking the new document snapshots.
+ await db.exec(readFileSync(new URL('./service_request_people_before.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260917155919_service_request_people_and_operators.sql',import.meta.url),'utf8'));
+ await db.exec(`SET ROLE authenticated; SELECT set_config('request.jwt.claim.sub','72000000-0000-4000-8000-000000000001',true);
+  SELECT set_config('test.manual.legacy',(public.billing_rpc('service-requests','get','{"id":"72000000-0000-4000-8000-000000000020"}')->'request')::text,true); RESET ROLE;`);
+ await db.exec(readFileSync(new URL('../migrations/20260918112906_service_request_manual_signatures_templates.sql',import.meta.url),'utf8'));
+ console.log('Manual signatures, document templates and record hashes migration compiled successfully');
+ await db.exec(readFileSync(new URL('../migrations/20260918125410_service_providers_registry.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./service_providers.sql',import.meta.url),'utf8'));
+ console.log('Providers: CPF/CNPJ, duplicates, server-derived request snapshots, retries, immutable hashes, permissions and isolation passed');
+ await db.exec(readFileSync(new URL('../migrations/20260918131759_service_request_optional_details.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260918133722_service_request_complement_conflict.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./service_request_complements.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260918134159_service_request_report_header.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./service_request_report_header.sql',import.meta.url),'utf8'));
+ console.log('Request report headers: portrait settings, selected company, request-only readers and private logo isolation passed');
+ console.log('Optional request details, approved complements, retries, conflicts, snapshots and isolation passed');
+ await db.exec(readFileSync(new URL('../migrations/20260918145206_service_request_pending_complements.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./service_request_pending_complements.sql',import.meta.url),'utf8'));
+ console.log('Pending request complements: private PDF upload, versioned approval evidence, later additions, retries, permissions and isolation passed');
+ await db.exec(readFileSync(new URL('../migrations/20260918151219_service_request_execution_status.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./service_request_execution_status.sql',import.meta.url),'utf8'));
+ console.log('Service execution: open/in-progress/completed states, audited completion, immutable approval, retries, filtered pagination and isolation passed');
+ await db.exec(readFileSync(new URL('./service_request_documents.sql',import.meta.url),'utf8'));
+ console.log('Document workflow: optional PNG/budget, manual choices, immutable templates and hashes, layout validation, audit and isolation passed');
+} catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
+try {
+ await db.exec(readFileSync(new URL('../migrations/20260918121253_service_request_watermark_access.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./service_request_watermark.sql',import.meta.url),'utf8'));
+ console.log('Document watermarks: request reader, private storage, Realtime isolation, no writes and permission revocation passed');
+} catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
+try {
+ // Document fixtures roll back the migrations applied inside their transaction.
+ // Restore the current schema before exercising the home projection end to end.
+ for (const migration of [
+  '20260917155919_service_request_people_and_operators.sql',
+  '20260918112906_service_request_manual_signatures_templates.sql',
+  '20260918125410_service_providers_registry.sql',
+  '20260918131759_service_request_optional_details.sql',
+  '20260918133722_service_request_complement_conflict.sql',
+  '20260918134159_service_request_report_header.sql',
+  '20260918145206_service_request_pending_complements.sql',
+  '20260918151219_service_request_execution_status.sql',
+ ]) await db.exec(readFileSync(new URL('../migrations/'+migration,import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260918162432_home_dashboard.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./home_dashboard.sql',import.meta.url),'utf8'));
+ console.log('Home dashboard: company finance, deadlines, current request details, planning, empty states, permissions and isolation passed');
+} catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
 await db.close();
