@@ -291,10 +291,18 @@ BEGIN
   PERFORM public.billing_rpc('contracts','save',jsonb_build_object('id',contract_id,'title','Contrato movido','companyId',company1,'clientId',client_id,'typeId',type_id,'status','Ativo','startDate','2026-09-01','endDate','','contractedVolume','1000.125','atrPriceType','gross','atrPeriodType','monthly','value','','notes',''));
   RAISE EXCEPTION 'Existing contract moved between company contexts';
  EXCEPTION WHEN no_data_found THEN NULL; END;
- BEGIN
-  PERFORM public.billing_rpc('contracts','save-load',jsonb_build_object('companyId',company2,'contractId',contract_id,'loadedAt','2026-09-11','farmId',farm,'plotId',other,'volume','901','atr','100','document','','notes',''));
-  RAISE EXCEPTION 'Contract volume overflow was accepted';
- EXCEPTION WHEN check_violation THEN NULL; END;
+ r=public.billing_rpc('contracts','save-load',jsonb_build_object('companyId',company2,'contractId',contract_id,'loadedAt','2026-09-11','farmId',farm,'plotId',other,'volume','901','atr','100','document','EXCEDENTE','notes',''));
+ missing_load_id=(r->'load'->>'id')::uuid;
+ r=public.billing_rpc('contracts','get',jsonb_build_object('companyId',company2,'id',contract_id));
+ IF r->'contract'->>'loadedVolume'<>'1001.125' OR r->'contract'->>'remainingVolume'<>'0'
+  OR r->'contract'->'financialSummary'->'totals'->>'loadedVolume'<>'1001.125' THEN
+  RAISE EXCEPTION 'Contract excess volume was not accepted or calculated: %',r;
+ END IF;
+ r=public.billing_rpc('contracts','save',jsonb_build_object('id',contract_id,'title','Contrato excedido','companyId',company2,'clientId',client_id,'typeId',type_id,'status','Ativo','startDate','2026-09-01','endDate','2026-12-01','contractedVolume','1000.125','atrPriceType','gross','atrPeriodType','monthly','value','123.45','notes',''));
+ IF r->'contract'->>'contractedVolume'<>'1000.125' OR r->'contract'->>'loadedVolume'<>'1001.125' THEN
+  RAISE EXCEPTION 'Contract edit failed after accepted excess volume: %',r;
+ END IF;
+ PERFORM public.billing_rpc('contracts','delete-load',jsonb_build_object('companyId',company2,'contractId',contract_id,'id',missing_load_id));
  PERFORM public.billing_rpc('contracts','delete-load',jsonb_build_object('companyId',company2,'contractId',contract_id,'id',load_id));
  r=public.billing_rpc('contracts','get',jsonb_build_object('companyId',company2,'id',contract_id));
  IF r->'contract'->>'loadedVolume'<>'0' OR r->'contract'->>'remainingVolume'<>'1000.125' OR jsonb_array_length(r->'contract'->'loads')<>0 THEN RAISE EXCEPTION 'Contract load delete did not recalculate totals'; END IF;

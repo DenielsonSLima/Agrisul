@@ -11,3 +11,9 @@ export const formatContractMonth=(month:string)=>{const [year,value]=month.split
 export const formatContractDate=(date:string)=>date?date.split('-').reverse().join('/'):'Não informada';
 export const contractPeriod=(start:string,end:string)=>start&&end?formatContractDate(start)+' – '+formatContractDate(end):start?'Desde '+formatContractDate(start):end?'Até '+formatContractDate(end):'Período não informado';
 export const statusClass=(status:string)=>({'Ativo':'active','Concluído':'completed','Cancelado':'cancelled'}[status]||'active');
+const previewDecimal=(value:string)=>Number(value.replace(',','.'));
+export const previewContractLoadExcess=(contractedVolume:string,loadedVolume:string,nextVolume:string,previousVolume='0')=>{
+ const contracted=previewDecimal(contractedVolume),loaded=previewDecimal(loadedVolume),next=previewDecimal(nextVolume),previous=previewDecimal(previousVolume);
+ if(![contracted,loaded,next,previous].every(Number.isFinite)||next<=0)return 0;
+ return Math.max(loaded-previous+next-contracted,0);
+};

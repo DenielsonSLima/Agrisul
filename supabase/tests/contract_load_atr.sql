@@ -72,7 +72,13 @@ BEGIN
  END LOOP;
  BEGIN PERFORM public.billing_rpc('contracts','save-load',input||'{"atrReferenceMonth":"2026-01"}');RAISE EXCEPTION 'Client reference override accepted';EXCEPTION WHEN invalid_parameter_value THEN NULL;END;
  BEGIN PERFORM public.billing_rpc('contracts','save-load',input||'{"volume":"0.0001"}');RAISE EXCEPTION 'Weight precision accepted';EXCEPTION WHEN invalid_parameter_value THEN NULL;END;
- BEGIN PERFORM public.billing_rpc('contracts','save-load',input||'{"volume":"100"}');RAISE EXCEPTION 'Capacity exceeded';EXCEPTION WHEN check_violation THEN NULL;END;
+ r=public.billing_rpc('contracts','save-load',input||'{"volume":"100","document":"EXCESS-CHECK"}');
+ c=public.billing_rpc('contracts','get',jsonb_build_object('id',contract,'companyId',company))->'contract';
+ IF c->>'loadedVolume'<>'130' OR c->>'remainingVolume'<>'0'
+  OR c->'financialSummary'->'totals'->>'loadedVolume'<>'130' THEN
+  RAISE EXCEPTION 'Excess load was not accepted in contract totals: %',c;
+ END IF;
+ PERFORM public.billing_rpc('contracts','delete-load',scope||jsonb_build_object('id',r->'load'->>'id'));
  PERFORM public.billing_rpc('atr','delete',jsonb_build_object('id',quote_id));
  -- Another owner's quote cannot fill the gap, nor can the current month's quote.
  PERFORM set_config('request.jwt.claim.sub','88888888-8888-4888-8888-888888888882',true);

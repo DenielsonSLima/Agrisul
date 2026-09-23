@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
-import {Loader2,Save,Truck} from 'lucide-react';
+import {Loader2,Save,TriangleAlert,Truck} from 'lucide-react';
 import {Dialog,DialogContent,DialogDescription,DialogHeader,DialogTitle} from '@/components/ui/dialog';
 import {Textarea} from '@/components/ui/textarea';
 import {Choice,Field} from '@/shared/components/Common';
@@ -7,7 +7,7 @@ import {notifications} from '@/shared/feedback';
 import {useFarms} from '@/modules/cadastro/fazenda/hooks/useFarms';
 import {usePlots} from '@/modules/cadastro/talhoes/hooks/usePlots';
 import {useContractLoadsMutation} from '../../hooks/useContracts';
-import {formatAtrCriterion} from '../../utils/contractFormat';
+import {formatAtrCriterion,formatContractVolume,previewContractLoadExcess} from '../../utils/contractFormat';
 import type {BillingContract,ContractLoad,ContractLoadInput} from '../../types';
 
 const today=()=>{const date=new Date();return [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-');};
@@ -17,6 +17,7 @@ export function ContractLoadDialog({contract,load,onClose,returnFocus}:{contract
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
  const [data,setData]=useState<ContractLoadInput>(()=>load?{loadedAt:load.loadedAt,farmId:load.farmId,plotId:load.plotId,volume:load.volume,atr:load.atr,document:load.document,notes:load.notes}:{loadedAt:today(),farmId:'',plotId:'',volume:'',atr:'',document:'',notes:''});
  const [error,setError]=useState('');const plots=usePlots(data.farmId);
+ const excessVolume=previewContractLoadExcess(contract.contractedVolume,contract.loadedVolume,data.volume,load?.volume??'0');
  const set=(key:keyof ContractLoadInput,value:string)=>setData(current=>({...current,[key]:value}));
  const save=async(event:React.FormEvent)=>{
   event.preventDefault();if(inFlight.current)return;inFlight.current=true;setError('');
@@ -51,6 +52,7 @@ export function ContractLoadDialog({contract,load,onClose,returnFocus}:{contract
        <Field label="Documento (opcional)"><input name="document" maxLength={100} placeholder="Ticket, romaneio ou nota" value={data.document} onChange={e=>set('document',e.target.value)}/></Field>
       </div>
       <p className="field-help">Faturamento = quantidade (t) × ATR do carregamento (kg/t) × cotação (R$/kg). A cotação será {formatAtrCriterion(contract.atrPriceType,contract.atrPeriodType)}, do mês anterior à data do carregamento.</p>
+      {excessVolume>0&&<p className="contract-load-excess-warning" role="status"><TriangleAlert size={18}/><span><strong>O volume contratado será ultrapassado em {formatContractVolume(String(excessVolume))}.</strong> O carregamento poderá ser lançado e todo o excedente será incluído normalmente no faturamento.</span></p>}
       <Field label="Observações (opcional)"><Textarea name="notes" rows={3} maxLength={1000} placeholder="Informações adicionais sobre este carregamento" value={data.notes} onChange={e=>set('notes',e.target.value)}/></Field>
      </section>
     </fieldset>

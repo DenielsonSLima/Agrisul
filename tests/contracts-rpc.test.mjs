@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {mkdtemp,rm} from 'node:fs/promises';
+import {mkdtemp,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -25,6 +25,16 @@ try{
     b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:'export class RpcError extends Error {constructor(message,status){super(message);this.status=status;}} export const rpcRequest=(...args)=>globalThis.contractsRpcFixture(...args);'}));
   }}]});
   const api=await import(pathToFileURL(out));
+  const formatOut=join(directory,'format.mjs');
+  await build({entryPoints:['modules/contratos/utils/contractFormat.ts'],outfile:formatOut,bundle:true,platform:'node',format:'esm'});
+  const format=await import(pathToFileURL(formatOut));
+  assert.equal(format.previewContractLoadExcess('100','80','30'),10);
+  assert.equal(format.previewContractLoadExcess('100','110','20','30'),0);
+  assert.equal(format.previewContractLoadExcess('100','110','20','10'),20);
+  assert.equal(format.previewContractLoadExcess('100','80','valor inválido'),0);
+  const loadDialog=await readFile('modules/contratos/components/details/ContractLoadDialog.tsx','utf8');
+  assert.match(loadDialog,/role="status"/);
+  assert.match(loadDialog,/todo o excedente será incluído normalmente no faturamento/);
   const controller=new AbortController();
   const filters={companyId:'company-id',bucket:'open',search:'Usina',from:'2026-09-01',to:'2026-09-30'};
   assert.deepEqual(await api.fetchContracts(filters,controller.signal),{contracts:[snapshot],counts:{open:1,finished:0},total:1});

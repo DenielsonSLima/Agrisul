@@ -44,6 +44,7 @@ const migrations=[
  '../migrations/20260915184718_contract_discount_monthly_breakdown.sql',
  '../migrations/20260915194313_contract_load_financial_columns.sql',
  '../migrations/20260915195837_contract_load_financial_kpis.sql',
+ '../migrations/20260923194302_allow_excess_contract_loads.sql',
 ];
 try{
  for(const path of migrations){
@@ -82,6 +83,7 @@ try{await db.exec(readFileSync(new URL('./contract_discount_breakdown.sql',impor
 try{await db.exec(readFileSync(new URL('./contract_loads.sql',import.meta.url),'utf8'));console.log('Contract loads: filters, groups, exact totals, weighted ATR and isolation passed');}catch(e){console.error(e.message,e.where,e.position);process.exit(1)}
 try{await db.exec(readFileSync(new URL('./contract_load_atr.sql',import.meta.url),'utf8'));console.log('Contract ATR: four criteria, previous month/year, date edits, quote edits, pending values, rounding and legacy isolation passed');}catch(e){console.error(e.message,e.where,e.position);process.exit(1)}
 try{await db.exec(readFileSync(new URL('./contract_load_financials.sql',import.meta.url),'utf8'));console.log('Load financials: monthly cents, agreement rounding, four ATR criteria, pending/zero/negative values, filters, edits, finance parity and isolation passed');}catch(e){console.error(e.message,e.where,e.position);process.exit(1)}
+try{await db.exec(readFileSync(new URL('./contract_load_excess.sql',import.meta.url),'utf8'));console.log('Excess contract loads: warning threshold, full billing and isolation passed');}catch(e){console.error(e.message,e.where,e.position);process.exit(1)}
 try{await db.exec(readFileSync(new URL('./contract_previous_month_atr.sql',import.meta.url),'utf8'));console.log('Contract ATR: independent load ATR, previous quotation month, year boundary, leap year and isolation passed');}catch(e){console.error(e.message,e.where,e.position);process.exit(1)}
 try{await db.exec(readFileSync(new URL('./contracts_list_summary.sql',import.meta.url),'utf8'));console.log('Contract list KPIs: filtered scope, weighted ATR, finance parity, credit isolation, missing quotes and account isolation passed');}catch(e){console.error(e.message,e.where,e.position);process.exit(1)}
 // Historical planning behavior above is verified before the removal migration.

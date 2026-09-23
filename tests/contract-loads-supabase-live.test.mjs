@@ -60,10 +60,11 @@ try{
  const inserted=(await rpc(second,'contracts','save-load',{...base,volume:'1',document:'Realtime'})).load;
  let eventTimer;try{await Promise.race([event,new Promise((_,reject)=>{eventTimer=setTimeout(()=>reject(new Error('Realtime event timeout')),25000);})]);}finally{clearTimeout(eventTimer);}
  await rpc(a.client,'contracts','delete-load',{...scope,id:inserted.id});await a.client.removeChannel(channel);
- const races=await Promise.allSettled([a.client,second].map(c=>rpc(c,'contracts','save-load',{...base,volume:'70',document:'Capacidade'})));
- assert.equal(races.filter(r=>r.status==='fulfilled').length,1);const winner=races.find(r=>r.status==='fulfilled').value.load;
- await rpc(a.client,'contracts','delete-load',{...scope,id:winner.id});
- console.log('PASS: remote filtered snapshots, grouping, decimals, tenant/company isolation, direct writes denied, concurrent capacity and independent Realtime.');
+ const races=await Promise.allSettled([a.client,second].map((c,index)=>rpc(c,'contracts','save-load',{...base,volume:'70',document:`Excedente-${index+1}`})));
+ assert.equal(races.filter(r=>r.status==='fulfilled').length,2);
+ snapshot=await list(a.client);assert.equal(snapshot.summary.volume,'240');assert.equal(snapshot.summary.billingPending,false);
+ for(const result of races)if(result.status==='fulfilled')await rpc(a.client,'contracts','delete-load',{...scope,id:result.value.load.id});
+ console.log('PASS: remote filtered snapshots, grouping, decimals, tenant/company isolation, direct writes denied, concurrent excess loads and independent Realtime.');
 }finally{
  for(const client of clients)await client.removeAllChannels();
  const failures=[];for(const id of users){const {error}=await admin.auth.admin.deleteUser(id);if(error)failures.push(id);}
