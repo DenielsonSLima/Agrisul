@@ -1,7 +1,7 @@
 'use client';
 
 import {useMemo, useRef, useState} from 'react';
-import {Loader2, PackagePlus, Plus, RefreshCw, Users} from 'lucide-react';
+import {Check, Loader2, PackagePlus, Plus, RefreshCw, Users} from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -287,8 +287,12 @@ export function QuoteAddProviderDialog({
             />
             <div className="quote-provider-table-wrap quote-scope-provider-list" role="region" aria-label="Fornecedores disponíveis" tabIndex={0}>
               <table className="quote-provider-table">
+                <caption className="sr-only">Fornecedores disponíveis para inclusão na cotação</caption>
                 <thead>
-                  <tr><th scope="col">Selecionar</th><th scope="col">Fornecedor</th></tr>
+                  <tr>
+                    <th className="quote-provider-select-heading" scope="col">Selecionar</th>
+                    <th scope="col">Fornecedor</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {filtered.map(provider => {
@@ -297,18 +301,23 @@ export function QuoteAddProviderDialog({
                     return (
                       <tr key={provider.id} className={checked ? 'selected' : ''}>
                         <td className="quote-provider-select-cell">
-                          <input
-                            id={inputId}
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => {
-                              setSelectedIds(current => checked
-                                ? current.filter(id => id !== provider.id)
-                                : [...current, provider.id]);
-                              setError('');
-                            }}
-                            aria-label={`Selecionar ${provider.legalName}`}
-                          />
+                          <label
+                            htmlFor={inputId}
+                            aria-label={`${checked ? 'Remover' : 'Selecionar'} ${provider.legalName}`}
+                          >
+                            <input
+                              id={inputId}
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {
+                                setSelectedIds(current => checked
+                                  ? current.filter(id => id !== provider.id)
+                                  : [...current, provider.id]);
+                                setError('');
+                              }}
+                            />
+                            <span className="quote-provider-check"><Check size={14}/></span>
+                          </label>
                         </td>
                         <td>
                           <label className="quote-provider-copy" htmlFor={inputId}>

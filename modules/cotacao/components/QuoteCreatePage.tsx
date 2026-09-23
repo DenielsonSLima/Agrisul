@@ -60,7 +60,7 @@ const initial = (): Draft => ({
 const steps = [
   ['Dados', 'Data e solicitante'],
   ['Materiais', 'Itens e quantidades'],
-  ['Prestadores', 'Selecionar fornecedores'],
+  ['Prestadores', 'Adicionar agora ou depois'],
   ['Resumo', 'Revisar e criar'],
 ] as const;
 
@@ -134,9 +134,6 @@ export function QuoteCreatePage() {
       || draft.items.some(item => !item.materialId || !item.quantity.trim())
     )) {
       return 'Selecione um produto e informe a quantidade.';
-    }
-    if (target === 2 && !draft.providers.length) {
-      return 'Selecione ao menos um prestador.';
     }
     return '';
   };
@@ -497,7 +494,7 @@ function ProvidersStep({
         <Users size={20}/>
         <div>
           <h3>Selecione os prestadores</h3>
-          <p>Ao criar, cada selecionado terá seu próprio PDF e sua coluna para lançar os preços.</p>
+          <p>Esta etapa é opcional. Você pode adicionar os fornecedores depois que a cotação for criada.</p>
         </div>
         <span>{selected.length} selecionado(s)</span>
       </header>
@@ -604,6 +601,9 @@ function ReviewStep({draft, materials, onEdit}: {draft: Draft; materials: Materi
         <article className="quote-review-card quote-review-providers-card">
           <ReviewCardHeader step="3" title="Prestadores" description={`${draft.providers.length} selecionado(s)`} onEdit={() => onEdit(2)}/>
           <div className="quote-review-provider-grid">
+            {!draft.providers.length && (
+              <p className="quote-review-empty-providers">Nenhum fornecedor adicionado. Você poderá adicioná-los depois.</p>
+            )}
             {draft.providers.map(provider => (
               <div className="quote-review-provider" key={provider.providerId}>
                 <span className="quote-review-provider-icon"><Users size={16}/></span>
@@ -655,8 +655,8 @@ function ReviewStep({draft, materials, onEdit}: {draft: Draft; materials: Materi
         <div>
           <strong>O que acontece depois?</strong>
           <p>
-            A cotação receberá um número automático. Depois, você poderá gerar um PDF individual para cada
-            prestador e preencher os valores recebidos para comparar o vencedor.
+            A cotação receberá um número automático. Depois, você poderá adicionar fornecedores, gerar os PDFs
+            individuais e preencher os valores recebidos para comparar o vencedor.
           </p>
         </div>
       </div>

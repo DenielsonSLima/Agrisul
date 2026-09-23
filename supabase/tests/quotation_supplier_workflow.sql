@@ -14,10 +14,13 @@ DECLARE
  item_a uuid:='94000000-0000-4000-8000-000000000010';
  item_b uuid:='94000000-0000-4000-8000-000000000011';
  reference_less_item uuid:='94000000-0000-4000-8000-000000000012';
+ empty_provider_item uuid:='94000000-0000-4000-8000-000000000013';
  quote_provider_a uuid:='94000000-0000-4000-8000-000000000020';
  quote_provider_b uuid:='94000000-0000-4000-8000-000000000021';
  priced_quote_id uuid:='94000000-0000-4000-8000-000000000022';
  reference_less_quote_provider uuid:='94000000-0000-4000-8000-000000000023';
+ empty_provider_quote_provider uuid:='94000000-0000-4000-8000-000000000024';
+ empty_provider_quote_id uuid;
  payload jsonb;
 BEGIN
  r=public.billing_rpc('signatures','save','{"name":"Equipe de compras","role":"requester"}');
@@ -43,6 +46,28 @@ BEGIN
   'street','Rua B','number','20','complement','','district','Centro','city','Cidade','state','SP',
   'zipCode','01001000','phone','11999990001','email','beta@example.invalid'));
  provider_b=(r->'provider'->>'id')::uuid;
+
+ r=public.billing_rpc('quotations','save',jsonb_build_object(
+  'title','Fornecedores definidos depois','number','COT-SEM-FORNECEDOR',
+  'requestDate','2026-09-22','requester','IGNORADO',
+  'requesterSignatureId',requester_id,'notes','',
+  'items',jsonb_build_array(jsonb_build_object(
+   'id',empty_provider_item,'materialId',material_a,'materialName','IGNORADO',
+   'quantity','2','unit','IGNORADO','notes','')),
+  'providers','[]'::jsonb));
+ empty_provider_quote_id=(r->'quote'->>'id')::uuid;
+ IF jsonb_array_length(r->'quote'->'providers')<>0 THEN
+  RAISE EXCEPTION 'Quotation created without providers returned an invalid aggregate: %',r;
+ END IF;
+ r=public.billing_rpc('quotations','add-providers',jsonb_build_object(
+  'id',empty_provider_quote_id,
+  'providers',jsonb_build_array(jsonb_build_object(
+   'id',empty_provider_quote_provider,'providerId',provider_a,'notes','','sentAt',NULL))));
+ IF jsonb_array_length(r->'quote'->'providers')<>1
+  OR r->'quote'->'providers'->0->>'providerId'<>provider_a::text THEN
+  RAISE EXCEPTION 'Provider could not be added after quotation creation: %',r;
+ END IF;
+ PERFORM public.billing_rpc('quotations','delete',jsonb_build_object('id',empty_provider_quote_id));
 
  r=public.billing_rpc('materials','save',jsonb_build_object(
   'name','Arruela sem referência','unit','PC','application','Uso geral'));

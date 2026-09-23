@@ -92,6 +92,24 @@ BEGIN
   RAISE EXCEPTION 'Conflicting item retry was accepted';
  EXCEPTION WHEN unique_violation THEN NULL; END;
 
+ r=public.billing_rpc('quotations','remove-item',jsonb_build_object(
+  'id',quote_id,'quotationItemId',item_b));
+ r=public.billing_rpc('quotations','remove-item',jsonb_build_object(
+  'id',quote_id,'quotationItemId',item_b));
+ IF jsonb_array_length(r->'quote'->'items')<>1
+  OR jsonb_array_length(r->'quote'->'negotiations')<>1 THEN
+  RAISE EXCEPTION 'Removing/retrying an unpriced item changed history: %',r;
+ END IF;
+ BEGIN
+  PERFORM public.billing_rpc('quotations','remove-item',jsonb_build_object(
+   'id',quote_id,'quotationItemId',item_a));
+  RAISE EXCEPTION 'Quotation accepted removal of its last material';
+ EXCEPTION WHEN check_violation THEN NULL; END;
+ r=public.billing_rpc('quotations','add-items',payload);
+ IF jsonb_array_length(r->'quote'->'items')<>2 THEN
+  RAISE EXCEPTION 'Removed item could not be added again: %',r;
+ END IF;
+
  payload=jsonb_build_object('id',quote_id,'providers',jsonb_build_array(
   jsonb_build_object('id',quote_provider_b,'providerId',provider_b,
    'notes','Incluído na negociação','sentAt',NULL)));
@@ -106,6 +124,19 @@ BEGIN
    'id',quote_id,'unexpected',true,'providers','[]'::jsonb));
   RAISE EXCEPTION 'Provider payload whitelist was bypassed';
  EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+
+ r=public.billing_rpc('quotations','remove-provider',jsonb_build_object(
+  'id',quote_id,'quotationProviderId',quote_provider_b));
+ r=public.billing_rpc('quotations','remove-provider',jsonb_build_object(
+  'id',quote_id,'quotationProviderId',quote_provider_b));
+ IF jsonb_array_length(r->'quote'->'providers')<>1
+  OR jsonb_array_length(r->'quote'->'negotiations')<>1 THEN
+  RAISE EXCEPTION 'Removing/retrying an unpriced provider changed history: %',r;
+ END IF;
+ r=public.billing_rpc('quotations','add-providers',payload);
+ IF jsonb_array_length(r->'quote'->'providers')<>2 THEN
+  RAISE EXCEPTION 'Removed provider could not be added again: %',r;
+ END IF;
 
  BEGIN
   PERFORM public.billing_rpc('quotations','award-item',jsonb_build_object(
@@ -122,6 +153,16 @@ BEGIN
  PERFORM public.billing_rpc('quotations','record-negotiation',jsonb_build_object(
   'id',quote_id,'quotationProviderId',quote_provider_b,
   'quotationItemId',item_b,'unitPrice','25.00','notes','Alternativa B'));
+ BEGIN
+  PERFORM public.billing_rpc('quotations','remove-item',jsonb_build_object(
+   'id',quote_id,'quotationItemId',item_b));
+  RAISE EXCEPTION 'Item with negotiation history was removed';
+ EXCEPTION WHEN check_violation THEN NULL; END;
+ BEGIN
+  PERFORM public.billing_rpc('quotations','remove-provider',jsonb_build_object(
+   'id',quote_id,'quotationProviderId',quote_provider_b));
+  RAISE EXCEPTION 'Provider with negotiation history was removed';
+ EXCEPTION WHEN check_violation THEN NULL; END;
 
  r=public.billing_rpc('quotations','award-item',jsonb_build_object(
   'id',quote_id,'quotationItemId',item_a,

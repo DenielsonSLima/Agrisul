@@ -127,6 +127,8 @@ export type QuoteScopeItemInput = Pick<QuoteItem, 'id' | 'materialId' | 'quantit
 export type QuoteScopeProviderInput = Pick<QuoteProvider, 'id' | 'providerId' | 'notes' | 'sentAt'>;
 export type QuoteAddItemsInput = { id: string; items: QuoteScopeItemInput[] };
 export type QuoteAddProvidersInput = { id: string; providers: QuoteScopeProviderInput[] };
+export type QuoteRemoveItemInput = { id: string; quotationItemId: string };
+export type QuoteRemoveProviderInput = { id: string; quotationProviderId: string };
 
 export type QuoteNegotiationInput = {
   id: string;

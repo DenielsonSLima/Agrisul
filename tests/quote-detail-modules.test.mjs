@@ -224,7 +224,7 @@ test('suppliers tab uses a semantic table and Export opens PdfExportDialog', asy
   assert.match(source, /onClose=\{\(\)=>setPdf\(null\)\}/);
 });
 
-test('open quotation scope can grow without replacing the existing negotiation', async () => {
+test('open quotation scope can grow and shrink without replacing existing negotiation history', async () => {
   const [detail, dialogs, api, hooks] = await Promise.all([
     readComponent('QuoteDetailPage'),
     readComponent('QuoteScopeDialogs'),
@@ -236,6 +236,10 @@ test('open quotation scope can grow without replacing the existing negotiation',
   assert.match(detail, /<QuoteAddProviderDialog\b/);
   assert.match(detail, /mutations\.addItems\(\{id:\s*quote\.id,\s*items:\s*\[item\]\}\)/);
   assert.match(detail, /mutations\.addProviders\(\{id:\s*quote\.id,\s*providers\}\)/);
+  assert.match(detail, /mutations\.removeItem\(\{id:\s*quote\.id,\s*quotationItemId:\s*item\.id\}\)/);
+  assert.match(detail, /mutations\.removeProvider\(\{id:\s*quote\.id,\s*quotationProviderId:\s*provider\.id\}\)/);
+  assert.match(detail, /title:\s*'Remover material da cotação\?'/);
+  assert.match(detail, /title:\s*'Remover fornecedor da cotação\?'/);
   assert.match(detail, /onAddMaterials=\{\(\)\s*=>\s*setAddingMaterial\(true\)\}/);
   assert.match(detail, /onAddProviders=\{\(\)\s*=>\s*setAddingProviders\(true\)\}/);
 
@@ -264,12 +268,27 @@ test('open quotation scope can grow without replacing the existing negotiation',
   assert.match(detail, /catalogError=\{providersQuery\.error\}/);
   assert.match(detail, /onReloadCatalog=\{providersQuery\.reload\}/);
 
-  for (const action of ['award-item', 'add-items', 'add-providers']) {
+  for (const action of ['award-item', 'add-items', 'add-providers', 'remove-item', 'remove-provider']) {
     assert.match(api, new RegExp(`['"]quotations['"],['"]${action}['"]`));
   }
-  for (const mutation of ['approveItem', 'addItems', 'addProviders']) {
+  for (const mutation of ['approveItem', 'addItems', 'addProviders', 'removeItem', 'removeProvider']) {
     assert.match(hooks, new RegExp(`${mutation}:\\(input:`));
   }
+});
+
+test('material and supplier removal controls are guarded by recorded prices and history', async () => {
+  const [summary, providers] = await Promise.all([
+    readComponent('QuoteSummaryTab'),
+    readComponent('QuoteProvidersTab'),
+  ]);
+
+  assert.match(summary, /onRemoveMaterial/);
+  assert.match(summary, /quote\.negotiations\.some\(entry => entry\.itemId === item\.id\)/);
+  assert.match(summary, /quote\.items\.length <= 1/);
+  assert.match(summary, /aria-label=\{`Remover \$\{item\.materialName\} da cotação`\}/);
+  assert.match(providers, /onRemoveProvider/);
+  assert.match(providers, /quote\.negotiations\.some\(entry => entry\.providerId === provider\.id\)/);
+  assert.match(providers, /aria-label=\{`Remover \$\{provider\.providerName\} da cotação`\}/);
 });
 
 test('quotation list is an operational workspace with KPIs, aligned filters and a four-column card grid', async () => {

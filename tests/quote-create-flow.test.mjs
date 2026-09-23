@@ -108,7 +108,7 @@ test('review summarizes quotation data, materials, references and providers', as
   assert.match(review, /provider\.providerName/);
 });
 
-test('final creation validates every editable step before saving', async () => {
+test('final creation validates required data and materials while providers remain optional', async () => {
   const source = compact(await readFile(createPath, 'utf8'));
   const validator = section(source, 'constvalidateStep=', 'constgoToStep=');
   const advance = section(source, 'constadvance=', 'constsave=');
@@ -119,19 +119,29 @@ test('final creation validates every editable step before saving', async () => {
   assert.match(validator, /(?:target|index)===1/);
   assert.match(validator, /!draft\.items\.length/);
   assert.match(validator, /draft\.items\.some\(/);
-  assert.match(validator, /(?:target|index)===2/);
-  assert.match(validator, /!draft\.providers\.length/);
+  assert.doesNotMatch(validator, /!draft\.providers\.length/);
   assert.match(advance, /validateStep\(step\)/);
   assert.match(
     save,
     /\(\[0,1,2\](?:asconst)?\)\.map\(index=>\(\{index,message:validateStep\(index\)\}\)\)\.find\((entry|result)=>\1\.message\)/,
-    'save must revalidate data, materials and providers independently of the current step',
+    'save must revalidate required data and materials independently of the current step',
   );
   assert.match(
     save,
     /(?:setStep|goToStep)\([^)]*\.index/,
     'an invalid final review must return the user to the failing step',
   );
+});
+
+test('provider step and review explain that suppliers can be added later', async () => {
+  const source = await readFile(createPath, 'utf8');
+  const providers = component(source, 'ProvidersStep');
+  const review = component(source, 'ReviewStep');
+
+  assert.match(providers, /etapa é opcional/);
+  assert.match(providers, /adicionar os fornecedores depois/);
+  assert.match(review, /Nenhum fornecedor adicionado/);
+  assert.match(review, /adicioná-los depois/);
 });
 
 test('quotation modal uses four desktop columns and no lateral summary column', async () => {

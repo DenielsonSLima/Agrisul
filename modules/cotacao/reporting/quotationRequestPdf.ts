@@ -37,7 +37,7 @@ const TABLE_COLUMNS = [
 
 const TABLE_HEADER_HEIGHT = 11;
 const ITEM_ROW_HEIGHT = 27;
-const TOTALS_HEIGHT = 20;
+const TOTALS_HEIGHT = 29;
 
 const safeFilePart = (value: string) => value
   .normalize('NFD')
@@ -284,40 +284,14 @@ export async function createQuotationRequestPdf(
     );
   };
 
-  const drawBlankField = (x: number, rowTop: number, columnWidth: number) => {
-    doc.setDrawColor(139, 157, 145);
-    doc.setLineWidth(.25);
-    doc.line(x + 2.2, rowTop + ITEM_ROW_HEIGHT * .66, x + columnWidth - 2.2, rowTop + ITEM_ROW_HEIGHT * .66);
-  };
-
-  const drawItem = (item: QuotationRequestItem, index: number, image: ReportPdfImage | null) => {
-    const rowTop = y;
-    if (index % 2 === 0) {
-      doc.setFillColor(249, 251, 249);
-      doc.rect(margin, rowTop, content, ITEM_ROW_HEIGHT, 'F');
-    }
-
-    let x = margin;
-    const photoWidth = TABLE_COLUMNS[0].width;
-    doc.setFillColor(245, 248, 246);
-    doc.roundedRect(x + 2, rowTop + 2, photoWidth - 4, ITEM_ROW_HEIGHT - 4, 1, 1, 'F');
-    if (image) {
-      drawContainedImage(image, x + 2.7, rowTop + 2.7, photoWidth - 5.4, ITEM_ROW_HEIGHT - 5.4);
-    } else {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(5.6);
-      doc.setTextColor(153, 165, 157);
-      doc.text('SEM FOTO', x + photoWidth / 2, rowTop + ITEM_ROW_HEIGHT / 2 + 1, {align: 'center'});
-    }
-    x += photoWidth;
-
+  const getItemLayout = (item: QuotationRequestItem, index: number) => {
     const productWidth = TABLE_COLUMNS[1].width;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7.6);
-    doc.setTextColor(43, 70, 51);
-    const nameLines = limitedLines(doc, `${index + 1}. ${item.materialName}`, productWidth - 5, 2);
-    doc.text(nameLines, x + 2.5, rowTop + 5, {lineHeightFactor: 1.15});
-
+    const nameLines = doc.splitTextToSize(
+      `${index + 1}. ${item.materialName}`,
+      productWidth - 5,
+    ) as string[];
     const references = item.materialReferences
       .map(reference => [reference.brand, reference.code].filter(Boolean).join(' '))
       .filter(Boolean)
@@ -328,13 +302,65 @@ export async function createQuotationRequestPdf(
       item.materialApplication,
       item.notes,
     ].filter(Boolean).join(' · ');
-    if (details) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.2);
+    const detailLines = details ? limitedLines(doc, details, productWidth - 5, 3) : [];
+    const rowHeight = Math.max(
+      ITEM_ROW_HEIGHT,
+      Math.ceil(8 + nameLines.length * 3.35 + detailLines.length * 2.7),
+    );
+    return {nameLines, detailLines, rowHeight};
+  };
+
+  const drawBlankField = (
+    x: number,
+    rowTop: number,
+    columnWidth: number,
+    rowHeight: number,
+  ) => {
+    doc.setDrawColor(139, 157, 145);
+    doc.setLineWidth(.25);
+    doc.line(x + 2.2, rowTop + rowHeight * .66, x + columnWidth - 2.2, rowTop + rowHeight * .66);
+  };
+
+  const drawItem = (
+    item: QuotationRequestItem,
+    index: number,
+    image: ReportPdfImage | null,
+    layout: ReturnType<typeof getItemLayout>,
+  ) => {
+    const rowTop = y;
+    if (index % 2 === 0) {
+      doc.setFillColor(249, 251, 249);
+      doc.rect(margin, rowTop, content, layout.rowHeight, 'F');
+    }
+
+    let x = margin;
+    const photoWidth = TABLE_COLUMNS[0].width;
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(x + 2, rowTop + 2, photoWidth - 4, layout.rowHeight - 4, 1, 1, 'F');
+    if (image) {
+      drawContainedImage(image, x + 2.7, rowTop + 2.7, photoWidth - 5.4, layout.rowHeight - 5.4);
+    } else {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(5.6);
+      doc.setTextColor(153, 165, 157);
+      doc.text('SEM FOTO', x + photoWidth / 2, rowTop + layout.rowHeight / 2 + 1, {align: 'center'});
+    }
+    x += photoWidth;
+
+    const productWidth = TABLE_COLUMNS[1].width;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.6);
+    doc.setTextColor(43, 70, 51);
+    doc.text(layout.nameLines, x + 2.5, rowTop + 5, {lineHeightFactor: 1.15});
+
+    if (layout.detailLines.length) {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6.2);
       doc.setTextColor(100, 118, 106);
-      const detailTop = rowTop + 5 + nameLines.length * 3.35;
-      const detailLines = limitedLines(doc, details, productWidth - 5, 3);
-      doc.text(detailLines, x + 2.5, detailTop, {lineHeightFactor: 1.15});
+      const detailTop = rowTop + 5 + layout.nameLines.length * 3.35;
+      doc.text(layout.detailLines, x + 2.5, detailTop, {lineHeightFactor: 1.15});
     }
     x += productWidth;
 
@@ -345,25 +371,25 @@ export async function createQuotationRequestPdf(
     doc.text(
       `${item.quantity} ${item.unit}`.trim(),
       x + requestedWidth / 2,
-      rowTop + ITEM_ROW_HEIGHT / 2 + 1,
+      rowTop + layout.rowHeight / 2 + 1,
       {align: 'center'},
     );
     x += requestedWidth;
 
     TABLE_COLUMNS.slice(3).forEach(column => {
-      drawBlankField(x, rowTop, column.width);
+      drawBlankField(x, rowTop, column.width, layout.rowHeight);
       x += column.width;
     });
 
     doc.setDrawColor(201, 215, 206);
     doc.setLineWidth(.2);
-    doc.rect(margin, rowTop, content, ITEM_ROW_HEIGHT);
+    doc.rect(margin, rowTop, content, layout.rowHeight);
     x = margin;
     TABLE_COLUMNS.forEach(column => {
       x += column.width;
-      if (x < width - margin - .1) doc.line(x, rowTop, x, rowTop + ITEM_ROW_HEIGHT);
+      if (x < width - margin - .1) doc.line(x, rowTop, x, rowTop + layout.rowHeight);
     });
-    y += ITEM_ROW_HEIGHT;
+    y += layout.rowHeight;
   };
 
   const drawTotals = () => {
@@ -374,6 +400,7 @@ export async function createQuotationRequestPdf(
     const totalsX = width - margin - totalsWidth;
     const rows = [
       {label: 'Subtotal', height: 9, fill: [247, 250, 248] as const},
+      {label: 'Desconto', height: 9, fill: [242, 247, 243] as const},
       {label: 'Valor total', height: 11, fill: [229, 239, 232] as const},
     ];
 
@@ -383,7 +410,7 @@ export async function createQuotationRequestPdf(
       doc.rect(totalsX, y, totalsWidth, row.height, 'FD');
       doc.line(totalsX + labelWidth, y, totalsX + labelWidth, y + row.height);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(index ? 8.5 : 7.5);
+      doc.setFontSize(index === rows.length - 1 ? 8.5 : 7.5);
       doc.setTextColor(43, 75, 53);
       doc.text(row.label, totalsX + labelWidth - 3, y + row.height / 2 + 1.1, {align: 'right'});
       doc.setFont('helvetica', 'normal');
@@ -405,7 +432,10 @@ export async function createQuotationRequestPdf(
   drawProviderPanel();
   drawNotes();
 
-  const minimumTableSpace = 4 + TABLE_HEADER_HEIGHT + (snapshot.items.length ? ITEM_ROW_HEIGHT : 12);
+  const firstItemHeight = snapshot.items.length
+    ? getItemLayout(snapshot.items[0], 0).rowHeight
+    : 12;
+  const minimumTableSpace = 4 + TABLE_HEADER_HEIGHT + firstItemHeight;
   if (y + minimumTableSpace > bottom) {
     newTablePage();
   } else {
@@ -415,9 +445,10 @@ export async function createQuotationRequestPdf(
 
   if (snapshot.items.length) {
     snapshot.items.forEach((item, index) => {
+      const layout = getItemLayout(item, index);
       const keepTotalsWithLastItem = index === snapshot.items.length - 1 ? TOTALS_HEIGHT + 4 : 0;
-      if (y + ITEM_ROW_HEIGHT + keepTotalsWithLastItem > bottom) newTablePage();
-      drawItem(item, index, itemImages[index] ?? null);
+      if (y + layout.rowHeight + keepTotalsWithLastItem > bottom) newTablePage();
+      drawItem(item, index, itemImages[index] ?? null, layout);
     });
   } else {
     doc.setFont('helvetica', 'normal');

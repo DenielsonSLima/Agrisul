@@ -8,12 +8,14 @@ import {
   FileDown,
   Loader2,
   PackageOpen,
+  Plus,
+  Trash2,
   Trophy,
   Users,
 } from 'lucide-react';
 import {dateLabel, moneyLabel} from '@/shared/utils/presentation';
 import {useMaterials} from '../hooks/useQuotes';
-import type {Quote, QuoteProvider} from '../types';
+import type {Quote, QuoteItem, QuoteProvider} from '../types';
 import {QuoteAwardExportDialog} from './QuoteAwardExportDialog';
 
 type QuoteSummaryTabProps = {
@@ -22,6 +24,9 @@ type QuoteSummaryTabProps = {
   finalizing: boolean;
   finalizeError: string;
   onFinalize: () => Promise<void>;
+  onAddMaterials: () => void;
+  onRemoveMaterial: (item: QuoteItem) => Promise<void>;
+  removingItemId: string;
 };
 
 function resultLabel(quote: Quote, provider: QuoteProvider) {
@@ -50,6 +55,9 @@ export function QuoteSummaryTab({
   finalizing,
   finalizeError,
   onFinalize,
+  onAddMaterials,
+  onRemoveMaterial,
+  removingItemId,
 }: QuoteSummaryTabProps) {
   const materialsQuery = useMaterials();
   const [exportProviderId, setExportProviderId] = useState<string | null>(null);
@@ -109,10 +117,17 @@ export function QuoteSummaryTab({
       </article>
 
       <article className="quote-summary-section">
-        <header><PackageOpen size={18}/><div><h4>Materiais</h4><p>Itens solicitados nesta cotação</p></div></header>
+        <header>
+          <PackageOpen size={18}/><div><h4>Materiais</h4><p>Itens solicitados nesta cotação</p></div>
+          {quote.status === 'open' && (
+            <button className="btn company-primary" type="button" disabled={busy} onClick={onAddMaterials}>
+              <Plus size={15}/>Adicionar material
+            </button>
+          )}
+        </header>
         <div className="quote-summary-table-wrap" role="region" aria-label="Materiais da cotação" tabIndex={0}>
           <table className="quote-summary-table">
-            <thead><tr><th scope="col">Material</th><th scope="col">Referências</th><th scope="col">Quantidade</th><th scope="col">Aprovação</th></tr></thead>
+            <thead><tr><th scope="col">Material</th><th scope="col">Referências</th><th scope="col">Quantidade</th><th scope="col">Aprovação</th><th scope="col"><span className="sr-only">Ações</span></th></tr></thead>
             <tbody>
               {quote.items.map(item => {
                 const references = item.materialReferences
@@ -120,6 +135,15 @@ export function QuoteSummaryTab({
                   .join(' · ');
                 const award = itemAwards.find(entry => entry.itemId === item.id);
                 const provider = award ? quote.providers.find(entry => entry.id === award.providerId) : null;
+                const hasPriceOrHistory = quote.negotiations.some(entry => entry.itemId === item.id)
+                  || quote.providers.some(entry => !!entry.values[item.id])
+                  || !!award;
+                const cannotRemove = quote.items.length <= 1 || hasPriceOrHistory;
+                const removeTitle = quote.items.length <= 1
+                  ? 'A cotação precisa manter ao menos um material.'
+                  : hasPriceOrHistory
+                    ? 'Materiais com preço, histórico ou aprovação não podem ser removidos.'
+                    : `Remover ${item.materialName}`;
                 return (
                   <tr key={item.id}>
                     <td>
@@ -133,6 +157,22 @@ export function QuoteSummaryTab({
                       {provider && award ? (
                         <span className="quote-summary-award"><strong>{provider.providerName}</strong><small>{moneyLabel(award.lineTotal)}</small></span>
                       ) : <span className="quote-result-badge pending">Pendente</span>}
+                    </td>
+                    <td className="quote-summary-row-actions">
+                      {quote.status === 'open' && (
+                        <button
+                          className="icon-btn danger"
+                          type="button"
+                          disabled={busy || cannotRemove}
+                          title={removeTitle}
+                          aria-label={`Remover ${item.materialName} da cotação`}
+                          onClick={() => void onRemoveMaterial(item)}
+                        >
+                          {removingItemId === item.id
+                            ? <Loader2 className="animate-spin" size={15}/>
+                            : <Trash2 size={15}/>}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );

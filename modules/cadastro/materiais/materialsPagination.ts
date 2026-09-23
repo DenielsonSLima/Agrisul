@@ -1,4 +1,4 @@
-export const MATERIALS_PAGE_SIZE=30;
+export const MATERIALS_PAGE_SIZE=20;
 
 export type MaterialsPagination<T>={
  items:T[];

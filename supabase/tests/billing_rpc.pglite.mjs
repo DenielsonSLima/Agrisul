@@ -278,6 +278,8 @@ try {
  `);
  await db.exec(readFileSync(new URL('../migrations/20260923161037_quotation_item_awards_and_scope.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('../migrations/20260923173330_purchase_order_workspace.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260923185900_allow_empty_quotation_providers.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260923191551_quotation_scope_removals.sql',import.meta.url),'utf8'));
  await db.exec(`DO $$
   DECLARE v_projection jsonb;
   BEGIN

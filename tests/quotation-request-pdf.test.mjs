@@ -181,7 +181,7 @@ test('quotation request PDF is a roomy supplier form with photo, prices, discoun
           id: 'item-without-photo',
           materialId: 'material-without-photo',
           materialVariantId: '',
-          materialName: 'FILTRO SEM FOTO',
+          materialName: 'LUVA TÉRMICA DE ALTA TEMPERATURA PARA USO INDUSTRIAL',
           materialCode: 'MAT-002',
           materialApplication: '',
           materialReferences: [],
@@ -242,18 +242,26 @@ test('quotation request PDF is a roomy supplier form with photo, prices, discoun
       'Desc. total',
       'Valor total',
       'Subtotal',
+      'Desconto',
     ]) {
       assert.ok(searchableText.includes(label), `the supplier form must include ${label}`);
     }
     assert.ok(
-      searchableText.lastIndexOf('Valor total') > searchableText.lastIndexOf('Subtotal'),
-      'the grand total must follow the subtotal',
+      searchableText.lastIndexOf('Desconto') > searchableText.lastIndexOf('Subtotal')
+        && searchableText.lastIndexOf('Valor total') > searchableText.lastIndexOf('Desconto'),
+      'the discount must sit between the subtotal and grand total',
     );
 
     const firstProduct = textDraw(draws, 'FILTRO COM FOTO');
-    const secondProduct = textDraw(draws, 'FILTRO SEM FOTO');
+    const secondProduct = textDraw(draws, 'LUVA TÉRMICA DE ALTA');
     const image = globalThis.__quotationImageDraws[0];
     assert.ok(firstProduct && secondProduct, 'every requested product must reach the form');
+    assert.ok(
+      secondProduct.value.includes('USO')
+        && secondProduct.value.includes('INDUSTRIAL')
+        && !secondProduct.value.includes('...'),
+      'long product names must wrap completely instead of being truncated',
+    );
     assert.ok(
       image.x + image.width <= firstProduct.x,
       'the registered photo must stay on the left of the product description',

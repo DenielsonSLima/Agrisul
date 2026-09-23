@@ -1,7 +1,7 @@
 'use client';
 
 import {useMemo, useState} from 'react';
-import {FileDown, Loader2, Plus, RefreshCw, Users} from 'lucide-react';
+import {FileDown, Loader2, Plus, RefreshCw, Trash2, Users} from 'lucide-react';
 import {providerDocument} from '@/modules/cadastro/prestadores/presentation';
 import {PdfExportDialog} from '@/shared/reporting/PdfExportDialog';
 import {formatReportPhone} from '@/shared/reporting';
@@ -75,11 +75,15 @@ function resultTone(quote: Quote, provider: QuoteProvider) {
 export function QuoteProvidersTab({
   quote,
   onAddProviders,
+  onRemoveProvider,
   addingProviders = false,
+  removingProviderId = '',
 }: {
   quote: Quote;
   onAddProviders?: () => void;
+  onRemoveProvider?: (provider: QuoteProvider) => Promise<void>;
   addingProviders?: boolean;
+  removingProviderId?: string;
 }) {
   const {activeCompanyId} = useWorkspaceCompany();
   const materialsQuery = useMaterials();
@@ -140,12 +144,15 @@ export function QuoteProvidersTab({
                 <th scope="col">Status</th>
                 <th scope="col">Total</th>
                 <th scope="col">Resultado</th>
-                <th scope="col"><span className="sr-only">Exportação</span></th>
+                <th scope="col"><span className="sr-only">Ações</span></th>
               </tr>
             </thead>
             <tbody>
-              {quote.providers.map(provider => (
-                <tr key={provider.id}>
+              {quote.providers.map(provider => {
+                const hasPriceOrHistory = (provider.quotedItemCount ?? 0) > 0
+                  || quote.negotiations.some(entry => entry.providerId === provider.id)
+                  || (provider.awardedItemCount ?? 0) > 0;
+                return <tr key={provider.id}>
                   <td>
                     <strong>{provider.providerName}</strong>
                     <small>{provider.providerTradeName || 'Nome fantasia não informado'}</small>
@@ -174,21 +181,39 @@ export function QuoteProvidersTab({
                     </span>
                   </td>
                   <td className="quote-provider-export">
-                    <button
-                      className="btn"
-                      type="button"
-                      disabled={materialsQuery.loading}
-                      aria-label={`Exportar solicitação para ${provider.providerName}`}
-                      onClick={() => setPdf(quotationRequestSnapshot(quote, provider, materialImages))}
-                    >
-                      {materialsQuery.loading
-                        ? <Loader2 className="animate-spin" size={15} aria-hidden="true"/>
-                        : <FileDown size={15} aria-hidden="true"/>}
-                      {materialsQuery.loading ? 'Preparando fotos…' : 'Exportar'}
-                    </button>
+                    <div className="quote-provider-row-actions">
+                      <button
+                        className="btn"
+                        type="button"
+                        disabled={materialsQuery.loading}
+                        aria-label={`Exportar solicitação para ${provider.providerName}`}
+                        onClick={() => setPdf(quotationRequestSnapshot(quote, provider, materialImages))}
+                      >
+                        {materialsQuery.loading
+                          ? <Loader2 className="animate-spin" size={15} aria-hidden="true"/>
+                          : <FileDown size={15} aria-hidden="true"/>}
+                        {materialsQuery.loading ? 'Preparando fotos…' : 'Exportar'}
+                      </button>
+                      {quote.status === 'open' && onRemoveProvider && (
+                        <button
+                          className="icon-btn danger"
+                          type="button"
+                          disabled={addingProviders || hasPriceOrHistory}
+                          title={hasPriceOrHistory
+                            ? 'Fornecedores com preço, histórico ou aprovação não podem ser removidos.'
+                            : `Remover ${provider.providerName}`}
+                          aria-label={`Remover ${provider.providerName} da cotação`}
+                          onClick={() => void onRemoveProvider(provider)}
+                        >
+                          {removingProviderId === provider.id
+                            ? <Loader2 className="animate-spin" size={15}/>
+                            : <Trash2 size={15}/>}
+                        </button>
+                      )}
+                    </div>
                   </td>
-                </tr>
-              ))}
+                </tr>;
+              })}
             </tbody>
           </table>
         </div>

@@ -6,6 +6,10 @@ const createPath = new URL(
   '../modules/cotacao/components/QuoteCreatePage.tsx',
   import.meta.url,
 );
+const scopeDialogsPath = new URL(
+  '../modules/cotacao/components/QuoteScopeDialogs.tsx',
+  import.meta.url,
+);
 const stylesPath = new URL('../modules/cotacao/styles.css', import.meta.url);
 
 function component(source, name) {
@@ -71,6 +75,22 @@ test('provider row keeps the legal name above formatted document and trade name'
   assert.ok(nameAt >= 0 && metaAt > nameAt, 'the metadata must be below the legal name');
   assert.ok(documentAt > metaAt, 'the formatted document must be on the metadata line');
   assert.ok(tradeAt > documentAt, 'the trade name must follow the formatted document');
+});
+
+test('add-provider dialog keeps selection in the compact checkbox column', async () => {
+  const source = await readFile(scopeDialogsPath, 'utf8');
+  const dialog = component(source, 'QuoteAddProviderDialog');
+
+  assert.match(
+    dialog,
+    /<th className="quote-provider-select-heading" scope="col">Selecionar<\/th>/,
+    'the dialog must apply the fixed-width selection heading',
+  );
+  assert.match(
+    dialog,
+    /<td className="quote-provider-select-cell">[\s\S]*?<label[\s\S]*?<input[\s\S]*?type="checkbox"[\s\S]*?<span className="quote-provider-check"><Check/,
+    'the dialog must render the same visible checkbox control used by the creation flow',
+  );
 });
 
 test('provider search covers legal name, trade name and raw and formatted documents', async () => {

@@ -8,7 +8,7 @@ import {notifications, useConfirmation} from '@/shared/feedback';
 import {ModuleLink, useModuleNavigation} from '@/shared/navigation/ModuleNavigation';
 import {dateLabel} from '@/shared/utils/presentation';
 import {useMaterials, useQuoteDetail, useQuoteMutations} from '../hooks/useQuotes';
-import type {Quote, QuoteItemAwardInput, QuoteNegotiationInput} from '../types';
+import type {Quote, QuoteItem, QuoteItemAwardInput, QuoteNegotiationInput, QuoteProvider} from '../types';
 import {listHref, QuotationBreadcrumb} from './QuoteShared';
 import {QuoteNegotiationTab} from './QuoteNegotiationTab';
 import {QuoteProvidersTab} from './QuoteProvidersTab';
@@ -58,6 +58,8 @@ function QuoteDetailContent({quote}: {quote: Quote}) {
   const [tab, setTab] = useState<QuoteDetailTab>('summary');
   const [addingMaterial, setAddingMaterial] = useState(false);
   const [addingProviders, setAddingProviders] = useState(false);
+  const [removingItemId, setRemovingItemId] = useState('');
+  const [removingProviderId, setRemovingProviderId] = useState('');
   const [finalizeError, setFinalizeError] = useState('');
   const purchaseOrders = quote.purchaseOrders ?? [];
   const singleOrderId = purchaseOrders.length === 1
@@ -173,6 +175,48 @@ function QuoteDetailContent({quote}: {quote: Quote}) {
     }
   };
 
+  const removeMaterial = async (item: QuoteItem) => {
+    if (quote.status !== 'open' || mutations.scopeSaving) return;
+    const accepted = await confirm({
+      title: 'Remover material da cotação?',
+      description: `${item.materialName} será removido somente desta cotação. O cadastro do material será mantido.`,
+      confirmLabel: 'Remover material',
+      tone: 'destructive',
+    });
+    if (!accepted) return;
+    setRemovingItemId(item.id);
+    try {
+      await mutations.removeItem({id: quote.id, quotationItemId: item.id});
+      setFinalizeError('');
+      notifications.deleted('Material removido da cotação.');
+    } catch (reason) {
+      notifications.error((reason as Error).message || 'Não foi possível remover o material da cotação.');
+    } finally {
+      setRemovingItemId('');
+    }
+  };
+
+  const removeProvider = async (provider: QuoteProvider) => {
+    if (quote.status !== 'open' || mutations.scopeSaving) return;
+    const accepted = await confirm({
+      title: 'Remover fornecedor da cotação?',
+      description: `${provider.providerName} deixará de participar desta cotação. O cadastro do fornecedor será mantido.`,
+      confirmLabel: 'Remover fornecedor',
+      tone: 'destructive',
+    });
+    if (!accepted) return;
+    setRemovingProviderId(provider.id);
+    try {
+      await mutations.removeProvider({id: quote.id, quotationProviderId: provider.id});
+      setFinalizeError('');
+      notifications.deleted('Fornecedor removido da cotação.');
+    } catch (reason) {
+      notifications.error((reason as Error).message || 'Não foi possível remover o fornecedor da cotação.');
+    } finally {
+      setRemovingProviderId('');
+    }
+  };
+
   return (
     <section className="cotacao-page quote-detail-page">
       <QuotationBreadcrumb name={quote.title}/>
@@ -224,6 +268,9 @@ function QuoteDetailContent({quote}: {quote: Quote}) {
             finalizing={mutations.finalizing}
             finalizeError={finalizeError}
             onFinalize={finalize}
+            onAddMaterials={() => setAddingMaterial(true)}
+            onRemoveMaterial={removeMaterial}
+            removingItemId={removingItemId}
           />
         </TabsContent>
         <TabsContent value="negotiation" className="quote-detail-tab-content">
@@ -240,7 +287,9 @@ function QuoteDetailContent({quote}: {quote: Quote}) {
           <QuoteProvidersTab
             quote={quote}
             onAddProviders={() => setAddingProviders(true)}
+            onRemoveProvider={removeProvider}
             addingProviders={mutations.scopeSaving}
+            removingProviderId={removingProviderId}
           />
         </TabsContent>
       </Tabs>
