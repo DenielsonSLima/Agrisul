@@ -32,6 +32,8 @@ export function QuoteAwardExportDialog({
       companyId={activeCompanyId}
       createPdf={createQuotationAwardPdf}
       orientation="portrait"
+      fitPreviewToWidth
+      showPreviewToolbar
       title="Exportar itens aprovados"
       description={`${provider.providerName} · ${snapshot.items.length} item(ns) · confira valores e quantidades antes de baixar.`}
       onClose={onClose}

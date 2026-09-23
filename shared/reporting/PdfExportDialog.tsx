@@ -11,6 +11,7 @@ import './pdfExport.css';
 type PdfResult = {doc: jsPDF; fileName: string};
 type ExportProps<T> = {
   snapshot: T; companyId: string; title: string; description: string; previewClassName?: string; orientation?: ReportOrientation;
+  fitPreviewToWidth?: boolean; showPreviewToolbar?: boolean;
   createPdf: (snapshot: T, brand: ReportPdfBrand) => Promise<PdfResult>; onClose: () => void;
 };
 
@@ -22,7 +23,7 @@ export function PdfExportDialog<T>(props: ExportProps<T>) {
   </DialogContent></Dialog>;
 }
 
-function PreparedPdf<T>({snapshot, createPdf, brand, title, previewClassName = '', orientation = 'landscape'}: ExportProps<T> & {brand: ReportPdfBrand}) {
+function PreparedPdf<T>({snapshot, createPdf, brand, title, previewClassName = '', orientation = 'landscape', fitPreviewToWidth = false, showPreviewToolbar = false}: ExportProps<T> & {brand: ReportPdfBrand}) {
   const [snapshotBrand] = useState(brand), [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<(PdfResult & {url: string}) | null>(null), [error, setError] = useState('');
   const [printing, setPrinting] = useState(false);
@@ -57,7 +58,9 @@ function PreparedPdf<T>({snapshot, createPdf, brand, title, previewClassName = '
       const url = URL.createObjectURL(pdf.doc.output('blob')); printUrls.current.push(url); popup.location.href = url;
     }).catch(reason => {popup.close(); if (mounted.current) notifications.error((reason as Error).message || 'Não foi possível imprimir o PDF.');}).finally(() => {pendingPrint.current = null; if (mounted.current) setPrinting(false);});
   }
-  return <>{error ? <div className="company-empty" role="alert"><p>{error}</p><button className="btn" onClick={() => {setError(''); setAttempt(value => value + 1);}}>Tentar novamente</button></div> : result ? <iframe className={`pdf-export-preview ${previewClassName}`} title={`Prévia completa: ${title}`} src={`${result.url}#view=${orientation === 'portrait' ? 'Fit' : 'FitH'}&toolbar=0`}/> : <div className="company-empty" role="status"><Loader2 className="animate-spin"/>Gerando páginas…</div>}
+  const previewView = fitPreviewToWidth || orientation === 'landscape' ? 'FitH' : 'Fit';
+  const previewToolbar = showPreviewToolbar ? '' : '&toolbar=0';
+  return <>{error ? <div className="company-empty" role="alert"><p>{error}</p><button className="btn" onClick={() => {setError(''); setAttempt(value => value + 1);}}>Tentar novamente</button></div> : result ? <iframe className={`pdf-export-preview ${previewClassName}`} title={`Prévia completa: ${title}`} src={`${result.url}#view=${previewView}${previewToolbar}`}/> : <div className="company-empty" role="status"><Loader2 className="animate-spin"/>Gerando páginas…</div>}
     <div className="pdf-export-actions"><span>A4 · {orientation === 'portrait' ? 'Retrato' : 'Paisagem'}{result ? ` · ${result.doc.getNumberOfPages()} página(s)` : ''}</span><div><button className="btn" disabled={!result || printing} onClick={print}>{printing ? <Loader2 size={16} className="animate-spin"/> : <Printer size={16}/>}Imprimir</button><button className="btn company-primary" disabled={!result} onClick={download}><Download size={16}/>Baixar PDF</button></div></div>
   </>;
 }

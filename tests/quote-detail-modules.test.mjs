@@ -224,6 +224,22 @@ test('suppliers tab uses a semantic table and Export opens PdfExportDialog', asy
   assert.match(source, /onClose=\{\(\)=>setPdf\(null\)\}/);
 });
 
+test('quotation and purchase order previews open fitted to width with native zoom controls', async () => {
+  const [dialog, providers, award, purchaseOrder] = await Promise.all([
+    readFile(new URL('../shared/reporting/PdfExportDialog.tsx', import.meta.url), 'utf8'),
+    readComponent('QuoteProvidersTab'),
+    readComponent('QuoteAwardExportDialog'),
+    readFile(new URL('../modules/pedidos/components/PurchaseOrderExportDialog.tsx', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(dialog, /fitPreviewToWidth\s*\|\|\s*orientation\s*===\s*'landscape'\s*\?\s*'FitH'\s*:\s*'Fit'/);
+  assert.match(dialog, /showPreviewToolbar\s*\?\s*''\s*:\s*'&toolbar=0'/);
+  for (const source of [providers, award, purchaseOrder]) {
+    assert.match(source, /<PdfExportDialog\b[^>]*\bfitPreviewToWidth\b/s);
+    assert.match(source, /<PdfExportDialog\b[^>]*\bshowPreviewToolbar\b/s);
+  }
+});
+
 test('open quotation scope can grow and shrink without replacing existing negotiation history', async () => {
   const [detail, dialogs, api, hooks] = await Promise.all([
     readComponent('QuoteDetailPage'),

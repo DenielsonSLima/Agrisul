@@ -231,6 +231,8 @@ export function QuoteProvidersTab({
           companyId={activeCompanyId}
           createPdf={createQuotationRequestPdf}
           orientation="portrait"
+          fitPreviewToWidth
+          showPreviewToolbar
           title="Exportar solicitação de cotação"
           description={`${pdf.provider.providerName} · ${quote.number || quote.title}. Confira a prévia antes de baixar ou imprimir.`}
           onClose={()=>setPdf(null)}
