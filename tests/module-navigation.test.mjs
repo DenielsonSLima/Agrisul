@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import { createModuleNavigation } from '../shared/navigation/navigationStore.ts';
 
 function hostAt(path='/') {
@@ -120,4 +121,16 @@ test('external URLs do not mutate module state or browser history',()=>{
   const host=hostAt('/cadastro');const nav=createModuleNavigation('/cadastro',host);
   assert.throws(()=>nav.navigate('https://other.example/contratos'),/externo/);
   assert.equal(nav.getSnapshot(),'/cadastro');assert.equal(host.location.pathname,'/cadastro');
+});
+
+test('sidebar nests quotation under requests and expands registrations by hover',async()=>{
+  const shell=await readFile(new URL('../shared/components/AppShell.tsx',import.meta.url),'utf8');
+  const requests=await readFile(new URL('../modules/solicitacoes/components/SolicitacoesPage.tsx',import.meta.url),'utf8');
+  assert.match(shell,/solicitacoesSections=.*name:"Cotação",href:"\/cotacao"/);
+  assert.match(shell,/filter\(x=>x\.path!=="\/configuracoes"&&x\.path!=="\/cotacao"\)/);
+  assert.match(shell,/onMouseEnter=\{x\.path==="\/cadastro"\?expandGroup:undefined\}/);
+  assert.match(shell,/onMouseLeave=\{x\.path==="\/cadastro"\?collapseGroup:undefined\}/);
+  assert.match(shell,/const groupExpanded=groupActive\|\|!!expanded\[x\.path\]/);
+  assert.match(shell,/const cadastroActive=path==="\/cadastro"/);
+  assert.match(requests,/<ModuleLink href="\/cotacao" className="request-module-card">/);
 });
