@@ -1,3 +1,4 @@
+import {useEffect,useRef} from 'react';
 import {useMutation,useQuery,useQueryClient} from '@tanstack/react-query';
 import {useAuth} from '@/shared/supabase/AuthProvider';
 import {RpcError} from '@/shared/supabase/rpc';
@@ -22,23 +23,47 @@ export function useCadastroQuery<T>(resource:string,params:Record<string,unknown
   };
 }
 
+export function shouldRefreshAfterMutationError(error:unknown){
+  if(error instanceof RpcError)return error.status===409||error.status>=500;
+  if(typeof DOMException!=='undefined'&&error instanceof DOMException){
+    return error.name==='TimeoutError'||error.name==='NetworkError';
+  }
+  if(error instanceof TypeError)return true;
+  return error instanceof Error&&/(?:network|failed to fetch|timeout|timed out|conex[aã]o)/i.test(error.message);
+}
+
 export function useCadastroMutation<TInput,TResult>(resource:string,save:(input:TInput)=>Promise<TResult>,related:string[]=[]){
   const {user}=useAuth();
   const queryClient=useQueryClient();
+  const activeUserIdRef=useRef<string|null>(user?.id??null);
+  useEffect(()=>{activeUserIdRef.current=user?.id??null;},[user?.id]);
+  const resources=mutationResources(resource,related);
+  const refresh=async(actorId:string,settled=false)=>{
+    const jobs=resources.map(key=>queryClient.invalidateQueries({queryKey:billingKeys.resource(actorId,key)}));
+    if(settled){await Promise.allSettled(jobs);return;}
+    await Promise.all(jobs);
+  };
   return useMutation({
+    onMutate:async()=>{
+      const actorId=activeUserIdRef.current;
+      if(actorId){
+        await Promise.all(resources.map(key=>queryClient.cancelQueries({queryKey:billingKeys.resource(actorId,key)})));
+      }
+      return {actorId};
+    },
     mutationFn:async(input:TInput)=>{
       if(!user)throw new RpcError('Entre para salvar seus cadastros.',401);
-      await Promise.all(mutationResources(resource,related).map(key=>queryClient.cancelQueries({queryKey:billingKeys.resource(user.id,key)})));
       return save(input);
     },
-    onSuccess:async()=>{
-      if(!user)return;
-      await Promise.all(mutationResources(resource,related).map(key=>queryClient.invalidateQueries({queryKey:billingKeys.resource(user.id,key)})));
+    onSuccess:async(_result,_input,context)=>{
+      if(!context.actorId||activeUserIdRef.current!==context.actorId)return;
+      await refresh(context.actorId);
     },
-    onError:async(error)=>{
-      if(user&&error instanceof RpcError&&error.status===409){
-        await Promise.all(mutationResources(resource,related).map(key=>queryClient.invalidateQueries({queryKey:billingKeys.resource(user.id,key)})));
-      }
+    onError:async(error,_input,context)=>{
+      if(!context?.actorId||activeUserIdRef.current!==context.actorId||!shouldRefreshAfterMutationError(error))return;
+      // A falha pode ter ocorrido depois do commit. Reconciliamos o cache sem
+      // substituir o erro original caso a própria reconsulta também falhe.
+      await refresh(context.actorId,true);
     },
   });
 }

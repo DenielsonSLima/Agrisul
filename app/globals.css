@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import "tailwindcss/index.css";
 @import "tw-animate-css";
 @import "../vendor/shadcn-tailwind-4.13.0.css";
 
@@ -278,6 +278,37 @@ body{margin:0;background:var(--background);color:#252a30;font-family:Arial,Helve
 @media(max-width:1250px){.contract-card-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:1000px){.contract-card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.contract-toolbar{flex-wrap:wrap}.contract-toolbar .local-search{flex-basis:100%}.contract-toolbar>label{flex:1}.contract-entry-layout{grid-template-columns:1fr}.contract-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:650px){.contract-heading-actions{width:100%;flex-wrap:wrap}.contract-heading-actions>*{flex:1}.contract-list-tabs [data-slot=tabs-trigger]{min-width:50%}.contract-toolbar{align-items:stretch}.contract-toolbar>label{min-width:calc(50% - 5px)}.contract-toolbar>span{padding:0}.contract-card-grid,.contract-summary-grid,.contract-kpis,.contract-financial-kpis{grid-template-columns:1fr}.contract-detail-modal{width:calc(100% - 20px)!important}.contract-dialog-heading{align-items:stretch;flex-direction:column;padding-right:20px}.contract-dialog-heading .btn{width:max-content}.contract-detail-tabs>[data-slot=tabs-list]>button{min-width:118px}.contract-load-form .form-grid{grid-template-columns:1fr}.contract-card h3{min-height:0}}
+
+/* Cotacao and materials reuse the operational registration rhythm. */
+.cotacao-page,.cadastro-page{min-width:0}
+.cotacao-page>.client-navigation,.cadastro-page>.client-navigation{margin-bottom:24px}
+.cotacao-page>.cotacao-layout{display:grid!important;grid-template-columns:minmax(0,350px) minmax(0,1fr)!important;gap:24px!important;align-items:start}
+.cotacao-page .contract-detail-page,.cotacao-page .quote-form,.cadastro-page .contract-detail-page{display:grid!important;gap:16px!important;margin:0;padding:20px;border:1px solid #e0e7e2;border-radius:10px;background:#fff}
+.cotacao-page .contract-detail-page .companies-heading,.cotacao-page .quote-form .companies-heading{margin:0 0 4px}
+.quote-form-heading{display:flex;align-items:center;gap:8px;padding-bottom:14px;border-bottom:1px solid #e8eeea;color:#3f5948}
+.quote-form-heading h3{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600}
+.quote-form-heading p{font-size:12px;color:#87968d;margin-top:5px}
+.cotacao-page .contract-toolbar,.cadastro-page .contract-toolbar{margin:0;padding:12px 0;border:0;border-top:1px solid #e8eeea;border-radius:0;background:transparent}
+.cotacao-page .cotacao-list,.cadastro-page>div[style*="grid-template-columns"]>section:last-child{min-width:0}
+.cotacao-page .cotacao-list>.companies-heading,.cadastro-page>div[style*="grid-template-columns"]>section:last-child>.companies-heading{margin-bottom:14px}
+.cotacao-page .cotacao-list>.companies-heading h3,.cadastro-page>div[style*="grid-template-columns"]>section:last-child>.companies-heading h3{font-size:16px;color:#354c3e}
+.cotacao-page .cotacao-list>.companies-heading p,.cadastro-page>div[style*="grid-template-columns"]>section:last-child>.companies-heading p{font-size:12px}
+.cotacao-page .contract-card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.cotacao-page .contract-card{min-height:154px;padding:16px;border-radius:10px;background:#fff}
+.cotacao-page .contract-card h3{min-height:42px}
+.quote-item{position:relative;display:grid;gap:12px;padding:14px;border:1px solid #e2eae4;border-radius:8px;background:#fbfdfb}
+.quote-item>.icon-btn{position:absolute;right:10px;top:10px}
+.quote-item-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.quote-detail-items{display:grid;gap:12px}
+.quote-detail-items article,.quote-material-list article{display:flex;justify-content:space-between;gap:16px;padding:16px;border:1px solid #e0e7e2;border-radius:10px;background:#fff}
+.quote-detail-items article>span{color:#5d7866;font-size:13px}
+.quote-detail-items article>p,.quote-detail-items article>small{grid-column:1/-1;color:#7f9086;font-size:12px}
+.quote-material-list{display:grid;gap:12px}.quote-material-list article>div:first-child{min-width:0}.quote-material-list strong,.quote-material-list small,.quote-material-list p{display:block}.quote-material-list strong{font-size:14px;color:#354c3e}.quote-material-list small{margin-top:4px;color:#87968d;font-size:11px}.quote-material-list p{margin-top:8px;color:#708279;font-size:12px;overflow-wrap:anywhere}
+.materials-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.material-card{min-height:218px}.material-card-code{margin-top:4px;color:#87968d;font-size:11px}.material-card-actions{display:flex;gap:4px}.material-card-application{margin:16px 0;padding-top:12px;border-top:1px solid #edf1ee}.material-card-application>span{display:block;color:#819488;font-size:11px}.material-card-application>p{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin-top:6px;color:#62766a;font-size:12px;line-height:1.55}.material-card .farm-card-location{font-size:12px}.material-card .farm-card-location strong{color:#4a6c56;font-weight:600}
+@media(max-width:1000px){.cotacao-page>.cotacao-layout,.cotacao-page>div[style*="grid-template-columns"],.cadastro-page>div[style*="grid-template-columns"]{grid-template-columns:1fr!important}.cotacao-page .contract-card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:1250px){.materials-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.quote-modal{width:min(780px,calc(100vw - 32px))!important;max-width:780px!important;max-height:min(90svh,820px);overflow-y:auto}.quote-modal .contract-detail-page{padding:0;border:0;background:transparent}.quote-modal .companies-heading{margin:0}.quote-modal .form-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:14px}
+@media(max-width:650px){.cotacao-page .contract-card-grid,.materials-grid{grid-template-columns:1fr}.quote-item-grid{grid-template-columns:1fr}.quote-detail-items article,.quote-material-list article{align-items:flex-start;flex-direction:column}.cotacao-page .contract-detail-page,.cotacao-page .quote-form,.cadastro-page .contract-detail-page{padding:16px}}
 
 /* Manejo: catálogo fixo associado por cultura e ciclo. */
 .management-tabs{gap:18px}.management-tabs>[data-slot=tabs-list]{width:100%;height:46px;justify-content:flex-start;border-bottom:1px solid #dfe7e1}.management-tabs [data-slot=tabs-trigger]{flex:none;min-width:190px;padding-inline:18px}.management-tabs [data-slot=tabs-trigger]>span{display:inline-grid;place-items:center;min-width:34px;height:21px;padding:0 7px;border-radius:999px;background:#e9f2ec;color:#567261;font-size:11px}.management-process-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.management-process{display:flex;align-items:flex-start;gap:12px;min-width:0;padding:15px;border:1px solid #e0e7e2;border-radius:10px;background:#fff;cursor:pointer;transition:border-color .16s,background .16s,box-shadow .16s}.management-process:hover{border-color:#9fc8ad;box-shadow:0 3px 14px #193b2709}.management-process.selected{border-color:#a9cfb6;background:#f5faf6}.management-process-check{position:relative;display:grid;place-items:center;flex:none;width:21px;height:21px;margin-top:1px}.management-process-check>svg{position:absolute;color:#47785a}.management-process>span:last-child{display:flex;flex-direction:column;min-width:0}.management-process strong{color:#3e5747;font-size:13px;font-weight:600;line-height:1.45}.management-process small{margin-top:4px;color:#89998f;font-size:11px}.management-process em{margin-top:8px;color:#718478;font-size:11px;font-style:normal;line-height:1.5;white-space:pre-line}.management-action-error{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;margin-bottom:16px;border:1px solid #efc9c4;border-radius:8px;background:#fff7f5;color:#9a4e45;font-size:12px}

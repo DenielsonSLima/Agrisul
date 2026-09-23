@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import {QueryClient} from '@tanstack/react-query';
 import {billingKeys} from '../shared/query/keys.ts';
 import {realtimeResources} from '../shared/query/realtimeResources.ts';
+import {mutationResources} from '../shared/query/derivedResources.ts';
 
 const client=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:Infinity}}});
 try{
@@ -39,6 +41,67 @@ try{
   for(const resource of realtimeResources[table])await client.invalidateQueries({queryKey:billingKeys.resource('owner-a',resource),refetchType:'none'});
   assert.equal(client.getQueryState(aContracts).isInvalidated,true,table+' refreshes contract balances');
  }
+
+ // Category writes and Realtime events refresh both the category registry and
+ // every cached material projection, without touching another workspace.
+ const aCategories=key('owner-a','material-categories',{view:'list'});
+ const aMaterials=key('owner-a','materials',{view:'list'});
+ const bCategories=key('owner-b','material-categories',{view:'list'});
+ const bMaterials=key('owner-b','materials',{view:'list'});
+ for(const queryKey of [aCategories,aMaterials,bCategories,bMaterials])client.setQueryData(queryKey,{saved:true});
+ assert.deepEqual(mutationResources('material-categories'),['material-categories','materials']);
+ for(const resource of realtimeResources.billing_material_categories){
+  await client.invalidateQueries({queryKey:billingKeys.resource('owner-a',resource),refetchType:'none'});
+ }
+ assert.equal(client.getQueryState(aCategories).isInvalidated,true);
+ assert.equal(client.getQueryState(aMaterials).isInvalidated,true);
+ assert.equal(client.getQueryState(bCategories).isInvalidated,false);
+ assert.equal(client.getQueryState(bMaterials).isInvalidated,false);
+
+ // Finalizing a quotation creates an order in the same transaction. Both
+ // mutation fallback and Realtime therefore refresh the order projections.
+ const aQuotes=key('owner-a','quotations',{view:'detail',id:'quote-one'});
+ const aOrders=key('owner-a','purchase-orders',{view:'list'});
+ const bOrders=key('owner-b','purchase-orders',{view:'list'});
+ for(const queryKey of [aQuotes,aOrders,bOrders])client.setQueryData(queryKey,{saved:true});
+ assert.deepEqual(mutationResources('quotations'),['quotations','purchase-orders']);
+ for(const resource of realtimeResources.billing_quotations){
+  await client.invalidateQueries({queryKey:billingKeys.resource('owner-a',resource),refetchType:'none'});
+ }
+ assert.equal(client.getQueryState(aQuotes).isInvalidated,true);
+ assert.equal(client.getQueryState(aOrders).isInvalidated,true);
+
+ // Payment methods are selected by orders, so registry mutations and
+ // Realtime changes refresh both projections for the active workspace.
+ const aPaymentMethods=key('owner-a','payment-methods',{view:'list'});
+ const bPaymentMethods=key('owner-b','payment-methods',{view:'list'});
+ for(const queryKey of [aPaymentMethods,bPaymentMethods])client.setQueryData(queryKey,{saved:true});
+ assert.deepEqual(mutationResources('payment-methods'),['payment-methods','purchase-orders']);
+ for(const resource of realtimeResources.billing_payment_methods){
+  await client.invalidateQueries({queryKey:billingKeys.resource('owner-a',resource),refetchType:'none'});
+ }
+ assert.equal(client.getQueryState(aPaymentMethods).isInvalidated,true);
+ assert.equal(client.getQueryState(aOrders).isInvalidated,true);
+ assert.equal(client.getQueryState(bPaymentMethods).isInvalidated,false);
+ assert.equal(client.getQueryState(bOrders).isInvalidated,false);
+
+ client.setQueryData(aQuotes,{saved:true});
+ for(const resource of realtimeResources.billing_quotation_negotiations){
+  await client.invalidateQueries({queryKey:billingKeys.resource('owner-a',resource),refetchType:'none'});
+ }
+ assert.equal(client.getQueryState(aQuotes).isInvalidated,true,'negotiation history refreshes quotation projections');
+
+ client.setQueryData(aQuotes,{saved:true});
+ for(const resource of realtimeResources.billing_quotation_item_awards){
+  await client.invalidateQueries({queryKey:billingKeys.resource('owner-a',resource),refetchType:'none'});
+ }
+ assert.equal(client.getQueryState(aQuotes).isInvalidated,true,'item awards refresh quotation projections');
+
+ client.setQueryData(aOrders,{saved:true});
+ for(const resource of realtimeResources.billing_purchase_order_items){
+  await client.invalidateQueries({queryKey:billingKeys.resource('owner-a',resource),refetchType:'none'});
+ }
+ assert.equal(client.getQueryState(aOrders).isInvalidated,true);
 
  // A profile event refreshes every presentation of the same saved account.
  for(const resource of ['settings','profile','users','watermarks','watermark'])client.setQueryData(key('owner-a',resource),{saved:true});
@@ -104,5 +167,39 @@ try{
  assert.equal(client.getQueryData(key('owner-a','slow-read')),undefined);
  assert.deepEqual(client.getQueryData(bFarm),{source:'owner-b-new-session'});
  assert.equal(client.getQueryCache().findAll({queryKey:billingKeys.all('owner-a')}).length,0);
+
+ // A focus/visibility refetch must update the remote material lists without
+ // replacing the controlled dialog or its local draft (including the File).
+ // Only an initial pending query may switch the page to its loading state.
+ const [materialsSource,quoteCreateSource,cotacaoPageSource,cadastroQuerySource]=await Promise.all([
+  readFile(new URL('../modules/cadastro/materiais/components/MateriaisPage.tsx',import.meta.url),'utf8'),
+  readFile(new URL('../modules/cotacao/components/QuoteCreatePage.tsx',import.meta.url),'utf8'),
+  readFile(new URL('../modules/cotacao/components/CotacaoPage.tsx',import.meta.url),'utf8'),
+  readFile(new URL('../modules/cadastro/hooks/useCadastroQuery.ts',import.meta.url),'utf8'),
+ ]);
+ assert.match(materialsSource,/<Dialog open=\{materialOpen\}/);
+ assert.match(materialsSource,/<MaterialForm material=\{editMaterial\}/);
+ assert.doesNotMatch(materialsSource,/<MaterialForm[^>]*\bkey=/);
+ assert.match(materialsSource,/const \[file,setFile\]=useState<File\|null>\(null\)/);
+ // The quotation draft and its current step remain owned by the mounted modal.
+ // Focus refetches only replace remote lists; they must not key or reconstruct it.
+ assert.match(
+  quoteCreateSource,
+  /\[draft,\s*setDraft\]\s*=\s*useState<Draft>\(initial\);[\s\S]*?\[step,\s*setStep\]\s*=\s*useState\(0\)/,
+ );
+ assert.match(cotacaoPageSource,/searchParams\.get\('nova'\)===\'1\'&&<QuoteCreatePage\/>/);
+ assert.doesNotMatch(cotacaoPageSource,/<QuoteCreatePage[^>]*\bkey=/);
+ assert.doesNotMatch(quoteCreateSource,/useEffect\([^)]*setDraft/);
+ assert.match(cadastroQuerySource,/loading:!ready\|\|\(!!user&&enabled&&query\.isPending\)/);
+ assert.doesNotMatch(cadastroQuerySource,/loading:[^\n]*query\.isFetching/);
+ // Ambiguous writes may have committed before the transport failed. They must
+ // reconcile only the account that started the mutation and never hide the
+ // original failure if the fallback refetch also fails.
+ assert.match(cadastroQuerySource,/error\.status===409\|\|error\.status>=500/);
+ assert.match(cadastroQuerySource,/error\.name==='TimeoutError'\|\|error\.name==='NetworkError'/);
+ assert.match(cadastroQuerySource,/error instanceof TypeError/);
+ assert.match(cadastroQuerySource,/Promise\.allSettled\(jobs\)/);
+ assert.match(cadastroQuerySource,/activeUserIdRef\.current!==context\.actorId/);
+ assert.match(cadastroQuerySource,/queryClient\.invalidateQueries\(\{queryKey:billingKeys\.resource\(actorId,key\)\}\)/);
  console.log('Passed: related realtime invalidation, profile/watermark aliases, parameter keys, account isolation and cancellation of stale account reads.');
 }finally{client.clear();}

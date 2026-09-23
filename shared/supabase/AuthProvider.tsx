@@ -6,6 +6,7 @@ import {AlertTriangle,Clock3,LogOut,RefreshCw} from 'lucide-react';
 import {getSupabaseBrowserClient,getSupabaseConfig} from './client';
 import {AuthExperience} from './AuthExperience';
 import {Button} from '@/components/ui/button';
+import {planAuthSessionTransition} from './authLifecycle';
 
 export type WorkspaceAccess='checking'|'ready'|'invite'|'disabled'|'removed'|'invalid'|'error';
 type AuthState={user:User|null;session:Session|null;ready:boolean;error:string;access:WorkspaceAccess;signOut:()=>Promise<void>;refreshAccess:()=>Promise<WorkspaceAccess>};
@@ -42,9 +43,14 @@ export function AuthProvider({children}:{children:ReactNode}){
   const update=(next:Session|null)=>{
    if(!active)return;
    const nextId=next?.user.id??null;
-   if(identity.current!==nextId){void queryClient.cancelQueries();queryClient.clear();identity.current=nextId;}
+   const transition=planAuthSessionTransition(identity.current,nextId);
+   if(transition.clearQueryCache){void queryClient.cancelQueries();queryClient.clear();identity.current=nextId;}
    setSession(next);setReady(true);
-   if(next){setAccess('checking');setTimeout(()=>{if(active)void refreshAccess();},0);}else setAccess('ready');
+   // Supabase emits SIGNED_IN again when a tab is refocused and may also emit
+   // TOKEN_REFRESHED. The credentials must be updated, but those same-user
+   // events are not a new login and must not unmount the workspace or drafts.
+   if(next&&transition.blockForAccessValidation){setAccess('checking');setTimeout(()=>{if(active)void refreshAccess();},0);}
+   else if(!next)setAccess('ready');
   };
   const {data:{subscription}}=client.auth.onAuthStateChange((_event,next)=>update(next));
   client.auth.getSession().then(({data,error:sessionError})=>{if(active)update(sessionError?null:data.session);}).catch(()=>{if(active)update(null);});

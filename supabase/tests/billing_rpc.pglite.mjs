@@ -191,4 +191,219 @@ try {
  await db.exec(readFileSync(new URL('./home_dashboard.sql',import.meta.url),'utf8'));
  console.log('Home dashboard: company finance, deadlines, current request details, planning, empty states, permissions and isolation passed');
 } catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
+try {
+ await db.exec(readFileSync(new URL('../migrations/20260922100000_quotations_and_materials.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260922103000_restore_billing_rpc_dispatchers.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260922183938_quotation_supplier_workflow.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260922184239_restore_all_billing_rpc_routes.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260922191137_quotation_comparison_result.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260922193410_quotation_requester_signature.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260923110700_material_images.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260923111246_fleet_registry.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260923113830_material_variants.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260923120836_material_product_references.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260923122812_material_reference_snapshot_fk.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260923123605_material_internal_code.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260923125408_purchase_orders_from_quotations.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260923131635_purchase_order_fk_indexes.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260923132334_material_categories.sql',import.meta.url),'utf8'));
+ await db.exec(`
+  INSERT INTO auth.users(id,email,email_confirmed_at) VALUES
+   ('95000000-0000-4000-8000-000000000001','quotation-backfill@example.invalid',now());
+  INSERT INTO public.billing_materials(id,owner_id,name,code,unit,application) VALUES
+   ('95000000-0000-4000-8000-000000000002','95000000-0000-4000-8000-000000000001','Material legado','LEGACY','kg','');
+  INSERT INTO public.billing_service_providers(id,owner_id,document_type,document,legal_name,trade_name) VALUES
+   ('95000000-0000-4000-8000-000000000003','95000000-0000-4000-8000-000000000001','CPF','52998224725','Prestador legado','Legado');
+  INSERT INTO public.billing_quotations(
+   id,owner_id,title,quotation_number,status,request_date,requester,notes
+  ) VALUES(
+   '95000000-0000-4000-8000-000000000004','95000000-0000-4000-8000-000000000001',
+   'Cotação anterior ao histórico','COT-LEGACY','open','2026-09-22','Equipe legada',''
+  );
+  INSERT INTO public.billing_quotation_items(
+   id,owner_id,quotation_id,material_id,material_name,material_code,
+   quantity,unit,unit_price,supplier,notes
+  ) VALUES(
+   '95000000-0000-4000-8000-000000000005','95000000-0000-4000-8000-000000000001',
+   '95000000-0000-4000-8000-000000000004','95000000-0000-4000-8000-000000000002',
+   'Material legado','LEGACY',2,'kg',NULL,'',''
+  );
+  INSERT INTO public.billing_quotation_providers(
+   id,owner_id,quotation_id,provider_id,provider_snapshot
+  ) VALUES(
+   '95000000-0000-4000-8000-000000000006','95000000-0000-4000-8000-000000000001',
+   '95000000-0000-4000-8000-000000000004','95000000-0000-4000-8000-000000000003',
+   '{"id":"95000000-0000-4000-8000-000000000003","legalName":"Prestador legado","documentType":"CPF","document":"52998224725","tradeName":"Legado"}'::jsonb
+  );
+  INSERT INTO public.billing_quotation_provider_values(
+   owner_id,quotation_id,quotation_provider_id,quotation_item_id,unit_price,created_at,updated_at
+  ) VALUES(
+   '95000000-0000-4000-8000-000000000001','95000000-0000-4000-8000-000000000004',
+   '95000000-0000-4000-8000-000000000006','95000000-0000-4000-8000-000000000005',12.34,
+   '2026-09-22 10:00:00+00','2026-09-23 11:12:13+00'
+  );
+ `);
+ await db.exec(readFileSync(new URL('../migrations/20260923145913_quotation_negotiation_history.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260923154316_allow_quotation_materials_without_references.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260923155214_preserve_quotation_internal_code_in_orders.sql',import.meta.url),'utf8'));
+ await db.exec(`
+  INSERT INTO public.billing_purchase_orders(
+   id,owner_id,quotation_id,quotation_provider_id,provider_id,
+   created_at,updated_at,order_number,purchase_order_number,payment_method,status,
+   quotation_number,quotation_title,quotation_request_date,quotation_requester,
+   quotation_notes,provider_snapshot,total
+  ) VALUES(
+   '95000000-0000-4000-8000-000000000007','95000000-0000-4000-8000-000000000001',
+   '95000000-0000-4000-8000-000000000004','95000000-0000-4000-8000-000000000006',
+   '95000000-0000-4000-8000-000000000003','2026-09-23 12:00:00+00','2026-09-23 12:00:00+00',
+   'PED-LEGACY','','','open','COT-LEGACY','Cotação anterior ao histórico','2026-09-22',
+   'Equipe legada','',
+   '{"id":"95000000-0000-4000-8000-000000000003","legalName":"Prestador legado","documentType":"CPF","document":"52998224725","tradeName":"Legado"}'::jsonb,
+   24.68
+  );
+  INSERT INTO public.billing_purchase_order_items(
+   id,owner_id,purchase_order_id,quotation_id,quotation_item_id,created_at,
+   material_id,material_name,material_internal_code,material_application,
+   material_references,quantity,unit,unit_price,line_total,notes
+  ) VALUES(
+   '95000000-0000-4000-8000-000000000008','95000000-0000-4000-8000-000000000001',
+   '95000000-0000-4000-8000-000000000007','95000000-0000-4000-8000-000000000004',
+   '95000000-0000-4000-8000-000000000005','2026-09-23 12:00:00+00',
+   '95000000-0000-4000-8000-000000000002','Material legado','LEGACY','',
+   '[]'::jsonb,2,'kg',12.34,24.68,''
+  );
+  UPDATE public.billing_quotations SET status='finished'
+  WHERE owner_id='95000000-0000-4000-8000-000000000001'
+   AND id='95000000-0000-4000-8000-000000000004';
+ `);
+ await db.exec(readFileSync(new URL('../migrations/20260923161037_quotation_item_awards_and_scope.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260923173330_purchase_order_workspace.sql',import.meta.url),'utf8'));
+ await db.exec(`DO $$
+  DECLARE v_projection jsonb;
+  BEGIN
+  IF NOT EXISTS(
+   SELECT 1 FROM public.billing_quotation_negotiations
+   WHERE owner_id='95000000-0000-4000-8000-000000000001'
+    AND quotation_id='95000000-0000-4000-8000-000000000004'
+    AND quotation_provider_id='95000000-0000-4000-8000-000000000006'
+    AND quotation_item_id='95000000-0000-4000-8000-000000000005'
+    AND revision=1 AND unit_price=12.34 AND notes=''
+    AND request_id=id
+    AND created_at='2026-09-23 11:12:13+00'::timestamptz
+  ) THEN RAISE EXCEPTION 'Existing quotation value was not backfilled as version one'; END IF;
+  IF NOT EXISTS(
+   SELECT 1 FROM public.billing_quotation_item_awards
+   WHERE owner_id='95000000-0000-4000-8000-000000000001'
+    AND quotation_id='95000000-0000-4000-8000-000000000004'
+    AND quotation_item_id='95000000-0000-4000-8000-000000000005'
+    AND quotation_provider_id='95000000-0000-4000-8000-000000000006'
+    AND created_at='2026-09-23 12:00:00+00'::timestamptz
+    AND updated_at='2026-09-23 12:00:00+00'::timestamptz
+  ) THEN RAISE EXCEPTION 'Existing purchase order item was not backfilled as an award'; END IF;
+  SELECT billing_private.quotation_json(q) INTO v_projection
+  FROM public.billing_quotations q
+  WHERE q.owner_id='95000000-0000-4000-8000-000000000001'
+   AND q.id='95000000-0000-4000-8000-000000000004';
+  IF v_projection->>'purchaseOrderId'<>'95000000-0000-4000-8000-000000000007'
+   OR v_projection->>'winnerProviderId'<>'95000000-0000-4000-8000-000000000006'
+   OR jsonb_array_length(v_projection->'purchaseOrders')<>1
+   OR v_projection->'purchaseOrders'->0->>'number'<>'PED-LEGACY'
+   OR v_projection->'purchaseOrders'->0->>'total'<>'24.68'
+   OR v_projection->'purchaseOrders'->0 ? 'items' THEN
+   RAISE EXCEPTION 'Quotation order summary/backfill projection is invalid: %',v_projection;
+  END IF;
+ END $$;
+ DELETE FROM auth.users WHERE id='95000000-0000-4000-8000-000000000001';
+ DO $$ BEGIN
+  IF EXISTS(SELECT 1 FROM public.billing_quotation_negotiations
+   WHERE owner_id='95000000-0000-4000-8000-000000000001') THEN
+   RAISE EXCEPTION 'Workspace deletion did not cascade negotiation history';
+  END IF;
+  IF EXISTS(SELECT 1 FROM public.billing_quotation_item_awards
+   WHERE owner_id='95000000-0000-4000-8000-000000000001') THEN
+   RAISE EXCEPTION 'Workspace deletion did not cascade item awards';
+  END IF;
+ END $$;`);
+ await db.exec(`DO $$
+ DECLARE v_rpc text:=pg_get_functiondef('public.billing_rpc(text,text,jsonb)'::regprocedure);
+  v_authorize text:=pg_get_functiondef('billing_private.authorize_resource(text,text)'::regprocedure);
+  v_negotiation_dispatch text:=pg_get_functiondef('billing_private.quotations_dispatch_before_item_awards(text,text,jsonb)'::regprocedure);
+  v_route text;v_is_definer boolean;v_config text[];v_rls boolean;v_replica "char";
+ BEGIN
+  FOREACH v_route IN ARRAY ARRAY[
+   'document-templates','service-providers','signatures','service-requests','home',
+   'settings','users','access-profiles','report-headers','agenda','summary','reports','planning',
+   'materials','quotations','contracts','cultural-practices','atr','farms','companies','watermarks'
+  ] LOOP
+   IF strpos(v_rpc,quote_literal(v_route))=0 THEN RAISE EXCEPTION 'RPC route lost after quotation migration: %',v_route; END IF;
+  END LOOP;
+  IF strpos(v_authorize,'billing_private.has_permission(''requests.read'')')=0 THEN
+   RAISE EXCEPTION 'Request readers lost watermark access after quotation migration';
+  END IF;
+  IF strpos(v_authorize,'''quotations''')=0 OR strpos(v_authorize,'''quotations.''')<>0 THEN
+   RAISE EXCEPTION 'Quotations must reuse registrations.read/write permissions';
+  END IF;
+  IF strpos(v_negotiation_dispatch,'''record-negotiation''')=0
+   OR strpos(v_negotiation_dispatch,'pg_advisory_xact_lock')=0
+   OR strpos(v_negotiation_dispatch,'FOR SHARE')=0 THEN
+   RAISE EXCEPTION 'Negotiation dispatcher lost its action or concurrency guards';
+  END IF;
+  SELECT c.relrowsecurity,c.relreplident INTO v_rls,v_replica
+  FROM pg_class c WHERE c.oid='public.billing_quotation_negotiations'::regclass;
+  IF NOT v_rls OR v_replica<>'f'
+   OR has_table_privilege('authenticated','public.billing_quotation_negotiations','INSERT')
+   OR has_table_privilege('authenticated','public.billing_quotation_negotiations','UPDATE')
+   OR has_table_privilege('authenticated','public.billing_quotation_negotiations','DELETE')
+   OR NOT has_table_privilege('authenticated','public.billing_quotation_negotiations','SELECT')
+   OR NOT EXISTS(
+    SELECT 1 FROM pg_constraint c
+    WHERE c.conrelid='public.billing_quotation_negotiations'::regclass
+     AND c.contype='u'
+     AND pg_get_constraintdef(c.oid) LIKE 'UNIQUE (owner_id, quotation_id, quotation_provider_id, quotation_item_id, revision)%'
+   ) THEN
+   RAISE EXCEPTION 'Negotiation history RLS, Realtime identity, grants or version uniqueness are unsafe';
+  END IF;
+  SELECT p.prosecdef,p.proconfig INTO v_is_definer,v_config FROM pg_proc p
+   WHERE p.oid='public.billing_rpc(text,text,jsonb)'::regprocedure;
+  IF v_is_definer OR NOT EXISTS(SELECT 1 FROM unnest(v_config) setting WHERE setting LIKE 'search_path=%') THEN
+   RAISE EXCEPTION 'Public RPC must remain SECURITY INVOKER with a fixed search path';
+  END IF;
+ END $$;
+ BEGIN;
+ RESET ROLE;
+ INSERT INTO auth.users(id,email,email_confirmed_at) VALUES
+  ('7a000000-0000-4000-8000-000000000001','quotation-owner@example.invalid',now()),
+  ('7a000000-0000-4000-8000-000000000002','quotation-reader@example.invalid',now());
+ SET LOCAL ROLE authenticated;
+ SELECT set_config('request.jwt.claim.sub','7a000000-0000-4000-8000-000000000001',true);
+ SELECT public.billing_rpc('settings','get','{}');
+ RESET ROLE;
+ INSERT INTO public.billing_access_profiles(id,owner_id,name,permissions) VALUES
+  ('7a000000-0000-4000-8000-000000000003','7a000000-0000-4000-8000-000000000001','Quotation reader',ARRAY['registrations.read']);
+ INSERT INTO public.billing_memberships(owner_id,user_id,access_profile_id,is_owner,status) VALUES
+  ('7a000000-0000-4000-8000-000000000001','7a000000-0000-4000-8000-000000000002','7a000000-0000-4000-8000-000000000003',false,'active');
+ SET LOCAL ROLE authenticated;
+ SELECT set_config('request.jwt.claim.sub','7a000000-0000-4000-8000-000000000002',true);
+ DO $$ DECLARE v_result jsonb; BEGIN
+  v_result=public.billing_rpc('quotations','list','{"status":"open"}');
+  IF v_result->'quotes'<>'[]'::jsonb THEN RAISE EXCEPTION 'Unexpected quotation reader result: %',v_result; END IF;
+ END $$;
+ RESET ROLE;
+ ROLLBACK;`);
+ console.log('Quotation integration preserves providers, requests, templates, home, watermark access and all prior RPC routes');
+ await db.exec(readFileSync(new URL('./material_images.sql',import.meta.url),'utf8'));
+ console.log('Materials: optional application, private optimized-image references and workspace isolation passed');
+ await db.exec(readFileSync(new URL('./material_variants.sql',import.meta.url),'utf8'));
+ console.log('Materials: clickable products, one product photo, equivalent references and workspace isolation passed');
+ await db.exec(readFileSync(new URL('./fleet_registry.sql',import.meta.url),'utf8'));
+ console.log('Fleet: vehicle registry, optional description, permissions and workspace isolation passed');
+ await db.exec(readFileSync(new URL('./quotation_supplier_workflow.sql',import.meta.url),'utf8'));
+ console.log('Quotation workflow: append-only negotiation versions, comparison matrix, explicit winner, snapshots, purchase-order finalization, permissions and isolation passed');
+ await db.exec(readFileSync(new URL('./purchase_orders.sql',import.meta.url),'utf8'));
+ console.log('Purchase orders: atomic idempotent finalization, snapshots, payment fields, permissions and isolation passed');
+ await db.exec(readFileSync(new URL('./quotation_item_awards.sql',import.meta.url),'utf8'));
+ console.log('Quotation item awards: incremental scope, exact decisions, split orders, retries, permissions and isolation passed');
+ await db.exec(readFileSync(new URL('./material_categories.sql',import.meta.url),'utf8'));
+ console.log('Material categories: normalized names, optional links, deletion guard, permissions and isolation passed');
+} catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
 await db.close();

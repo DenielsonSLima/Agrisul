@@ -14,9 +14,12 @@ export const derivedResources: Record<string, readonly string[]> = {
   'cultural-practices': ['planning', 'home'],
   planning: ['farms', 'plots', 'summary', 'home'],
   'contract-types': ['summary', 'reports', 'home'],
+  'material-categories': ['materials'],
+  'payment-methods': ['purchase-orders'],
   'service-requests': ['home'],
   'access-profiles': ['home'],
   users: ['home'],
+  quotations: ['purchase-orders'],
 };
 export function mutationResources(resource: string, related: readonly string[] = []) {
   return [...new Set([resource, ...related].flatMap(key => [key, ...(derivedResources[key] ?? [])]))];

@@ -27,7 +27,7 @@ test('each menu destination updates the same snapshot consumed by screen and act
   let selected='/',screen='/';
   nav.subscribe(()=>{selected=new URL(nav.getSnapshot(),host.location.origin).pathname});
   nav.subscribe(()=>{screen=new URL(nav.getSnapshot(),host.location.origin).pathname});
-  for(const path of ['/cadastro','/solicitacoes','/contratos','/planejamento','/resumo','/agenda','/relatorios','/configuracoes','/']) {
+  for(const path of ['/cadastro','/solicitacoes','/cotacao','/pedidos','/contratos','/planejamento','/resumo','/agenda','/relatorios','/configuracoes','/']) {
     nav.navigate(path);
     assert.equal(screen,path);assert.equal(selected,path);assert.equal(host.location.pathname,path);
   }
@@ -82,6 +82,30 @@ test('configuration submodules preserve deep links and browser history',()=>{
   for(const section of ['usuarios','perfis-acesso','cabecalho-relatorios'])nav.navigate('/configuracoes?secao='+section);
   assert.equal(new URL(nav.getSnapshot(),host.location.origin).searchParams.get('secao'),'cabecalho-relatorios');
   host.back();assert.equal(new URL(nav.getSnapshot(),host.location.origin).searchParams.get('secao'),'perfis-acesso');
+});
+
+test('material details are deep linked and return to the filtered table',()=>{
+  const list='/cadastro?secao=materiais&busca=filtro&categoria=category-a';
+  const host=hostAt(list);const nav=createModuleNavigation(list,host);nav.connect();
+  nav.navigate(list+'&material=material-a');
+  const detail=new URL(nav.getSnapshot(),host.location.origin);
+  assert.equal(detail.searchParams.get('secao'),'materiais');
+  assert.equal(detail.searchParams.get('material'),'material-a');
+  assert.equal(detail.searchParams.get('busca'),'filtro');
+  assert.equal(detail.searchParams.get('categoria'),'category-a');
+  host.back();
+  assert.equal(nav.getSnapshot(),list);
+});
+
+test('purchase-order detail preserves tab, search and period in browser history',()=>{
+  const list='/pedidos?aba=finalizados&busca=agrisul&de=2026-09-01&ate=2026-09-30';
+  const host=hostAt(list);const nav=createModuleNavigation(list,host);nav.connect();
+  nav.navigate(list+'&pedido=order-a');
+  const detail=new URL(nav.getSnapshot(),host.location.origin);
+  assert.equal(detail.searchParams.get('pedido'),'order-a');
+  assert.equal(detail.searchParams.get('aba'),'finalizados');
+  assert.equal(detail.searchParams.get('busca'),'agrisul');
+  host.back();assert.equal(nav.getSnapshot(),list);
 });
 
 test('report type and month participate in navigation history',()=>{
