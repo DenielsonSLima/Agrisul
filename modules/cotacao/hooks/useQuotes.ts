@@ -3,8 +3,8 @@ import {fetchSignatures} from '@/modules/cadastro/assinaturas/services/signature
 import {addQuoteItems,addQuoteProviders,awardQuoteItem,deleteMaterial,deleteMaterialReference,deleteQuote,fetchMaterials,fetchQuote,fetchQuotes,finalizeQuote,persistMaterial,persistMaterialReference,persistQuote,recordQuoteNegotiation,removeQuoteItem,removeQuoteProvider} from '../services/quoteApi';
 import type {MaterialImageChange,MaterialInput,MaterialReferenceInput,QuoteAddItemsInput,QuoteAddProvidersInput,QuoteFinalizeInput,QuoteInput,QuoteItemAwardInput,QuoteNegotiationInput,QuoteRemoveItemInput,QuoteRemoveProviderInput,QuoteStatus} from '../types';
 
-export function useMaterials(){
- const query=useCadastroQuery('materials',{view:'list'},fetchMaterials);
+export function useMaterials(enabled=true){
+ const query=useCadastroQuery('materials',{view:'list'},fetchMaterials,enabled);
  return {...query,materials:query.data?.materials??[]};
 }
 export function useQuotationRequesters(){

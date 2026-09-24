@@ -31,9 +31,14 @@ export type QuoteItem = {
   materialCode: string;
   materialApplication: string;
   materialReferences: Pick<MaterialReference,'brand'|'code'>[];
+  materialImageKey?: string | null;
+  materialImageName?: string;
+  materialImageUrl?: string | null;
   quantity: string;
   unit: string;
   notes: string;
+  canRemove?: boolean;
+  removeBlockedReason?: string;
 };
 
 export type QuoteProvider = {
@@ -53,6 +58,8 @@ export type QuoteProvider = {
   isComplete?: boolean;
   awardedItemCount?: number;
   awardedTotal?: string;
+  canRemove?: boolean;
+  removeBlockedReason?: string;
 };
 
 export type QuoteNegotiation = {
@@ -89,6 +96,8 @@ export type Quote = {
   negotiations: QuoteNegotiation[];
   itemAwards: QuoteItemAward[];
   awardedItemCount: number;
+  completeProviderCount: number;
+  pendingAwardCount: number;
   awardComplete: boolean;
   winningProviderIds: string[];
   winnerProviderId?: string | null;

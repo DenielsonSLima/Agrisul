@@ -282,6 +282,7 @@ try {
  await db.exec(readFileSync(new URL('../migrations/20260923173330_purchase_order_workspace.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('../migrations/20260923185900_allow_empty_quotation_providers.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('../migrations/20260923191551_quotation_scope_removals.sql',import.meta.url),'utf8'));
+  await db.exec(readFileSync(new URL('../migrations/20260924144222_quotation_export_projection.sql',import.meta.url),'utf8'));
  await db.exec(`DO $$
   DECLARE v_projection jsonb;
   BEGIN
@@ -313,6 +314,13 @@ try {
    OR jsonb_array_length(v_projection->'purchaseOrders')<>1
    OR v_projection->'purchaseOrders'->0->>'number'<>'PED-LEGACY'
    OR v_projection->'purchaseOrders'->0->>'total'<>'24.68'
+   OR (v_projection->>'completeProviderCount')::integer<>1
+   OR (v_projection->>'pendingAwardCount')::integer<>0
+   OR (v_projection->'items'->0->>'canRemove')::boolean
+   OR (v_projection->'providers'->0->>'canRemove')::boolean
+   OR NOT (v_projection->'items'->0 ? 'materialImageKey')
+   OR NOT (v_projection->'items'->0 ? 'removeBlockedReason')
+   OR NOT (v_projection->'providers'->0 ? 'removeBlockedReason')
    OR v_projection->'purchaseOrders'->0 ? 'items' THEN
    RAISE EXCEPTION 'Quotation order summary/backfill projection is invalid: %',v_projection;
   END IF;

@@ -26,10 +26,6 @@ import {newHref,QuotationBreadcrumb} from './QuoteShared';
 const quoteHref=(id:string)=>`/cotacao?cotacao=${encodeURIComponent(id)}`;
 const plural=(value:number,singular:string,pluralLabel=`${singular}s`)=>`${value} ${value===1?singular:pluralLabel}`;
 
-function completeProviderCount(quote:Quote){
- return quote.providers.filter(provider=>provider.isComplete||(quote.items.length>0&&(provider.quotedItemCount??0)>=quote.items.length)).length;
-}
-
 function winnerName(quote:Quote){
  const winnerId=quote.winnerProviderId??quote.winningProviderIds?.[0];
  if(!winnerId)return '';
@@ -120,7 +116,7 @@ export function QuoteList(){
       ?<div className="company-empty quote-list-state"><span className="company-empty-icon">{filtersActive?<SlidersHorizontal size={24}/>:<FileText size={24}/>}</span><h3>{filtersActive?'Nenhuma cotação corresponde aos filtros':'Nenhuma cotação encontrada'}</h3><p>{filtersActive?'Limpe ou ajuste os filtros para ampliar a busca.':'Crie uma cotação para solicitar preços aos prestadores.'}</p>{filtersActive?<button type="button" className="btn" onClick={clearFilters}><X size={15}/>Limpar filtros</button>:<ModuleLink className="btn company-primary" href={newHref}><Plus size={16}/>Nova cotação</ModuleLink>}</div>
       :<div className="quote-list-card-grid" role="list" aria-label="Cotações encontradas">
        {filtered.map(quote=>{
-         const completed=completeProviderCount(quote),providersTotal=quote.providers.length;
+          const completed=quote.completeProviderCount,providersTotal=quote.providers.length;
          const ready=providersTotal>0&&completed===providersTotal;
          const progress=providersTotal?Math.min(100,Math.round(completed/providersTotal*100)):0;
          const winner=winnerName(quote);

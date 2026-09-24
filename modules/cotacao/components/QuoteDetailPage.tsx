@@ -52,15 +52,15 @@ export function QuoteDetailPage({id}: {id: string}) {
 function QuoteDetailContent({quote}: {quote: Quote}) {
   const {navigate} = useModuleNavigation();
   const mutations = useQuoteMutations();
-  const materialsQuery = useMaterials();
-  const providersQuery = useProviders();
-  const confirm = useConfirmation();
   const [tab, setTab] = useState<QuoteDetailTab>('summary');
   const [addingMaterial, setAddingMaterial] = useState(false);
   const [addingProviders, setAddingProviders] = useState(false);
   const [removingItemId, setRemovingItemId] = useState('');
   const [removingProviderId, setRemovingProviderId] = useState('');
   const [finalizeError, setFinalizeError] = useState('');
+  const materialsQuery = useMaterials(tab === 'negotiation' || addingMaterial);
+  const providersQuery = useProviders();
+  const confirm = useConfirmation();
   const purchaseOrders = quote.purchaseOrders ?? [];
   const singleOrderId = purchaseOrders.length === 1
     ? purchaseOrders[0].id

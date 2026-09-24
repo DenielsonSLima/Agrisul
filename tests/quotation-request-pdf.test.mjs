@@ -11,6 +11,8 @@ const {build} = require(require.resolve('esbuild', {paths: [require.resolve('vit
 const jsPdfModulePath = require.resolve('jspdf');
 const pdfSourceUrl = new URL('../modules/cotacao/reporting/quotationRequestPdf.ts', import.meta.url);
 const providersSourceUrl = new URL('../modules/cotacao/components/QuoteProvidersTab.tsx', import.meta.url);
+const workerClientSourceUrl = new URL('../modules/cotacao/reporting/quotationRequestPdfWorker.ts', import.meta.url);
+const workerSourceUrl = new URL('../modules/cotacao/reporting/quotationRequestPdf.worker.ts', import.meta.url);
 
 const onePixelPng = [
   137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82,
@@ -99,10 +101,12 @@ function textDraw(draws, value) {
   return draws.find(draw => draw.value.includes(value));
 }
 
-test('quotation request snapshot receives each signed material image from the catalog', async () => {
-  const [pdfSource, providersSource] = await Promise.all([
+test('quotation request snapshot receives only signed images selected by the quotation RPC', async () => {
+  const [pdfSource, providersSource, workerClientSource, workerSource] = await Promise.all([
     readFile(pdfSourceUrl, 'utf8'),
     readFile(providersSourceUrl, 'utf8'),
+    readFile(workerClientSourceUrl, 'utf8'),
+    readFile(workerSourceUrl, 'utf8'),
   ]);
 
   assert.match(
@@ -112,16 +116,16 @@ test('quotation request snapshot receives each signed material image from the ca
   );
   assert.match(
     providersSource,
-    /\buseMaterials\s*\(/,
-    'the supplier export must load the signed material catalog',
+    /item\.materialImageUrl\s*\?\?\s*null/,
+    'the supplier export must use only the signed image returned for each quotation item',
   );
-  for (const property of ['materialImageUrl', 'materialId', 'imageUrl']) {
-    assert.match(
-      providersSource,
-      new RegExp(`\\b${property}\\b`),
-      `the PDF snapshot enrichment must use ${property}`,
-    );
-  }
+  assert.doesNotMatch(providersSource, /\buseMaterials\s*\(/, 'export must not load the complete material catalog');
+  assert.match(providersSource, /createPdf=\{createQuotationRequestPdfInWorker\}/);
+  assert.match(workerClientSource, /new Worker\(new URL\('\.\/quotationRequestPdf\.worker\.ts', import\.meta\.url\)/);
+  assert.match(workerClientSource, /worker\.terminate\(\)/, 'closing or completing a job must release the worker');
+  assert.match(workerSource, /doc\.output\('arraybuffer'\)/, 'PDF serialization must happen inside the worker');
+  assert.match(workerSource, /doc\.autoPrint\(\)/, 'the worker must prepare printing without rebuilding layout on the UI thread');
+  assert.match(pdfSource, /maxWidth:\s*360[\s\S]*maxHeight:\s*360/, 'item photos must be bounded before jsPDF embeds them');
   assert.doesNotMatch(
     pdfSource,
     /line\(\s*['"]Solicitante['"]|text\(\s*['"]SOLICITANTE['"]|snapshot\.requester/,

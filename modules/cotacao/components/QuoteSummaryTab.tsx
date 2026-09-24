@@ -14,7 +14,6 @@ import {
   Users,
 } from 'lucide-react';
 import {dateLabel, moneyLabel} from '@/shared/utils/presentation';
-import {useMaterials} from '../hooks/useQuotes';
 import type {Quote, QuoteItem, QuoteProvider} from '../types';
 import {QuoteAwardExportDialog} from './QuoteAwardExportDialog';
 
@@ -59,19 +58,18 @@ export function QuoteSummaryTab({
   onRemoveMaterial,
   removingItemId,
 }: QuoteSummaryTabProps) {
-  const materialsQuery = useMaterials();
   const [exportProviderId, setExportProviderId] = useState<string | null>(null);
   const exportProvider = exportProviderId
     ? quote.providers.find(provider => provider.id === exportProviderId) ?? null
     : null;
   const materialImages = useMemo(
-    () => new Map(materialsQuery.materials.map(material => [material.id, material.imageUrl] as const)),
-    [materialsQuery.materials],
+    () => new Map(quote.items.map(item => [item.materialId, item.materialImageUrl ?? null] as const)),
+    [quote.items],
   );
-  const completed = quote.providers.filter(provider => provider.isComplete).length;
+  const completed = quote.completeProviderCount;
   const itemAwards = quote.itemAwards ?? [];
-  const awardedCount = quote.awardedItemCount ?? itemAwards.length;
-  const readyToFinalize = quote.awardComplete ?? false;
+  const awardedCount = quote.awardedItemCount;
+  const readyToFinalize = quote.awardComplete;
 
   return (
     <section className="quote-summary-tab">
@@ -135,15 +133,10 @@ export function QuoteSummaryTab({
                   .join(' · ');
                 const award = itemAwards.find(entry => entry.itemId === item.id);
                 const provider = award ? quote.providers.find(entry => entry.id === award.providerId) : null;
-                const hasPriceOrHistory = quote.negotiations.some(entry => entry.itemId === item.id)
-                  || quote.providers.some(entry => !!entry.values[item.id])
-                  || !!award;
-                const cannotRemove = quote.items.length <= 1 || hasPriceOrHistory;
-                const removeTitle = quote.items.length <= 1
-                  ? 'A cotação precisa manter ao menos um material.'
-                  : hasPriceOrHistory
-                    ? 'Materiais com preço, histórico ou aprovação não podem ser removidos.'
-                    : `Remover ${item.materialName}`;
+                const cannotRemove = !item.canRemove;
+                const removeTitle = item.canRemove
+                  ? `Remover ${item.materialName}`
+                  : item.removeBlockedReason;
                 return (
                   <tr key={item.id}>
                     <td>
@@ -184,9 +177,6 @@ export function QuoteSummaryTab({
 
       <article className="quote-summary-section">
         <header><Trophy size={18}/><div><h4>Fornecedores e resumo de preços</h4><p>Valores e aprovações calculados pelo banco</p></div></header>
-        {materialsQuery.error && (
-          <p className="quote-summary-export-warning" role="status">As fotos não foram carregadas. O PDF aprovado ainda pode ser exportado sem elas.</p>
-        )}
         <div className="quote-summary-table-wrap" role="region" aria-label="Resumo de preços por fornecedor" tabIndex={0}>
           <table className="quote-summary-table quote-result-table">
             <thead>
@@ -211,12 +201,12 @@ export function QuoteSummaryTab({
                       <button
                         className="btn"
                         type="button"
-                        disabled={!providerAwardCount || materialsQuery.loading}
+                        disabled={!providerAwardCount}
                         title={!providerAwardCount ? 'Aprove ao menos um material para este fornecedor' : undefined}
                         aria-label={`Exportar itens aprovados para ${provider.providerName}`}
                         onClick={() => setExportProviderId(provider.id)}
                       >
-                        {materialsQuery.loading ? <Loader2 className="animate-spin" size={15} aria-hidden="true"/> : <FileDown size={15} aria-hidden="true"/>}
+                        <FileDown size={15} aria-hidden="true"/>
                         Exportar
                       </button>
                     </td>
@@ -234,7 +224,7 @@ export function QuoteSummaryTab({
             <strong>{readyToFinalize ? 'Pedidos prontos para gerar' : 'Conclua a aprovação dos materiais'}</strong>
             <p>{readyToFinalize
               ? 'Todos os itens possuem fornecedor e preço aprovados. Ao finalizar, será criado um pedido para cada fornecedor selecionado.'
-              : `Ainda faltam ${Math.max(quote.items.length - awardedCount, 0)} material(is) para aprovar na aba Negociação.`}</p>
+              : `Ainda faltam ${quote.pendingAwardCount} material(is) para aprovar na aba Negociação.`}</p>
             {finalizeError && <p className="form-error" role="alert">{finalizeError}</p>}
           </div>
           <button className="btn company-primary" type="button" disabled={busy || !readyToFinalize} onClick={() => void onFinalize()}>

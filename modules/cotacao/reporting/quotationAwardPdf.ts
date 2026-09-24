@@ -76,7 +76,7 @@ async function loadItemImages(items: QuotationAwardItem[]) {
     const batch = urls.slice(index, index + 4);
     const images = await Promise.all(batch.map(async url => {
       try {
-        return await loadReportImage(url);
+        return await loadReportImage(url, {maxWidth: 360, maxHeight: 360, quality: .86});
       } catch {
         return null;
       }

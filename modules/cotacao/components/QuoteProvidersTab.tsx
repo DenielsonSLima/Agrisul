@@ -1,23 +1,21 @@
 'use client';
 
-import {useMemo, useState} from 'react';
-import {FileDown, Loader2, Plus, RefreshCw, Trash2, Users} from 'lucide-react';
+import {useState} from 'react';
+import {FileDown, Loader2, Plus, Trash2, Users} from 'lucide-react';
 import {providerDocument} from '@/modules/cadastro/prestadores/presentation';
 import {PdfExportDialog} from '@/shared/reporting/PdfExportDialog';
 import {formatReportPhone} from '@/shared/reporting';
 import {useWorkspaceCompany} from '@/shared/state/WorkspaceCompanyProvider';
 import {moneyLabel} from '@/shared/utils/presentation';
 import {
-  createQuotationRequestPdf,
   type QuotationRequestSnapshot,
 } from '../reporting/quotationRequestPdf';
-import {useMaterials} from '../hooks/useQuotes';
+import {createQuotationRequestPdfInWorker} from '../reporting/quotationRequestPdfWorker';
 import type {Quote, QuoteProvider} from '../types';
 
 function quotationRequestSnapshot(
   quote: Quote,
   provider: QuoteProvider,
-  materialImages: ReadonlyMap<string, string | null>,
 ): QuotationRequestSnapshot {
   return {
     title: quote.title,
@@ -26,7 +24,7 @@ function quotationRequestSnapshot(
     notes: quote.notes,
     items: quote.items.map(item => ({
       ...item,
-      materialImageUrl: materialImages.get(item.materialId) ?? null,
+      materialImageUrl: item.materialImageUrl ?? null,
     })),
     provider,
   };
@@ -86,12 +84,7 @@ export function QuoteProvidersTab({
   removingProviderId?: string;
 }) {
   const {activeCompanyId} = useWorkspaceCompany();
-  const materialsQuery = useMaterials();
   const [pdf, setPdf] = useState<QuotationRequestSnapshot | null>(null);
-  const materialImages = useMemo(
-    () => new Map(materialsQuery.materials.map(material => [material.id, material.imageUrl] as const)),
-    [materialsQuery.materials],
-  );
 
   return (
     <section className="quote-provider-directory" aria-labelledby="quote-providers-title">
@@ -119,15 +112,6 @@ export function QuoteProvidersTab({
         </div>
       </header>
 
-      {materialsQuery.error && (
-        <div className="quote-pdf-assets-error" role="alert">
-          <span>As fotos dos materiais não puderam ser carregadas. O PDF pode ser gerado sem elas.</span>
-          <button className="btn" type="button" onClick={() => void materialsQuery.reload()}>
-            <RefreshCw size={14} aria-hidden="true"/>Tentar novamente
-          </button>
-        </div>
-      )}
-
       {quote.providers.length ? (
         <div
           className="quote-provider-directory-table-wrap"
@@ -149,9 +133,6 @@ export function QuoteProvidersTab({
             </thead>
             <tbody>
               {quote.providers.map(provider => {
-                const hasPriceOrHistory = (provider.quotedItemCount ?? 0) > 0
-                  || quote.negotiations.some(entry => entry.providerId === provider.id)
-                  || (provider.awardedItemCount ?? 0) > 0;
                 return <tr key={provider.id}>
                   <td>
                     <strong>{provider.providerName}</strong>
@@ -185,23 +166,20 @@ export function QuoteProvidersTab({
                       <button
                         className="btn"
                         type="button"
-                        disabled={materialsQuery.loading}
                         aria-label={`Exportar solicitação para ${provider.providerName}`}
-                        onClick={() => setPdf(quotationRequestSnapshot(quote, provider, materialImages))}
+                        onClick={() => setPdf(quotationRequestSnapshot(quote, provider))}
                       >
-                        {materialsQuery.loading
-                          ? <Loader2 className="animate-spin" size={15} aria-hidden="true"/>
-                          : <FileDown size={15} aria-hidden="true"/>}
-                        {materialsQuery.loading ? 'Preparando fotos…' : 'Exportar'}
+                        <FileDown size={15} aria-hidden="true"/>
+                        Exportar
                       </button>
                       {quote.status === 'open' && onRemoveProvider && (
                         <button
                           className="icon-btn danger"
                           type="button"
-                          disabled={addingProviders || hasPriceOrHistory}
-                          title={hasPriceOrHistory
-                            ? 'Fornecedores com preço, histórico ou aprovação não podem ser removidos.'
-                            : `Remover ${provider.providerName}`}
+                          disabled={addingProviders || !provider.canRemove}
+                          title={provider.canRemove
+                            ? `Remover ${provider.providerName}`
+                            : provider.removeBlockedReason}
                           aria-label={`Remover ${provider.providerName} da cotação`}
                           onClick={() => void onRemoveProvider(provider)}
                         >
@@ -229,7 +207,7 @@ export function QuoteProvidersTab({
         <PdfExportDialog
           snapshot={pdf}
           companyId={activeCompanyId}
-          createPdf={createQuotationRequestPdf}
+          createPdf={createQuotationRequestPdfInWorker}
           orientation="portrait"
           fitPreviewToWidth
           showPreviewToolbar

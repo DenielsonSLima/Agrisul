@@ -209,7 +209,7 @@ test('suppliers tab uses a semantic table and Export opens PdfExportDialog', asy
   const source = await readComponent('QuoteProvidersTab');
 
   assert.match(source, /import\s*\{PdfExportDialog\}\s*from\s*['"]@\/shared\/reporting\/PdfExportDialog['"]/);
-  assert.match(source, /import\s*\{[^}]*createQuotationRequestPdf[^}]*\}\s*from\s*['"]\.\.\/reporting\/quotationRequestPdf['"]/s);
+  assert.match(source, /import\s*\{createQuotationRequestPdfInWorker\}\s*from\s*['"]\.\.\/reporting\/quotationRequestPdfWorker['"]/);
   assert.match(source, /<table\b/);
   assert.match(source, /<thead>[\s\S]*?<tbody>/);
   assert.match(source, /<th\b[^>]*scope="col"/);
@@ -220,7 +220,7 @@ test('suppliers tab uses a semantic table and Export opens PdfExportDialog', asy
   assert.match(source, /<button\b[^>]*onClick=\{[^}]*setPdf[^}]*\}[^>]*>[\s\S]*?Exportar[\s\S]*?<\/button>/);
   assert.match(source, /\{pdf&&[\s\S]*?<PdfExportDialog\b/);
   assert.match(source, /snapshot=\{pdf\}/);
-  assert.match(source, /createPdf=\{createQuotationRequestPdf\}/);
+  assert.match(source, /createPdf=\{createQuotationRequestPdfInWorker\}/);
   assert.match(source, /onClose=\{\(\)=>setPdf\(null\)\}/);
 });
 
@@ -292,18 +292,21 @@ test('open quotation scope can grow and shrink without replacing existing negoti
   }
 });
 
-test('material and supplier removal controls are guarded by recorded prices and history', async () => {
+test('material and supplier removal controls use RPC-calculated permissions', async () => {
   const [summary, providers] = await Promise.all([
     readComponent('QuoteSummaryTab'),
     readComponent('QuoteProvidersTab'),
   ]);
 
   assert.match(summary, /onRemoveMaterial/);
-  assert.match(summary, /quote\.negotiations\.some\(entry => entry\.itemId === item\.id\)/);
-  assert.match(summary, /quote\.items\.length <= 1/);
+  assert.match(summary, /const cannotRemove = !item\.canRemove/);
+  assert.match(summary, /item\.removeBlockedReason/);
+  assert.doesNotMatch(summary, /quote\.negotiations\.some\(entry => entry\.itemId === item\.id\)/);
   assert.match(summary, /aria-label=\{`Remover \$\{item\.materialName\} da cotação`\}/);
   assert.match(providers, /onRemoveProvider/);
-  assert.match(providers, /quote\.negotiations\.some\(entry => entry\.providerId === provider\.id\)/);
+  assert.match(providers, /disabled=\{addingProviders \|\| !provider\.canRemove\}/);
+  assert.match(providers, /provider\.removeBlockedReason/);
+  assert.doesNotMatch(providers, /quote\.negotiations\.some\(entry => entry\.providerId === provider\.id\)/);
   assert.match(providers, /aria-label=\{`Remover \$\{provider\.providerName\} da cotação`\}/);
 });
 
@@ -334,7 +337,7 @@ test('quotation list is an operational workspace with KPIs, aligned filters and 
   assert.match(source, /className="quote-list-card-meta"/);
   assert.match(source, /className="quote-list-card-scope"/);
   assert.match(source, /className="btn quote-list-card-open"/);
-  assert.match(source, /completeProviderCount\(quote\)/);
+  assert.match(source, /completed=quote\.completeProviderCount/);
   assert.match(source, /quote\.items\.slice\(0,2\)/);
   assert.match(source, /quoteHref\(quote\.id\)/);
   assert.match(source, /aria-label=\{`Abrir \$\{quote\.number\|\|quote\.title\}`\}/);

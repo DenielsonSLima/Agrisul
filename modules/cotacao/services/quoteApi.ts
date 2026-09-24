@@ -21,6 +21,15 @@ async function withMaterialImageUrls(materials:Material[],signal?:AbortSignal){
  const urls=new Map((data??[]).filter(item=>!item.error&&item.signedUrl).map(item=>[item.path,item.signedUrl]));
  return normalized.map(material=>({...material,imageUrl:material.imageKey?urls.get(material.imageKey)??null:null}));
 }
+async function withQuotationImageUrls(quote:Quote,signal?:AbortSignal){
+ const paths=[...new Set(quote.items.map(item=>item.materialImageKey).filter((key):key is string=>!!key))];
+ if(!paths.length)return quote;
+ const {data,error}=await getSupabaseBrowserClient().storage.from(MATERIAL_IMAGE_BUCKET).createSignedUrls(paths,3600);
+ if(signal?.aborted)throw new DOMException('Consulta cancelada','AbortError');
+ if(error)return {...quote,items:quote.items.map(item=>({...item,materialImageUrl:null}))};
+ const urls=new Map((data??[]).filter(item=>!item.error&&item.signedUrl).map(item=>[item.path,item.signedUrl]));
+ return {...quote,items:quote.items.map(item=>({...item,materialImageUrl:item.materialImageKey?urls.get(item.materialImageKey)??null:null}))};
+}
 export async function fetchMaterials(signal:AbortSignal){
  const result=await rpcRequest<{materials:Material[]}>('materials','list',{},signal);
  return {materials:await withMaterialImageUrls(result.materials,signal)};
@@ -60,7 +69,7 @@ export async function deleteMaterial(id:string){
 }
 export const deleteMaterialReference=(id:string)=>rpcRequest<{id:string;deleted:true}>('material-variants','delete',{id});
 export const fetchQuotes = (status: QuoteStatus, signal: AbortSignal) => rpcRequest<{quotes: Quote[]; total: number}>('quotations','list',{status},signal);
-export const fetchQuote = async (id: string, signal: AbortSignal) => (await rpcRequest<{quote: Quote}>('quotations','get',{id},signal)).quote;
+export const fetchQuote = async (id: string, signal: AbortSignal) => withQuotationImageUrls((await rpcRequest<{quote: Quote}>('quotations','get',{id},signal)).quote,signal);
 export const persistQuote = async (input: QuoteInput) => (await rpcRequest<{quote: Quote}>('quotations','save',input)).quote;
 export const recordQuoteNegotiation = async (input: QuoteNegotiationInput) => (await rpcRequest<{quote: Quote}>('quotations','record-negotiation',input)).quote;
 export const awardQuoteItem = async (input: QuoteItemAwardInput) => (await rpcRequest<{quote: Quote}>('quotations','award-item',input)).quote;
