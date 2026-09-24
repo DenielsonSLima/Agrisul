@@ -3,9 +3,9 @@ import {bootstrapSugarcaneManagement,deletePractice,fetchPractices,persistPracti
 import type {PracticeInput} from '../types';
 export function usePractices(filters:PracticeFilters={},enabled=true){
   const query=useCadastroQuery('cultural-practices',filters,signal=>fetchPractices(filters,signal),enabled);
-  const mutation=useCadastroMutation('cultural-practices',({input,id}:{input:PracticeInput;id?:string})=>persistPractice(input,id),[]);
-  const removal=useCadastroMutation('cultural-practices',deletePractice,[]);
-  const bootstrap=useCadastroMutation('cultural-practices',bootstrapSugarcaneManagement,['cultures']);
+  const mutation=useCadastroMutation('cultural-practices',({input,id}:{input:PracticeInput;id?:string})=>persistPractice(input,id),['planning']);
+  const removal=useCadastroMutation('cultural-practices',deletePractice,['planning']);
+  const bootstrap=useCadastroMutation('cultural-practices',bootstrapSugarcaneManagement,['cultures','planning']);
   return {
    ...query,
    practices:query.data?.practices??[],

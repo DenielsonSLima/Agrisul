@@ -6,10 +6,11 @@ import {AlertTriangle,Clock3,LogOut,RefreshCw} from 'lucide-react';
 import {getSupabaseBrowserClient,getSupabaseConfig} from './client';
 import {AuthExperience} from './AuthExperience';
 import {Button} from '@/components/ui/button';
-import {planAuthSessionTransition} from './authLifecycle';
+import {canApplyAccessCheck,planAuthSessionTransition} from './authLifecycle';
 
 export type WorkspaceAccess='checking'|'ready'|'invite'|'disabled'|'removed'|'invalid'|'error';
-type AuthState={user:User|null;session:Session|null;ready:boolean;error:string;access:WorkspaceAccess;signOut:()=>Promise<void>;refreshAccess:()=>Promise<WorkspaceAccess>};
+export type RefreshAccessOptions={silent?:boolean};
+type AuthState={user:User|null;session:Session|null;ready:boolean;error:string;access:WorkspaceAccess;signOut:()=>Promise<void>;refreshAccess:(options?:RefreshAccessOptions)=>Promise<WorkspaceAccess>};
 const AuthContext=createContext<AuthState|null>(null);
 const IDLE_MS=30*60*1000;
 const ACTIVITY_WRITE_MS=15000;
@@ -23,16 +24,20 @@ export function AuthProvider({children}:{children:ReactNode}){
  const [error]=useState(()=>{try{getSupabaseConfig();return '';}catch(caught){return(caught as Error).message;}});
  const [ready,setReady]=useState(!!error);
  const identity=useRef<string|null>(null);
+ const accessCheckRevision=useRef(0);
  const mounted=useRef(true);
 
- const refreshAccess=useCallback(async():Promise<WorkspaceAccess>=>{
+ const refreshAccess=useCallback(async({silent=false}:RefreshAccessOptions={}):Promise<WorkspaceAccess>=>{
+  const revision=++accessCheckRevision.current;
   const client=getSupabaseBrowserClient();
   const {data:{session:current}}=await client.auth.getSession();
-  if(!current){if(mounted.current)setAccess('ready');return'ready';}
-  if(mounted.current)setAccess('checking');
+  const checkedUserId=current?.user.id??null;
+  const canApply=()=>mounted.current&&canApplyAccessCheck(revision,accessCheckRevision.current,checkedUserId,identity.current);
+  if(!current){if(canApply())setAccess('ready');return'ready';}
+  if(!silent&&canApply())setAccess('checking');
   const {data,error:rpcError}=await client.rpc('billing_rpc',{p_resource:'onboarding',p_action:'inspect',p_payload:{}});
   const status=rpcError?'error':(['ready','invite','disabled','removed','invalid'].includes(data?.status)?data.status:'error') as WorkspaceAccess;
-  if(mounted.current&&identity.current===current.user.id)setAccess(status);
+  if(canApply())setAccess(status);
   return status;
  },[]);
 
@@ -44,7 +49,7 @@ export function AuthProvider({children}:{children:ReactNode}){
    if(!active)return;
    const nextId=next?.user.id??null;
    const transition=planAuthSessionTransition(identity.current,nextId);
-   if(transition.clearQueryCache){void queryClient.cancelQueries();queryClient.clear();identity.current=nextId;}
+   if(transition.clearQueryCache){accessCheckRevision.current++;void queryClient.cancelQueries();queryClient.clear();identity.current=nextId;}
    setSession(next);setReady(true);
    // Supabase emits SIGNED_IN again when a tab is refocused and may also emit
    // TOKEN_REFRESHED. The credentials must be updated, but those same-user
@@ -59,6 +64,7 @@ export function AuthProvider({children}:{children:ReactNode}){
 
  const signOut=useCallback(async()=>{
   const currentId=identity.current;
+  accessCheckRevision.current++;
   const {error:signOutError}=await getSupabaseBrowserClient().auth.signOut({scope:'local'});
   await queryClient.cancelQueries();queryClient.clear();setSession(null);setAccess('ready');identity.current=null;
   if(currentId){try{localStorage.removeItem(`billing:last-activity:${currentId}`);}catch{}}

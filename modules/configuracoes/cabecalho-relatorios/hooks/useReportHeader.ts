@@ -1,8 +1,8 @@
 import {useState} from "react";
-import {useMutation,useQuery,useQueryClient} from "@tanstack/react-query";
+import {useQuery} from "@tanstack/react-query";
+import {useCadastroMutation} from '@/modules/cadastro/hooks/useCadastroQuery';
 import {useAuth} from "@/shared/supabase/AuthProvider";
 import {billingKeys} from "@/shared/query/keys";
-import {mutationResources} from '@/shared/query/derivedResources';
 import {notifications} from "@/shared/feedback";
 import type {ReportCompanyBrand,ReportHeaderVariant,ReportIssuer,ReportOrientation,ReportWatermarkBrand} from "@/shared/reporting";
 import {fetchCompanies} from "../../empresas/services/companyApi";
@@ -12,7 +12,7 @@ import {defaultReportHeaderSettings,type ReportHeaderSettings} from "../types";
 import {fetchReportHeader,persistReportHeader} from "../services/reportHeaderApi";
 
 export function useReportHeader(activeCompanyId?:string,orientationOverride?:ReportOrientation){
- const {user,ready}=useAuth();const queryClient=useQueryClient();const userId=user?.id??"anonymous";
+ const {user,ready}=useAuth();const userId=user?.id??"anonymous";
  const headerQuery=useQuery({queryKey:billingKeys.resource(userId,"report-headers"),queryFn:({signal})=>fetchReportHeader(signal),enabled:ready&&!!user});
  const companiesQuery=useQuery({queryKey:billingKeys.resource(userId,"companies"),queryFn:({signal})=>fetchCompanies(signal),enabled:ready&&!!user});
  const watermarkQuery=useQuery({queryKey:billingKeys.resource(userId,"watermarks"),queryFn:({signal})=>fetchWatermark(signal),enabled:ready&&!!user,staleTime:300000,refetchInterval:3000000});
@@ -27,7 +27,7 @@ export function useReportHeader(activeCompanyId?:string,orientationOverride?:Rep
  const watermark=watermarkFor(watermarkSettings);
  const refreshWatermark=async()=>{const result=await watermarkQuery.refetch();if(result.error)throw result.error;return watermarkFor(result.data);};
  const issuer:ReportIssuer={id:user?.id??"",name:profileQuery.data?.name??user?.user_metadata?.display_name??user?.email??"Usuário",email:user?.email??profileQuery.data?.email??""};
- const mutation=useMutation({mutationFn:persistReportHeader,onMutate:async()=>{await Promise.all(mutationResources('report-headers').map(resource=>queryClient.cancelQueries({queryKey:billingKeys.resource(userId,resource)})));},onSuccess:async saved=>{queryClient.setQueryData(billingKeys.resource(userId,"report-headers"),saved);await Promise.all(mutationResources('report-headers').map(resource=>queryClient.invalidateQueries({queryKey:billingKeys.resource(userId,resource)})));}});
+ const mutation=useCadastroMutation('report-headers',persistReportHeader);
  const change=(patch:Partial<Pick<ReportHeaderSettings,"orientation"|"defaultCompanyId">>)=>setDraft(current=>({...current??headerQuery.data??defaultReportHeaderSettings,...patch}));
  const changeVariant=(orientation:ReportOrientation,patch:Partial<ReportHeaderVariant>)=>setDraft(current=>{const base=current??headerQuery.data??defaultReportHeaderSettings;return {...base,[orientation]:{...base[orientation],...patch}};});
  const save=async()=>{if(!user||mutation.isPending)return;setOperationError('');try{const saved=await mutation.mutateAsync(settings);setDraft(null);notifications.saved("Os modelos de cabeçalho em retrato e paisagem foram salvos.");return saved;}catch(error){const message=(error as Error).message;setOperationError(message);notifications.error(message);throw error;}};

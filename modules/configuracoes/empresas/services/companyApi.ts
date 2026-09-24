@@ -1,5 +1,6 @@
 import {getSupabaseBrowserClient} from "@/shared/supabase/client";
 import {rpcRequest,RpcError} from "@/shared/supabase/rpc";
+import {assertSessionActor} from '@/shared/supabase/sessionActor';
 import {fetchWorkspaceId} from "@/shared/supabase/workspace";
 import type {Company,CompanyInput,CompanyDetails,CompanyLogoChange} from "../types";
 export class CompanyApiError extends Error{constructor(message:string,public status:number){super(message)}}
@@ -15,28 +16,37 @@ export async function fetchCompanies(signal?:AbortSignal):Promise<Company[]>{
  const urls=new Map((signed??[]).filter(item=>!item.error&&item.signedUrl).map(item=>[item.path,item.signedUrl]));
  return data.companies.map(company=>({...company,logoKey:company.logoKey??null,logoName:company.logoName??"",logoUrl:company.logoKey?urls.get(company.logoKey)??null:null}));
 }
-export async function persistCompany(data:CompanyInput,id?:string,logo?:CompanyLogoChange){
+export async function persistCompany(data:CompanyInput,id?:string,logo?:CompanyLogoChange,expectedActorId?:string){
+ const actorId=await assertSessionActor(expectedActorId,"Entre na sua conta para salvar a empresa.");
  const client=getSupabaseBrowserClient();const storage=client.storage.from(logoBucket);
  let uploadedKey:string|undefined;
+ let rpcStarted=false;
+ let rpcCompleted=false;
  const payload:Record<string,unknown>={...data,...(id?{id}:{})};
- if(logo?.file){
-  const {data:{session},error:authError}=await client.auth.getSession();
-  if(authError||!session)throw new CompanyApiError("Entre na sua conta para enviar a logo.",401);
-  const extension=({"image/png":"png","image/jpeg":"jpg","image/webp":"webp"} as Record<string,string>)[logo.file.type];
-  if(!extension||!logo.file.size||logo.file.size>3*1024*1024)throw new Error("Envie uma logo PNG, JPG ou WebP de até 3 MB.");
-  const workspaceId=await fetchWorkspaceId();
-  uploadedKey=`${workspaceId}/companies/${crypto.randomUUID()}.${extension}`;
-  const {error}=await storage.upload(uploadedKey,logo.file,{contentType:logo.file.type,upsert:false});
-  if(error)throw new Error("Não foi possível enviar a logo. Verifique o arquivo e tente novamente.");
-  payload.logoKey=uploadedKey;payload.logoName=logo.file.name;
- }else if(logo?.remove){payload.removeLogo=true;}
  try{
+  if(logo?.file){
+   const extension=({"image/png":"png","image/jpeg":"jpg","image/webp":"webp"} as Record<string,string>)[logo.file.type];
+   if(!extension||!logo.file.size||logo.file.size>3*1024*1024)throw new Error("Envie uma logo PNG, JPG ou WebP de até 3 MB.");
+   await assertSessionActor(actorId);
+   const workspaceId=await fetchWorkspaceId();
+   await assertSessionActor(actorId);
+   uploadedKey=`${workspaceId}/companies/${crypto.randomUUID()}.${extension}`;
+   await assertSessionActor(actorId);
+   const {error}=await storage.upload(uploadedKey,logo.file,{contentType:logo.file.type,upsert:false});
+   if(error)throw new Error("Não foi possível enviar a logo. Verifique o arquivo e tente novamente.");
+   await assertSessionActor(actorId);
+   payload.logoKey=uploadedKey;payload.logoName=logo.file.name;
+  }else if(logo?.remove){payload.removeLogo=true;}
+  await assertSessionActor(actorId);
+  rpcStarted=true;
   const result=await rpcRequest<{id:string;company:Company;previousLogoKey:string|null}>("companies","save",payload);
+  rpcCompleted=true;
+  await assertSessionActor(actorId);
   const old=result.previousLogoKey??logo?.previousKey;
   if(old&&old!==uploadedKey&&(logo?.remove||uploadedKey))void storage.remove([old]);
   return result;
  }catch(error){
-  if(uploadedKey&&error instanceof RpcError&&error.status<500)void storage.remove([uploadedKey]);
+  if(uploadedKey&&!rpcCompleted&&(!rpcStarted||error instanceof RpcError&&error.status<500))void storage.remove([uploadedKey]);
   throw error;
  }
 }

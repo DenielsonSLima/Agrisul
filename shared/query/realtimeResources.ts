@@ -26,7 +26,7 @@ const baseResources: Record<string, readonly string[]> = {
   billing_memberships: ['companies','contracts','clients','atr','farms','plots','contract-types','cultures','cultural-practices','watermark','watermarks','settings','profile','users','access-profiles','permissions','report-headers','signatures','service-requests','document-templates','service-providers'],
   billing_invitations: ['users'],
   billing_access_profiles: ['companies','contracts','clients','atr','farms','plots','contract-types','cultures','cultural-practices','watermark','watermarks','settings','profile','users','access-profiles','permissions','report-headers','signatures','service-requests','document-templates','service-providers'],
-  billing_user_settings: ['settings', 'profile', 'users', 'report-headers', 'signatures', 'service-requests'],
+  billing_user_settings: ['settings', 'profile', 'users', 'report-headers', 'signatures', 'service-requests', 'planning'],
   billing_report_headers: ['report-headers', 'service-requests'],
   billing_signatures: ['signatures', 'service-requests'],
   billing_service_providers: ['service-providers', 'service-requests'],

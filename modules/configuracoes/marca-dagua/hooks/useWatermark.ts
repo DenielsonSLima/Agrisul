@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
-import {useMutation,useQuery,useQueryClient} from '@tanstack/react-query';
+import {useQuery} from '@tanstack/react-query';
+import {useCadastroMutation} from '@/modules/cadastro/hooks/useCadastroQuery';
 import {useAuth} from '@/shared/supabase/AuthProvider';
-import {getSupabaseBrowserClient} from '@/shared/supabase/client';
 import {billingKeys} from '@/shared/query/keys';
 import {notifications} from '@/shared/feedback';
 import {defaultWatermark,type WatermarkOrientation,type WatermarkSettings} from '../types';
@@ -14,7 +14,7 @@ type OrientationFlags=Record<WatermarkOrientation,boolean>;
 const emptyFlags=():OrientationFlags=>({portrait:false,landscape:false});
 
 export function useWatermark(){
- const {user,ready}=useAuth();const queryClient=useQueryClient();const userId=user?.id??'anonymous';
+ const {user,ready}=useAuth();const userId=user?.id??'anonymous';
  const query=useQuery({queryKey:billingKeys.resource(userId,'watermarks'),queryFn:({signal})=>fetchWatermark(signal),enabled:ready&&!!user,staleTime:300000,refetchInterval:3000000});
  const [draft,setDraft]=useState<WatermarkSettings|null>(null);
  const [files,setFiles]=useState<OrientationFiles>({});
@@ -27,12 +27,7 @@ export function useWatermark(){
  const loading=!ready||!!user&&query.isPending;
  const release=(orientation:WatermarkOrientation)=>{const url=localUrls.current[orientation];if(url)URL.revokeObjectURL(url);localUrls.current[orientation]=null;};
  useEffect(()=>()=>{for(const orientation of ['portrait','landscape'] as const){selections.current[orientation]++;release(orientation);}},[]);
- const mutation=useMutation({mutationFn:({value,nextFiles,remove}:{value:WatermarkSettings;nextFiles:OrientationFiles;remove:OrientationFlags})=>persistWatermark(value,nextFiles,remove),onSuccess:async(value)=>{
-  const {data:{session}}=await getSupabaseBrowserClient().auth.getSession();
-  if(session?.user.id!==userId)return;
-  queryClient.setQueryData(billingKeys.resource(userId,'watermarks'),value);
-  await queryClient.invalidateQueries({queryKey:billingKeys.resource(userId,'watermarks')});
- }});
+ const mutation=useCadastroMutation('watermarks',({value,nextFiles,remove,actorId}:{value:WatermarkSettings;nextFiles:OrientationFiles;remove:OrientationFlags;actorId:string})=>persistWatermark(value,nextFiles,remove,actorId),['watermark','report-headers']);
  const change=(patch:Partial<WatermarkSettings>)=>{setDraft(current=>({...current??query.data??defaultWatermark,...patch}));setSaved(false);};
  const choose=async(next:File)=>{
   const orientation=settings.orientation;
@@ -61,7 +56,7 @@ export function useWatermark(){
  const save=async()=>{
   if(mutation.isPending||loading||processingOrientation!==null||!user)return;setError('');setSaved(false);
   try {
-   await mutation.mutateAsync({value:settings,nextFiles:files,remove:removed});
+   await mutation.mutateAsync({value:settings,nextFiles:files,remove:removed,actorId:user.id});
    release('portrait');release('landscape');setFiles({});setRemoved(emptyFlags());setDraft(null);setSaved(true);
    notifications.saved('As imagens de retrato e paisagem e os ajustes da marca d’água foram salvos.');
   }catch(caught){const message=(caught as Error).message;setError(message);notifications.error(message);}

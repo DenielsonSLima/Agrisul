@@ -22,6 +22,8 @@ export function AtrPage(){
   const [draft,setDraft]=useState<{record?:AtrRecord;year?:number;month?:number}>({});
 
   useEffect(()=>{
+    // The RPC can clamp a now-invalid page after remote data changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if(m.pagination.page!==page)setPage(m.pagination.page);
   },[m.pagination.page,page]);
 

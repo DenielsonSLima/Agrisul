@@ -1,5 +1,6 @@
 import {getSupabaseBrowserClient} from '@/shared/supabase/client';
 import {rpcRequest,RpcError} from '@/shared/supabase/rpc';
+import {assertSessionActor} from '@/shared/supabase/sessionActor';
 import {fetchWorkspaceId} from '@/shared/supabase/workspace';
 import {defaultWatermark,type WatermarkOrientation,type WatermarkSettings} from '../types';
 
@@ -34,39 +35,53 @@ export async function fetchWatermark(signal?:AbortSignal){
  if(signal?.aborted)throw new DOMException('Consulta cancelada','AbortError');
  return withImageUrls(settings,signal);
 }
-export async function persistWatermark(settings:WatermarkSettings,files:OrientationFiles={},removed:OrientationFlags={}){
+export async function persistWatermark(settings:WatermarkSettings,files:OrientationFiles={},removed:OrientationFlags={},expectedActorId?:string){
+ const actorId=await assertSessionActor(expectedActorId,'Entre na sua conta para salvar a marca d’água.');
  const client=getSupabaseBrowserClient();
- const {data:{session},error:authError}=await client.auth.getSession();
- if(authError||!session)throw new WatermarkApiError('Entre na sua conta para salvar a marca d’água.',401);
  const storage=client.storage.from(bucket);
  const previous={portrait:settings.portraitImageKey,landscape:settings.landscapeImageKey};
  const keys:{portrait:string|null;landscape:string|null}={portrait:removed.portrait?null:previous.portrait,landscape:removed.landscape?null:previous.landscape};
  const names={portrait:removed.portrait?'':settings.portraitImageName,landscape:removed.landscape?'':settings.landscapeImageName};
  const uploaded:string[]=[];
- const workspaceId=Object.values(files).some(Boolean)?await fetchWorkspaceId():session.user.id;
- for(const orientation of ['portrait','landscape'] as const){
-  const file=files[orientation];if(!file)continue;
-  const extension=({'image/png':'png','image/jpeg':'jpg','image/webp':'webp'} as Record<string,string>)[file.type];
-  if(!extension||!file.size||file.size>3*1024*1024)throw new Error('Envie uma imagem PNG, JPG ou WebP de até 3 MB.');
-  const uploadedKey=`${workspaceId}/${orientation}/${crypto.randomUUID()}.${extension}`;
-  const {error}=await storage.upload(uploadedKey,file,{contentType:file.type,upsert:false});
-  if(error){if(uploaded.length)void storage.remove(uploaded);throw new Error(`Não foi possível enviar a imagem de ${orientation==='portrait'?'retrato':'paisagem'}. Verifique o arquivo e tente novamente.`);}
-  uploaded.push(uploadedKey);keys[orientation]=uploadedKey;names[orientation]=file.name;
- }
- let response:{settings:Partial<WatermarkSettings>};
+ let rpcStarted=false;
+ let rpcCompleted=false;
  try{
-  response=await rpcRequest<{settings:Partial<WatermarkSettings>}>('watermarks','save',{
+  let workspaceId=actorId;
+  if(Object.values(files).some(Boolean)){
+   await assertSessionActor(actorId);
+   workspaceId=await fetchWorkspaceId();
+   await assertSessionActor(actorId);
+  }
+  for(const orientation of ['portrait','landscape'] as const){
+   const file=files[orientation];if(!file)continue;
+   const extension=({'image/png':'png','image/jpeg':'jpg','image/webp':'webp'} as Record<string,string>)[file.type];
+   if(!extension||!file.size||file.size>3*1024*1024)throw new Error('Envie uma imagem PNG, JPG ou WebP de até 3 MB.');
+   const uploadedKey=`${workspaceId}/${orientation}/${crypto.randomUUID()}.${extension}`;
+   uploaded.push(uploadedKey);
+   await assertSessionActor(actorId);
+   const {error}=await storage.upload(uploadedKey,file,{contentType:file.type,upsert:false});
+   if(error)throw new Error(`Não foi possível enviar a imagem de ${orientation==='portrait'?'retrato':'paisagem'}. Verifique o arquivo e tente novamente.`);
+   await assertSessionActor(actorId);
+   keys[orientation]=uploadedKey;names[orientation]=file.name;
+  }
+  await assertSessionActor(actorId);
+  rpcStarted=true;
+  const response=await rpcRequest<{settings:Partial<WatermarkSettings>}>('watermarks','save',{
    orientation:settings.orientation,opacity:settings.opacity,size:settings.size,
    portraitImageKey:keys.portrait,portraitImageName:names.portrait,
    landscapeImageKey:keys.landscape,landscapeImageName:names.landscape,
   });
+  rpcCompleted=true;
+  await assertSessionActor(actorId);
+  const saved=await withImageUrls(response.settings);
+  await assertSessionActor(actorId);
+  const obsolete=(['portrait','landscape'] as const).flatMap(orientation=>{
+   const old=previous[orientation];return old&&old!==keys[orientation]&&(!!files[orientation]||!!removed[orientation])?[old]:[];
+  });
+  if(obsolete.length)void storage.remove([...new Set(obsolete)]);
+  return saved;
  }catch(error){
-  if(uploaded.length&&error instanceof RpcError&&error.status<500)void storage.remove(uploaded);
+  if(uploaded.length&&!rpcCompleted&&(!rpcStarted||error instanceof RpcError&&error.status<500))void storage.remove([...new Set(uploaded)]);
   throw error;
  }
- const obsolete=(['portrait','landscape'] as const).flatMap(orientation=>{
-  const old=previous[orientation];return old&&old!==keys[orientation]&&(!!files[orientation]||!!removed[orientation])?[old]:[];
- });
- if(obsolete.length)void storage.remove([...new Set(obsolete)]);
- return withImageUrls(response.settings);
 }

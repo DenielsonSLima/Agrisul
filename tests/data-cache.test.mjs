@@ -14,9 +14,13 @@ try{
  const aCompanies=key('owner-a','companies');
  const aManagement=key('owner-a','cultural-practices',{cultureId:'culture-one',cultureSubtypeId:'subtype-one'});
  const aContracts=key('owner-a','contracts',{view:'detail',id:'contract-one'});
+ const aPlanning=key('owner-a','planning',{periodId:'period-one',section:'historico'});
  const bFarm=key('owner-b','farms');
  const bPlots=key('owner-b','plots',{farmId:'farm-one'});
- for(const queryKey of [aFarm,aPlotOne,aPlotTwo,aCompanies,aManagement,aContracts,bFarm,bPlots])client.setQueryData(queryKey,{source:queryKey[1]});
+ const bManagement=key('owner-b','cultural-practices',{cultureId:'culture-one',cultureSubtypeId:'subtype-one'});
+ const bContracts=key('owner-b','contracts',{view:'detail',id:'contract-one'});
+ const bPlanning=key('owner-b','planning',{periodId:'period-one',section:'historico'});
+ for(const queryKey of [aFarm,aPlotOne,aPlotTwo,aCompanies,aManagement,aContracts,aPlanning,bFarm,bPlots,bManagement,bContracts,bPlanning])client.setQueryData(queryKey,{source:queryKey[1]});
  for(const resource of realtimeResources.billing_farm_plots){
   await client.invalidateQueries({queryKey:billingKeys.resource('owner-a',resource),refetchType:'none'});
  }
@@ -31,10 +35,30 @@ try{
  }
  assert.equal(client.getQueryState(aManagement).isInvalidated,true);
 
+ // Local culture/subtype writes refresh the labels embedded in management and
+ // planning snapshots even while Realtime is unavailable.
+ for(const queryKey of [aManagement,aPlanning,bManagement,bPlanning])client.setQueryData(queryKey,{saved:true});
+ for(const resource of mutationResources('cultures',['cultural-practices','planning'])){
+  await client.invalidateQueries({queryKey:billingKeys.resource('owner-a',resource),refetchType:'none'});
+ }
+ assert.equal(client.getQueryState(aManagement).isInvalidated,true);
+ assert.equal(client.getQueryState(aPlanning).isInvalidated,true);
+ assert.equal(client.getQueryState(bManagement).isInvalidated,false);
+ assert.equal(client.getQueryState(bPlanning).isInvalidated,false);
+
  for(const resource of realtimeResources.billing_contract_loads){
   await client.invalidateQueries({queryKey:billingKeys.resource('owner-a',resource),refetchType:'none'});
  }
  assert.equal(client.getQueryState(aContracts).isInvalidated,true);
+
+ // ATR quotations feed contract billing. The mutation fallback must update
+ // contract projections without touching another signed-in account.
+ for(const queryKey of [aContracts,bContracts])client.setQueryData(queryKey,{saved:true});
+ for(const resource of mutationResources('atr',['contracts'])){
+  await client.invalidateQueries({queryKey:billingKeys.resource('owner-a',resource),refetchType:'none'});
+ }
+ assert.equal(client.getQueryState(aContracts).isInvalidated,true);
+ assert.equal(client.getQueryState(bContracts).isInvalidated,false);
 
  for(const table of ['billing_contract_payments','billing_contract_discounts']){
   client.setQueryData(aContracts,{saved:true});
@@ -117,6 +141,14 @@ try{
  }
  for(const resource of ['users','access-profiles','permissions','settings','profile','report-headers'])assert.equal(client.getQueryState(key('owner-a',resource)).isInvalidated,true);
 
+ // Planning history and diary rows embed the saved operator name.
+ for(const queryKey of [aPlanning,bPlanning])client.setQueryData(queryKey,{saved:true});
+ for(const resource of realtimeResources.billing_user_settings){
+  await client.invalidateQueries({queryKey:billingKeys.resource('owner-a',resource),refetchType:'none'});
+ }
+ assert.equal(client.getQueryState(aPlanning).isInvalidated,true);
+ assert.equal(client.getQueryState(bPlanning).isInvalidated,false);
+
  // Approval and signature changes invalidate lists, detail and options together.
  for(const table of ['billing_signatures','billing_request_files','billing_service_requests','billing_service_request_events', 'billing_service_request_complements','billing_document_templates','billing_service_providers','billing_report_headers','billing_companies']){
   const detail=key('owner-a','service-requests',{id:'request-a'});
@@ -171,11 +203,15 @@ try{
  // A focus/visibility refetch must update the remote material lists without
  // replacing the controlled dialog or its local draft (including the File).
  // Only an initial pending query may switch the page to its loading state.
- const [materialsSource,quoteCreateSource,cotacaoPageSource,cadastroQuerySource]=await Promise.all([
+ const [materialsSource,quoteCreateSource,cotacaoPageSource,cadastroQuerySource,atrHookSource,settingsHookSource,culturesHookSource,practicesHookSource]=await Promise.all([
   readFile(new URL('../modules/cadastro/materiais/components/MateriaisPage.tsx',import.meta.url),'utf8'),
   readFile(new URL('../modules/cotacao/components/QuoteCreatePage.tsx',import.meta.url),'utf8'),
   readFile(new URL('../modules/cotacao/components/CotacaoPage.tsx',import.meta.url),'utf8'),
   readFile(new URL('../modules/cadastro/hooks/useCadastroQuery.ts',import.meta.url),'utf8'),
+  readFile(new URL('../modules/cadastro/atr/hooks/useAtr.ts',import.meta.url),'utf8'),
+  readFile(new URL('../modules/configuracoes/hooks/useSettings.ts',import.meta.url),'utf8'),
+  readFile(new URL('../modules/cadastro/culturas/hooks/useCultures.ts',import.meta.url),'utf8'),
+  readFile(new URL('../modules/cadastro/tratos-culturais/hooks/usePractices.ts',import.meta.url),'utf8'),
  ]);
  assert.match(materialsSource,/<Dialog open=\{materialOpen\}/);
  assert.match(materialsSource,/<MaterialForm material=\{editMaterial\}/);
@@ -201,5 +237,11 @@ try{
  assert.match(cadastroQuerySource,/Promise\.allSettled\(jobs\)/);
  assert.match(cadastroQuerySource,/activeUserIdRef\.current!==context\.actorId/);
  assert.match(cadastroQuerySource,/queryClient\.invalidateQueries\(\{queryKey:billingKeys\.resource\(actorId,key\)\}\)/);
+ assert.match(atrHookSource,/useCadastroMutation\('atr',[\s\S]*?,\['contracts'\]\)/);
+ assert.match(settingsHookSource,/useCadastroMutation<[\s\S]*?>\('settings',persistSettings,\['profile','users','planning'\]\)/);
+ assert.match(culturesHookSource,/useCadastroMutation\('cultures',persistCulture,\['cultural-practices','planning'\]\)/);
+ assert.match(practicesHookSource,/useCadastroMutation\('cultural-practices',[\s\S]*?,\['planning'\]\)/);
+ assert.match(practicesHookSource,/useCadastroMutation\('cultural-practices',deletePractice,\['planning'\]\)/);
+ assert.match(practicesHookSource,/useCadastroMutation\('cultural-practices',bootstrapSugarcaneManagement,\['cultures','planning'\]\)/);
  console.log('Passed: related realtime invalidation, profile/watermark aliases, parameter keys, account isolation and cancellation of stale account reads.');
 }finally{client.clear();}

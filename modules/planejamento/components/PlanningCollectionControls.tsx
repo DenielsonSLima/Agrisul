@@ -1,4 +1,4 @@
-import {useEffect,useState,type FormEvent} from 'react';
+import {useState,type FormEvent} from 'react';
 import {CalendarRange,ChevronLeft,ChevronRight,Search,X} from 'lucide-react';
 import type {PlanningPagination} from '../types';
 
@@ -10,7 +10,6 @@ export function PlanningSearchBar({value,placeholder,pagination,onSearch}:{value
 
 export function PlanningPeriodFilter({dateFrom,dateTo,minDate,maxDate,onApply}:{dateFrom:string;dateTo:string;minDate:string;maxDate:string;onApply:(dateFrom:string,dateTo:string)=>void}){
  const [from,setFrom]=useState(dateFrom);const [to,setTo]=useState(dateTo);const [error,setError]=useState('');
- useEffect(()=>{setFrom(dateFrom);setTo(dateTo);setError('');},[dateFrom,dateTo]);
  const submit=(event:FormEvent)=>{event.preventDefault();if(from&&to&&from>to){setError('A data inicial deve ser anterior à final.');return;}setError('');onApply(from,to);};
  const clear=()=>{setFrom('');setTo('');setError('');onApply('','');};
  return <form className="planning-period-filter" onSubmit={submit} aria-label="Filtrar Diário por período">
