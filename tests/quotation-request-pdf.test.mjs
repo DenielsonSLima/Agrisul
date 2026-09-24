@@ -121,7 +121,17 @@ test('quotation request snapshot receives only signed images selected by the quo
   );
   assert.doesNotMatch(providersSource, /\buseMaterials\s*\(/, 'export must not load the complete material catalog');
   assert.match(providersSource, /createPdf=\{createQuotationRequestPdfInWorker\}/);
-  assert.match(workerClientSource, /new Worker\(new URL\('\.\/quotationRequestPdf\.worker\.ts', import\.meta\.url\)/);
+  assert.match(
+    workerClientSource,
+    /import\s+QuotationRequestPdfWorker\s+from\s+'\.\/quotationRequestPdf\.worker\?worker'/,
+    'the worker must use the Vite constructor so production never exposes a server file URL',
+  );
+  assert.match(workerClientSource, /new QuotationRequestPdfWorker\(\)/);
+  assert.doesNotMatch(
+    workerClientSource,
+    /new Worker\(new URL\([^)]*import\.meta\.url/,
+    'the client must not resolve a worker from the SSR import.meta.url',
+  );
   assert.match(workerClientSource, /worker\.terminate\(\)/, 'closing or completing a job must release the worker');
   assert.match(workerSource, /doc\.output\('arraybuffer'\)/, 'PDF serialization must happen inside the worker');
   assert.match(workerSource, /doc\.autoPrint\(\)/, 'the worker must prepare printing without rebuilding layout on the UI thread');
