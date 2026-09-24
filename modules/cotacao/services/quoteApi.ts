@@ -1,7 +1,7 @@
 import {getSupabaseBrowserClient} from '@/shared/supabase/client';
 import {rpcRequest,RpcError} from '@/shared/supabase/rpc';
 import {fetchWorkspaceId} from '@/shared/supabase/workspace';
-import type {Material,MaterialImageChange,MaterialInput,MaterialReference,MaterialReferenceInput,Quote,QuoteAddItemsInput,QuoteAddProvidersInput,QuoteFinalizeInput,QuoteFinalizeResult,QuoteInput,QuoteItemAwardInput,QuoteNegotiationInput,QuoteRemoveItemInput,QuoteRemoveProviderInput,QuoteStatus} from '../types';
+import type {Material,MaterialImageChange,MaterialInput,MaterialReference,MaterialReferenceInput,Quote,QuoteAddItemsInput,QuoteAddProvidersInput,QuoteDetailsInput,QuoteFinalizeInput,QuoteFinalizeResult,QuoteInput,QuoteItemAwardInput,QuoteNegotiationInput,QuoteRemoveItemInput,QuoteRemoveProviderInput,QuoteStatus} from '../types';
 
 export const MATERIAL_IMAGE_BUCKET='billing-material-images';
 
@@ -71,6 +71,7 @@ export const deleteMaterialReference=(id:string)=>rpcRequest<{id:string;deleted:
 export const fetchQuotes = (status: QuoteStatus, signal: AbortSignal) => rpcRequest<{quotes: Quote[]; total: number}>('quotations','list',{status},signal);
 export const fetchQuote = async (id: string, signal: AbortSignal) => withQuotationImageUrls((await rpcRequest<{quote: Quote}>('quotations','get',{id},signal)).quote,signal);
 export const persistQuote = async (input: QuoteInput) => (await rpcRequest<{quote: Quote}>('quotations','save',input)).quote;
+export const updateQuoteDetails = async (input: QuoteDetailsInput) => (await rpcRequest<{quote: Quote}>('quotations','update-details',input)).quote;
 export const recordQuoteNegotiation = async (input: QuoteNegotiationInput) => (await rpcRequest<{quote: Quote}>('quotations','record-negotiation',input)).quote;
 export const awardQuoteItem = async (input: QuoteItemAwardInput) => (await rpcRequest<{quote: Quote}>('quotations','award-item',input)).quote;
 export const addQuoteItems = async (input: QuoteAddItemsInput) => (await rpcRequest<{quote: Quote}>('quotations','add-items',input)).quote;

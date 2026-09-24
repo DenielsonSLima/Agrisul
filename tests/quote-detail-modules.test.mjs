@@ -102,6 +102,32 @@ test('summary tab presents quotation data, materials, suppliers and winner resul
   );
 });
 
+test('open quotation details can be edited through a narrow RPC without replacing scope or history', async () => {
+  const [detail, dialog, api, hooks, migration] = await Promise.all([
+    readComponent('QuoteDetailPage'),
+    readComponent('QuoteDetailsDialog'),
+    readFile(new URL('../modules/cotacao/services/quoteApi.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../modules/cotacao/hooks/useQuotes.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../supabase/migrations/20260924162702_quotation_details_update.sql', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(detail, /Editar dados/);
+  assert.match(detail, /quote\.status === 'open'/);
+  assert.match(detail, /<QuoteDetailsDialog\b/);
+  assert.match(detail, /notifications\.updated\('Dados da cotação atualizados\.'/);
+  assert.match(dialog, /<DialogTitle>Editar dados da cotação<\/DialogTitle>/);
+  assert.match(dialog, /Data da cotação \*/);
+  assert.match(dialog, /Solicitante \*/);
+  assert.match(dialog, /Observações gerais/);
+  assert.match(dialog, /requesterSignatureId/);
+  assert.match(api, /['"]quotations['"],['"]update-details['"]/);
+  assert.match(hooks, /updateDetails:\(input:QuoteDetailsInput\)/);
+  assert.match(migration, /ARRAY\['id','title','requestDate','requesterSignatureId','notes'\]/);
+  assert.match(migration, /SET title=v_title,[\s\S]*request_date=v_request_date,[\s\S]*requester=v_signature\.name,[\s\S]*requester_signature_id=v_signature\.id,[\s\S]*notes=v_notes/);
+  assert.match(migration, /v_quote\.status<>'open'/);
+  assert.doesNotMatch(migration, /DELETE FROM public\.billing_quotation_(?:items|providers|negotiations)/);
+});
+
 test('negotiation tab crosses materials with suppliers and opens the new-price dialog', async () => {
   const [source, dialog] = await Promise.all([
     readComponent('QuoteNegotiationTab'),

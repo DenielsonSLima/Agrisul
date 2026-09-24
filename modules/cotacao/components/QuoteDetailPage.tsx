@@ -1,14 +1,15 @@
 'use client';
 
 import {useState} from 'react';
-import {ClipboardList, DollarSign, Loader2, RefreshCw, ShoppingCart, Trash2, Users} from 'lucide-react';
+import {ClipboardList, DollarSign, Loader2, Pencil, RefreshCw, ShoppingCart, Trash2, Users} from 'lucide-react';
 import {Tabs, TabsList, TabsTrigger, TabsContent} from '@/components/ui/tabs';
 import {useProviders} from '@/modules/cadastro/prestadores/hooks/useProviders';
 import {notifications, useConfirmation} from '@/shared/feedback';
 import {ModuleLink, useModuleNavigation} from '@/shared/navigation/ModuleNavigation';
 import {dateLabel} from '@/shared/utils/presentation';
-import {useMaterials, useQuoteDetail, useQuoteMutations} from '../hooks/useQuotes';
-import type {Quote, QuoteItem, QuoteItemAwardInput, QuoteNegotiationInput, QuoteProvider} from '../types';
+import {useMaterials, useQuotationRequesters, useQuoteDetail, useQuoteMutations} from '../hooks/useQuotes';
+import type {Quote, QuoteDetailsInput, QuoteItem, QuoteItemAwardInput, QuoteNegotiationInput, QuoteProvider} from '../types';
+import {QuoteDetailsDialog} from './QuoteDetailsDialog';
 import {listHref, QuotationBreadcrumb} from './QuoteShared';
 import {QuoteNegotiationTab} from './QuoteNegotiationTab';
 import {QuoteProvidersTab} from './QuoteProvidersTab';
@@ -55,10 +56,12 @@ function QuoteDetailContent({quote}: {quote: Quote}) {
   const [tab, setTab] = useState<QuoteDetailTab>('summary');
   const [addingMaterial, setAddingMaterial] = useState(false);
   const [addingProviders, setAddingProviders] = useState(false);
+  const [editingDetails, setEditingDetails] = useState(false);
   const [removingItemId, setRemovingItemId] = useState('');
   const [removingProviderId, setRemovingProviderId] = useState('');
   const [finalizeError, setFinalizeError] = useState('');
   const materialsQuery = useMaterials(tab === 'negotiation' || addingMaterial);
+  const requestersQuery = useQuotationRequesters(editingDetails);
   const providersQuery = useProviders();
   const confirm = useConfirmation();
   const purchaseOrders = quote.purchaseOrders ?? [];
@@ -86,6 +89,18 @@ function QuoteDetailContent({quote}: {quote: Quote}) {
       notifications.deleted('Cotação excluída.');
     } catch (reason) {
       notifications.error((reason as Error).message || 'Não foi possível excluir a cotação.');
+    }
+  };
+
+  const updateDetails = async (input: QuoteDetailsInput) => {
+    try {
+      await mutations.updateDetails(input);
+      setEditingDetails(false);
+      notifications.updated('Dados da cotação atualizados.');
+    } catch (reason) {
+      const message = (reason as Error).message || 'Não foi possível atualizar os dados da cotação.';
+      notifications.error(message);
+      throw reason;
     }
   };
 
@@ -227,6 +242,16 @@ function QuoteDetailContent({quote}: {quote: Quote}) {
           <p>{dateLabel(quote.requestDate)} · Solicitante: {quote.requester}</p>
         </div>
         <div className="contract-detail-actions">
+          {quote.status === 'open' && (
+            <button
+              className="btn"
+              type="button"
+              disabled={mutations.saving}
+              onClick={() => setEditingDetails(true)}
+            >
+              <Pencil size={16}/>Editar dados
+            </button>
+          )}
           {quote.status === 'open' && quote.negotiations.length === 0 ? (
             <button
               className="btn danger"
@@ -316,6 +341,18 @@ function QuoteDetailContent({quote}: {quote: Quote}) {
         onClose={() => setAddingProviders(false)}
         onSave={addProviders}
       />
+      {editingDetails && (
+        <QuoteDetailsDialog
+          quote={quote}
+          requesters={requestersQuery.requesters}
+          loading={requestersQuery.loading}
+          loadError={requestersQuery.error}
+          saving={mutations.updatingDetails}
+          onReload={requestersQuery.reload}
+          onClose={() => setEditingDetails(false)}
+          onSave={updateDetails}
+        />
+      )}
     </section>
   );
 }

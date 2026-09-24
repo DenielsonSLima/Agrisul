@@ -12,6 +12,7 @@ DO $$
 DECLARE
  r jsonb;
  requester_id uuid;
+ requester_b uuid;
  material_a uuid;
  material_b uuid;
  provider_a uuid;
@@ -32,6 +33,9 @@ BEGIN
  r=public.billing_rpc('signatures','save',
   '{"name":"Comprador adjudicação","role":"requester"}');
  requester_id=(r->'signature'->>'id')::uuid;
+ r=public.billing_rpc('signatures','save',
+  '{"name":"Solicitante atualizado","role":"requester"}');
+ requester_b=(r->'signature'->>'id')::uuid;
  r=public.billing_rpc('materials','save',jsonb_build_object(
   'name','Material da adjudicação A','internalCode','AWD-A','unit','PC',
   'application','Máquina A'));
@@ -73,6 +77,28 @@ BEGIN
  PERFORM public.billing_rpc('quotations','record-negotiation',jsonb_build_object(
   'id',quote_id,'quotationProviderId',quote_provider_a,
   'quotationItemId',item_a,'unitPrice','10.00','notes','Preço inicial preservado'));
+
+ -- Header edits are narrow updates: they must not rebuild scope or erase history.
+ r=public.billing_rpc('quotations','update-details',jsonb_build_object(
+  'id',quote_id,'title','Cotação atualizada','requestDate','2026-09-24',
+  'requesterSignatureId',requester_b,'notes','Cabeçalho atualizado'));
+ IF r->'quote'->>'title'<>'Cotação atualizada'
+  OR r->'quote'->>'requestDate'<>'2026-09-24'
+  OR r->'quote'->>'requester'<>'Solicitante atualizado'
+  OR r->'quote'->>'requesterSignatureId'<>requester_b::text
+  OR r->'quote'->>'notes'<>'Cabeçalho atualizado'
+  OR jsonb_array_length(r->'quote'->'items')<>1
+  OR jsonb_array_length(r->'quote'->'providers')<>1
+  OR jsonb_array_length(r->'quote'->'negotiations')<>1
+  OR r->'quote'->'providers'->0->'values'->>item_a::text<>'10' THEN
+  RAISE EXCEPTION 'Updating quotation details changed scope or history: %',r;
+ END IF;
+ BEGIN
+  PERFORM public.billing_rpc('quotations','update-details',jsonb_build_object(
+   'id',quote_id,'title','Inválida','requestDate','2026-09-24',
+   'requesterSignatureId',requester_b,'notes','','unexpected',true));
+  RAISE EXCEPTION 'Quotation details payload whitelist was bypassed';
+ EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
 
  -- Additions are append-only and retry-safe through client-generated row ids.
  payload=jsonb_build_object('id',quote_id,'items',jsonb_build_array(
@@ -307,6 +333,12 @@ BEGIN
    'id',quote_id,'quotationItemId',item_a,'quotationProviderId',quote_provider_b));
   RAISE EXCEPTION 'Finished quotation accepted award changes';
  EXCEPTION WHEN check_violation THEN NULL; END;
+ BEGIN
+  PERFORM public.billing_rpc('quotations','update-details',jsonb_build_object(
+   'id',quote_id,'title','Alteração tardia','requestDate','2026-09-25',
+   'requesterSignatureId',requester_b,'notes',''));
+  RAISE EXCEPTION 'Finished quotation accepted details changes';
+ EXCEPTION WHEN check_violation THEN NULL; END;
 
  -- The 100-item limit applies to the complete quotation, not only one request.
  r=public.billing_rpc('quotations','save',jsonb_build_object(
@@ -451,6 +483,12 @@ BEGIN
    'quotationItemId',current_setting('test.award.item')::uuid,
    'quotationProviderId',current_setting('test.award.provider')::uuid));
   RAISE EXCEPTION 'Read-only member changed an award';
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ BEGIN
+  PERFORM public.billing_rpc('quotations','update-details',jsonb_build_object(
+   'id',current_setting('test.award.quote')::uuid,'title','Sem permissão',
+   'requestDate','2026-09-25','requesterSignatureId',gen_random_uuid(),'notes',''));
+  RAISE EXCEPTION 'Read-only member changed quotation details';
  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
 

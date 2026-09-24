@@ -88,6 +88,7 @@ export type Quote = {
   number: string;
   requestDate: string;
   requester: string;
+  requesterSignatureId?: string | null;
   notes: string;
   createdAt: string;
   status: QuoteStatus;
@@ -138,6 +139,13 @@ export type QuoteAddItemsInput = { id: string; items: QuoteScopeItemInput[] };
 export type QuoteAddProvidersInput = { id: string; providers: QuoteScopeProviderInput[] };
 export type QuoteRemoveItemInput = { id: string; quotationItemId: string };
 export type QuoteRemoveProviderInput = { id: string; quotationProviderId: string };
+export type QuoteDetailsInput = {
+  id: string;
+  title: string;
+  requestDate: string;
+  requesterSignatureId: string;
+  notes: string;
+};
 
 export type QuoteNegotiationInput = {
   id: string;
