@@ -41,6 +41,9 @@ export type PurchaseOrder = {
   providerAddress: string;
   providerEmail: string;
   providerPhone: string;
+  providerContactId: string | null;
+  providerContactName: string;
+  providerContactPhone: string;
   requestDate: string;
   createdAt: string;
   paymentMethod: string;
@@ -66,4 +69,4 @@ export type PurchaseOrderFilters = {
   dateTo: string;
 };
 
-export type PurchaseOrderInput = Pick<PurchaseOrder, 'id' | 'paymentMethodId' | 'purchaseOrderNumber'>;
+export type PurchaseOrderInput = Pick<PurchaseOrder, 'id' | 'paymentMethodId' | 'purchaseOrderNumber' | 'providerContactId'>;

@@ -30,6 +30,7 @@ const baseResources: Record<string, readonly string[]> = {
   billing_report_headers: ['report-headers', 'service-requests'],
   billing_signatures: ['signatures', 'service-requests'],
   billing_service_providers: ['service-providers', 'service-requests'],
+  billing_service_provider_contacts: ['service-providers', 'purchase-orders'],
   billing_request_files: ['signatures', 'service-requests'],
   billing_service_requests: ['service-requests'],
   billing_service_request_events: ['service-requests'],

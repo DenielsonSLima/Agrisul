@@ -23,6 +23,7 @@ DECLARE
  requester_id uuid;
  provider_a uuid;
  provider_b uuid;
+ provider_contact_id uuid;
  payment_method_id uuid;
  quote_id uuid;
  order_id uuid;
@@ -56,6 +57,18 @@ BEGIN
   'street','Rua B','number','20','complement','','district','Centro','city','Cidade','state','SP',
   'zipCode','01001000','phone','11999990001','email','menor@example.invalid'));
  provider_b=(r->'provider'->>'id')::uuid;
+ r=public.billing_rpc('service-providers','save-contact',jsonb_build_object(
+  'providerId',provider_a,'name','José Carlos','phone','(11) 98888-0000'));
+ provider_contact_id=(r->'contact'->>'id')::uuid;
+ IF public.billing_rpc('service-providers','get',jsonb_build_object('id',provider_a))
+   ->'contacts'->0->>'name'<>'José Carlos' THEN
+  RAISE EXCEPTION 'Provider contact was not returned by the detail projection';
+ END IF;
+ BEGIN
+  PERFORM public.billing_rpc('service-providers','save-contact',jsonb_build_object(
+   'providerId',provider_a,'name','José Carlos','phone','11 98888-0000'));
+  RAISE EXCEPTION 'Duplicate active provider contact was accepted';
+ EXCEPTION WHEN unique_violation THEN NULL; END;
 
  payload=jsonb_build_object(
   'title','Filtros para manutenção','number','','requestDate','2026-09-23',
@@ -147,12 +160,33 @@ BEGIN
   RAISE EXCEPTION 'Quotation with a purchase order was deleted';
  EXCEPTION WHEN check_violation THEN NULL; END;
 
+ BEGIN
+  PERFORM public.billing_rpc('purchase-orders','save',jsonb_build_object(
+   'id',order_id,'purchaseOrderNumber','OC-2026-0042','paymentMethodId',payment_method_id));
+  RAISE EXCEPTION 'Purchase-order number without a responsible contact was accepted';
+ EXCEPTION WHEN check_violation THEN NULL; END;
  r=public.billing_rpc('purchase-orders','save',jsonb_build_object(
-  'id',order_id,'purchaseOrderNumber','OC-2026-0042','paymentMethodId',payment_method_id));
+  'id',order_id,'purchaseOrderNumber','OC-2026-0042','paymentMethodId',payment_method_id,
+  'providerContactId',provider_contact_id));
  IF r->'order'->>'purchaseOrderNumber'<>'OC-2026-0042'
   OR r->'order'->>'paymentMethod'<>'30 dias via boleto'
-  OR r->'order'->>'paymentMethodId'<>payment_method_id::text THEN
+  OR r->'order'->>'paymentMethodId'<>payment_method_id::text
+  OR r->'order'->>'providerContactId'<>provider_contact_id::text
+  OR r->'order'->>'providerContactName'<>'José Carlos'
+  OR r->'order'->>'providerContactPhone'<>'(11) 98888-0000' THEN
   RAISE EXCEPTION 'Editable purchase-order fields were not persisted: %',r;
+ END IF;
+ PERFORM public.billing_rpc('service-providers','save-contact',jsonb_build_object(
+  'id',provider_contact_id,'providerId',provider_a,
+  'name','José Carlos Atualizado','phone','(11) 97777-0000'));
+ r=public.billing_rpc('purchase-orders','get',jsonb_build_object('id',order_id));
+ IF r->'order'->>'providerContactName'<>'José Carlos'
+  OR r->'order'->>'providerContactPhone'<>'(11) 98888-0000' THEN
+  RAISE EXCEPTION 'Provider contact edit changed the purchase-order snapshot: %',r;
+ END IF;
+ PERFORM public.billing_rpc('service-providers','delete-contact',jsonb_build_object('id',provider_contact_id));
+ IF jsonb_array_length(public.billing_rpc('service-providers','get',jsonb_build_object('id',provider_a))->'contacts')<>0 THEN
+  RAISE EXCEPTION 'Deleted provider contact remains selectable';
  END IF;
  r=public.billing_rpc('purchase-orders','get',jsonb_build_object('id',order_id));
  IF r->'order'->>'id'<>order_id::text OR r->'order'->>'total'<>'25.625' THEN
@@ -206,6 +240,11 @@ DO $$ BEGIN
    jsonb_build_object('id',gen_random_uuid()),0);
   RAISE EXCEPTION 'Direct purchase-order DML was accepted';
  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ BEGIN
+  INSERT INTO public.billing_service_provider_contacts(owner_id,provider_id,name,phone)
+  VALUES(auth.uid(),gen_random_uuid(),'Contato direto','79999999999');
+  RAISE EXCEPTION 'Direct provider-contact DML was accepted';
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
 
 SELECT set_config('request.jwt.claim.sub','95000000-0000-4000-8000-000000000002',true);
@@ -214,7 +253,8 @@ DO $$
 DECLARE r jsonb;foreign_order uuid:=current_setting('test.purchase_order.id')::uuid;
 BEGIN
  r=public.billing_rpc('purchase-orders','list','{"status":"finished"}');
- IF r->>'total'<>'0' OR EXISTS(SELECT 1 FROM public.billing_purchase_orders) THEN
+ IF r->>'total'<>'0' OR EXISTS(SELECT 1 FROM public.billing_purchase_orders)
+  OR EXISTS(SELECT 1 FROM public.billing_service_provider_contacts) THEN
   RAISE EXCEPTION 'Purchase-order tenant isolation failed: %',r;
  END IF;
  BEGIN
@@ -243,6 +283,12 @@ BEGIN
   PERFORM public.billing_rpc('purchase-orders','save',jsonb_build_object(
    'id',order_id,'purchaseOrderNumber','Sem acesso'));
   RAISE EXCEPTION 'Read-only member edited a purchase order';
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ BEGIN
+  PERFORM public.billing_rpc('service-providers','save-contact',jsonb_build_object(
+   'providerId','95000000-0000-4000-8000-000000000099',
+   'name','Sem acesso','phone','79999999999'));
+  RAISE EXCEPTION 'Read-only member edited provider contacts';
  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
 

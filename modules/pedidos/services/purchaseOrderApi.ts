@@ -6,10 +6,12 @@ const MATERIAL_IMAGE_BUCKET='billing-material-images';
 
 type WireReference = Partial<PurchaseOrderReference>;
 type WireItem = Partial<Omit<PurchaseOrderItem,'materialReferences'|'materialImageUrl'>> & {materialReferences?:WireReference[];total?:string|number|null};
-type WireOrder = Partial<Omit<PurchaseOrder,'items'|'providerEmail'|'providerPhone'>> & {
+type WireOrder = Partial<Omit<PurchaseOrder,'items'|'providerEmail'|'providerPhone'|'providerContactId'>> & {
   items?:WireItem[];
   providerEmail?:string|null;
   providerPhone?:string|null;
+  providerContactId?:string|null;
+  providerContact?:{id?:string|null;name?:string|null;phone?:string|null}|null;
   quotationRequestDate?:string|null;
   provider?:{legalName?:string|null;name?:string|null;email?:string|null;phone?:string|null}|null;
   contacts?:{email?:string|null;phone?:string|null}|null;
@@ -52,6 +54,9 @@ const normalizeOrder=(order:WireOrder):PurchaseOrder=>({
   providerAddress:text(order.providerAddress),
   providerEmail:text(order.providerEmail??order.provider?.email??order.contacts?.email),
   providerPhone:text(order.providerPhone??order.provider?.phone??order.contacts?.phone),
+  providerContactId:text(order.providerContactId??order.providerContact?.id)||null,
+  providerContactName:text(order.providerContactName??order.providerContact?.name),
+  providerContactPhone:text(order.providerContactPhone??order.providerContact?.phone),
   requestDate:text(order.requestDate??order.quotationRequestDate),
   createdAt:text(order.createdAt),
   paymentMethod:text(order.paymentMethod),

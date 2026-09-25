@@ -109,6 +109,15 @@ try{
  assert.equal(client.getQueryState(bPaymentMethods).isInvalidated,false);
  assert.equal(client.getQueryState(bOrders).isInvalidated,false);
 
+ // Provider contacts refresh both the provider detail and purchase-order contact choices.
+ const aProviders=key('owner-a','service-providers',{view:'detail',id:'provider-a'});
+ client.setQueryData(aProviders,{saved:true});client.setQueryData(aOrders,{saved:true});
+ for(const resource of realtimeResources.billing_service_provider_contacts){
+  await client.invalidateQueries({queryKey:billingKeys.resource('owner-a',resource),refetchType:'none'});
+ }
+ assert.equal(client.getQueryState(aProviders).isInvalidated,true);
+ assert.equal(client.getQueryState(aOrders).isInvalidated,true);
+
  client.setQueryData(aQuotes,{saved:true});
  for(const resource of realtimeResources.billing_quotation_negotiations){
   await client.invalidateQueries({queryKey:billingKeys.resource('owner-a',resource),refetchType:'none'});
