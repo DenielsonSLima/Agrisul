@@ -62,6 +62,7 @@ BEGIN
   OR offer->>'discountValue'<>'10' OR offer->>'lineSubtotal'<>'60'
   OR offer->>'discountAmount'<>'6' OR offer->>'lineTotal'<>'54'
   OR offer->>'netUnitPrice'<>'18'
+  OR r->'quote'->'providers'->0->>'grossTotal'<>'60'
   OR r->'quote'->'providers'->0->>'total'<>'54'
   OR negotiation->>'lineTotal'<>'54' THEN
   RAISE EXCEPTION 'Percentage discount projection is incorrect: %',r;
@@ -109,7 +110,9 @@ BEGIN
  award=r->'quote'->'itemAwards'->0;
  IF award->>'discountType'<>'amount' OR award->>'discountAmount'<>'7.25'
   OR award->>'lineSubtotal'<>'60' OR award->>'lineTotal'<>'52.75'
+  OR r->'quote'->'providers'->0->>'awardedGrossTotal'<>'60'
   OR r->'quote'->'providers'->0->>'awardedTotal'<>'52.75'
+  OR r->'quote'->>'awardedGrossTotal'<>'60'
   OR r->'quote'->>'awardedTotal'<>'52.75' THEN
   RAISE EXCEPTION 'Discounted award is incorrect: %',r;
  END IF;

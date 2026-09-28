@@ -65,10 +65,12 @@ export type QuoteProvider = {
   offers?: Record<string,QuoteOffer>;
   notes: string;
   sentAt: string | null;
+  grossTotal?: string;
   total?: string;
   quotedItemCount?: number;
   isComplete?: boolean;
   awardedItemCount?: number;
+  awardedGrossTotal?: string;
   awardedTotal?: string;
   canRemove?: boolean;
   removeBlockedReason?: string;
@@ -119,6 +121,7 @@ export type Quote = {
   negotiations: QuoteNegotiation[];
   itemAwards: QuoteItemAward[];
   awardedItemCount: number;
+  awardedGrossTotal: string;
   awardedTotal: string;
   completeProviderCount: number;
   pendingAwardCount: number;

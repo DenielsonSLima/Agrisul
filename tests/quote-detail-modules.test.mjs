@@ -227,9 +227,14 @@ test('negotiation is a supplier matrix with per-item approval and accessible abb
   assert.match(source, /onApproveItem\(\{quotationItemId: item\.id, quotationProviderId: provider\.id\}\)/);
   assert.match(source, />Adicionar materiais</);
   assert.match(source, /onClick=\{onAddMaterials\}/);
-  assert.match(source, /<tfoot>[\s\S]*?Total dos itens[\s\S]*?provider\.total/);
-  assert.match(source, /Total aprovado[\s\S]*?provider\.awardedTotal/);
-  assert.match(source, /Total geral aprovado[\s\S]*?quote\.awardedTotal/);
+  assert.match(source, /quote-matrix-price-values[\s\S]*?currentOffer\.netUnitPrice[\s\S]*?<del[\s\S]*?currentOffer\.unitPrice/);
+  assert.match(source, /total líquido[\s\S]*?currentOffer\.lineTotal/);
+  assert.match(source, /<tfoot>[\s\S]*?Valor total[\s\S]*?provider\.grossTotal/);
+  assert.match(source, /Valor total com desconto[\s\S]*?provider\.total/);
+  assert.match(source, /Valor aprovado[\s\S]*?provider\.awardedGrossTotal/);
+  assert.match(source, /Valor aprovado com desconto[\s\S]*?provider\.awardedTotal/);
+  assert.match(source, /Valor geral aprovado[\s\S]*?quote\.awardedGrossTotal/);
+  assert.match(source, /Valor geral aprovado com desconto[\s\S]*?quote\.awardedTotal/);
 
   assert.match(css, /\.quote-negotiation-matrix-wrap\{[^}]*overflow:auto/);
   assert.match(css, /\.quote-negotiation-matrix \.quote-matrix-material-column\{[^}]*position:sticky;left:0/);

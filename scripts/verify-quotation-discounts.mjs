@@ -26,6 +26,12 @@ select
   from public.billing_quotations q
   cross join lateral (select billing_private.quotation_json(q) j) projection
   limit 1),true) as awarded_total_projection_ready
+ ,coalesce((select (j ? 'awardedGrossTotal')
+    and ((j->'providers'->0) ? 'grossTotal')
+    and ((j->'providers'->0) ? 'awardedGrossTotal')
+  from public.billing_quotations q
+  cross join lateral (select billing_private.quotation_json(q) j) projection
+  limit 1),true) as gross_total_projection_ready
 from pg_proc dispatcher
 where dispatcher.oid='billing_private.quotations_dispatch(text,text,jsonb)'::regprocedure;
 `;

@@ -258,14 +258,26 @@ export function QuoteNegotiationTab({
                               aria-label={`${currentPrice ? 'Alterar' : 'Informar'} preço de ${item.materialName} para ${provider.providerName}`}
                             >
                               <span className="sr-only">Novo preço</span>
-                              <strong>{currentPrice ? moneyLabel(currentPrice) : 'Informar preço'}</strong>
-                              <small>
-                                {currentOffer?.discountType && currentOffer.discountType !== 'none'
-                                  ? `${discountLabel(currentOffer.discountType, currentOffer.discountValue)} · líquido ${moneyLabel(currentOffer.lineTotal)}`
-                                  : providerHistory.length
-                                    ? `${providerHistory.length} ${providerHistory.length === 1 ? 'versão' : 'versões'}`
-                                    : 'Sem histórico'}
-                              </small>
+                              {currentOffer?.discountType && currentOffer.discountType !== 'none' ? (
+                                <>
+                                  <span className="quote-matrix-price-values">
+                                    <strong>{moneyLabel(currentOffer.netUnitPrice)}</strong>
+                                    <del title="Valor unitário sem desconto">{moneyLabel(currentOffer.unitPrice)}</del>
+                                  </span>
+                                  <small>
+                                    {discountLabel(currentOffer.discountType, currentOffer.discountValue)} · total líquido {moneyLabel(currentOffer.lineTotal)}
+                                  </small>
+                                </>
+                              ) : (
+                                <>
+                                  <strong>{currentPrice ? moneyLabel(currentPrice) : 'Informar preço'}</strong>
+                                  <small>
+                                    {providerHistory.length
+                                      ? `${providerHistory.length} ${providerHistory.length === 1 ? 'versão' : 'versões'}`
+                                      : 'Sem histórico'}
+                                  </small>
+                                </>
+                              )}
                             </button>
                             {quote.status === 'open' ? (
                               <label
@@ -299,17 +311,25 @@ export function QuoteNegotiationTab({
                 <tr className="quote-matrix-totals-row">
                   <th className="quote-matrix-material-column" scope="row">
                     <strong>Totais por fornecedor</strong>
-                    <small>Valores líquidos após os descontos</small>
+                    <small>Valores brutos e líquidos</small>
                   </th>
                   {quote.providers.map(provider => (
                     <td key={`totals:${provider.id}`}>
                       <div className="quote-matrix-provider-totals">
                         <span>
-                          <small>Total dos itens</small>
+                          <small>Valor total</small>
+                          <strong>{moneyLabel(provider.grossTotal ?? provider.total ?? '0')}</strong>
+                        </span>
+                        <span className="is-net-total">
+                          <small>Valor total com desconto</small>
                           <strong>{moneyLabel(provider.total ?? '0')}</strong>
                         </span>
-                        <span className="is-approved-total">
-                          <small>Total aprovado</small>
+                        <span className="is-approved-gross-total">
+                          <small>Valor aprovado</small>
+                          <strong>{moneyLabel(provider.awardedGrossTotal ?? provider.awardedTotal ?? '0')}</strong>
+                        </span>
+                        <span className="is-approved-total is-net-total">
+                          <small>Valor aprovado com desconto</small>
                           <strong>{moneyLabel(provider.awardedTotal ?? '0')}</strong>
                         </span>
                       </div>
@@ -321,7 +341,11 @@ export function QuoteNegotiationTab({
           </div>
           <div className="quote-negotiation-approved-total" aria-live="polite">
             <span>
-              <small>Total geral aprovado</small>
+              <small>Valor geral aprovado</small>
+              <strong>{moneyLabel(quote.awardedGrossTotal)}</strong>
+            </span>
+            <span className="is-net-total">
+              <small>Valor geral aprovado com desconto</small>
               <strong>{moneyLabel(quote.awardedTotal)}</strong>
             </span>
             <small>{quote.awardedItemCount} de {quote.items.length} itens aprovados</small>

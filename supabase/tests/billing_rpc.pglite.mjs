@@ -287,6 +287,7 @@ try {
  await db.exec(readFileSync(new URL('../migrations/20260925114548_provider_contacts_for_purchase_orders.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('../migrations/20260925192051_quotation_item_discounts.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('../migrations/20260928110923_quotation_awarded_total_projection.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260928112852_quotation_gross_and_net_totals.sql',import.meta.url),'utf8'));
  await db.exec(`DO $$
   DECLARE v_projection jsonb;
   BEGIN
