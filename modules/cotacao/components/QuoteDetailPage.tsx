@@ -144,7 +144,7 @@ function QuoteDetailContent({quote}: {quote: Quote}) {
   ) => {
     try {
       await mutations.recordNegotiation({...input, id: quote.id});
-      notifications.saved('Novo preço registrado. O valor anterior continua no histórico.');
+      notifications.saved('Nova condição comercial registrada. A versão anterior continua no histórico.');
     } catch (reason) {
       const message = (reason as Error).message || 'Não foi possível registrar o novo preço.';
       notifications.error(message);

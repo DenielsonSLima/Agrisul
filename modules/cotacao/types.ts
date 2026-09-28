@@ -1,4 +1,15 @@
 export type QuoteStatus = 'open' | 'finished';
+export type QuoteDiscountType = 'none' | 'percentage' | 'amount';
+
+export type QuoteOffer = {
+  unitPrice: string;
+  discountType: QuoteDiscountType;
+  discountValue: string;
+  lineSubtotal: string;
+  discountAmount: string;
+  lineTotal: string;
+  netUnitPrice: string;
+};
 
 export type MaterialReference = {
   id: string;
@@ -51,6 +62,7 @@ export type QuoteProvider = {
   providerEmail?: string;
   providerPhone?: string;
   values: Record<string,string>;
+  offers?: Record<string,QuoteOffer>;
   notes: string;
   sentAt: string | null;
   total?: string;
@@ -69,6 +81,12 @@ export type QuoteNegotiation = {
   itemId: string;
   version: number;
   unitPrice: string;
+  discountType: QuoteDiscountType;
+  discountValue: string;
+  lineSubtotal: string;
+  discountAmount: string;
+  lineTotal: string;
+  netUnitPrice: string;
   notes: string;
   createdAt: string;
 };
@@ -77,6 +95,10 @@ export type QuoteItemAward = {
   itemId: string;
   providerId: string;
   unitPrice: string;
+  discountType: QuoteDiscountType;
+  discountValue: string;
+  lineSubtotal: string;
+  discountAmount: string;
   lineTotal: string;
   awardedAt: string;
   updatedAt: string;
@@ -97,6 +119,7 @@ export type Quote = {
   negotiations: QuoteNegotiation[];
   itemAwards: QuoteItemAward[];
   awardedItemCount: number;
+  awardedTotal: string;
   completeProviderCount: number;
   pendingAwardCount: number;
   awardComplete: boolean;
@@ -153,6 +176,8 @@ export type QuoteNegotiationInput = {
   quotationProviderId: string;
   quotationItemId: string;
   unitPrice: string;
+  discountType: QuoteDiscountType;
+  discountValue: string;
   notes: string;
 };
 

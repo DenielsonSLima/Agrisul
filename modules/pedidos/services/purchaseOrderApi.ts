@@ -33,6 +33,10 @@ const normalizeItem=(item:WireItem,index:number):PurchaseOrderItem=>({
   quantity:text(item.quantity),
   unit:text(item.unit),
   unitPrice:text(item.unitPrice),
+  discountType:item.discountType==='percentage'?'percentage':item.discountType==='amount'?'amount':'none',
+  discountValue:text(item.discountValue),
+  lineSubtotal:text(item.lineSubtotal),
+  discountAmount:text(item.discountAmount),
   lineTotal:text(item.lineTotal??item.total),
   notes:text(item.notes),
 });

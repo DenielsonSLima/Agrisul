@@ -128,7 +128,7 @@ test('open quotation details can be edited through a narrow RPC without replacin
   assert.doesNotMatch(migration, /DELETE FROM public\.billing_quotation_(?:items|providers|negotiations)/);
 });
 
-test('negotiation tab crosses materials with suppliers and opens the new-price dialog', async () => {
+test('negotiation tab crosses materials with suppliers and opens the commercial-condition dialog', async () => {
   const [source, dialog] = await Promise.all([
     readComponent('QuoteNegotiationTab'),
     readComponent('QuotePriceDialog'),
@@ -154,8 +154,11 @@ test('negotiation tab crosses materials with suppliers and opens the new-price d
   assert.match(dialog, /from ['"]@\/components\/ui\/dialog['"]/);
   assert.match(dialog, /<Dialog\b/);
   assert.match(dialog, /<DialogContent\b/);
-  assert.match(dialog, /<DialogTitle>Novo preço<\/DialogTitle>/);
-  assert.match(dialog, /(?:Valor unitário|Preço)/);
+  assert.match(dialog, /<DialogTitle>Nova condição comercial<\/DialogTitle>/);
+  assert.match(dialog, /Valor unitário bruto/);
+  assert.match(dialog, /discountType/);
+  assert.match(dialog, /Percentual sobre o item/);
+  assert.match(dialog, /Valor fixo sobre o item/);
   assert.match(dialog, /(?:onSave|onSubmit)/);
 });
 
@@ -224,11 +227,15 @@ test('negotiation is a supplier matrix with per-item approval and accessible abb
   assert.match(source, /onApproveItem\(\{quotationItemId: item\.id, quotationProviderId: provider\.id\}\)/);
   assert.match(source, />Adicionar materiais</);
   assert.match(source, /onClick=\{onAddMaterials\}/);
+  assert.match(source, /<tfoot>[\s\S]*?Total dos itens[\s\S]*?provider\.total/);
+  assert.match(source, /Total aprovado[\s\S]*?provider\.awardedTotal/);
+  assert.match(source, /Total geral aprovado[\s\S]*?quote\.awardedTotal/);
 
   assert.match(css, /\.quote-negotiation-matrix-wrap\{[^}]*overflow:auto/);
   assert.match(css, /\.quote-negotiation-matrix \.quote-matrix-material-column\{[^}]*position:sticky;left:0/);
   assert.match(css, /\.quote-matrix-material\{[^}]*grid-template-columns:64px minmax\(0,1fr\)/);
   assert.match(css, /\.quote-negotiation-matrix tbody td\.is-approved/);
+  assert.match(css, /\.quote-negotiation-approved-total\{/);
 });
 
 test('suppliers tab uses a semantic table and Export opens PdfExportDialog', async () => {

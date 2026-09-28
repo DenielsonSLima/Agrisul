@@ -16,6 +16,7 @@ import type {
   QuoteItem,
   QuoteNegotiation,
   QuoteNegotiationInput,
+  QuoteOffer,
   QuoteProvider,
 } from '../types';
 
@@ -25,6 +26,7 @@ type QuotePriceDialogProps = {
   item: QuoteItem;
   provider: QuoteProvider;
   currentPrice: string;
+  currentOffer?: QuoteOffer;
   history: QuoteNegotiation[];
   saving: boolean;
   onClose: () => void;
@@ -40,16 +42,29 @@ function timestampLabel(value: string) {
   }).format(date);
 }
 
+function discountLabel(type: QuoteOffer['discountType'], value: string, amount: string) {
+  if (type === 'percentage') return `Desconto ${value.replace('.', ',')}% (${moneyLabel(amount)})`;
+  if (type === 'amount') return `Desconto fixo ${moneyLabel(amount)}`;
+  return 'Sem desconto';
+}
+
 export function QuotePriceDialog({
   item,
   provider,
   currentPrice,
+  currentOffer,
   history,
   saving,
   onClose,
   onSave,
 }: QuotePriceDialogProps) {
-  const [unitPrice, setUnitPrice] = useState('');
+  const [unitPrice, setUnitPrice] = useState(currentOffer?.unitPrice ?? '');
+  const [discountType, setDiscountType] = useState<QuoteOffer['discountType']>(
+    currentOffer?.discountType ?? 'none',
+  );
+  const [discountValue, setDiscountValue] = useState(
+    currentOffer?.discountType === 'none' ? '' : currentOffer?.discountValue ?? '',
+  );
   const [notes, setNotes] = useState('');
   const [validationError, setValidationError] = useState('');
   const [requestError, setRequestError] = useState('');
@@ -62,7 +77,11 @@ export function QuotePriceDialog({
     event.preventDefault();
     if (saving || submittingRef.current) return;
     if (!unitPrice.trim()) {
-      setValidationError('Informe o novo valor unitário.');
+      setValidationError('Informe o valor unitário bruto.');
+      return;
+    }
+    if (discountType !== 'none' && !discountValue.trim()) {
+      setValidationError('Informe o valor do desconto.');
       return;
     }
     const normalizedNotes = notes.trim();
@@ -70,6 +89,8 @@ export function QuotePriceDialog({
       quotationProviderId: provider.id,
       quotationItemId: item.id,
       unitPrice: unitPrice.trim(),
+      discountType,
+      discountValue: discountType === 'none' ? '0' : discountValue.trim(),
       notes: normalizedNotes,
     });
     if (requestRef.current?.fingerprint !== fingerprint) {
@@ -85,6 +106,8 @@ export function QuotePriceDialog({
         quotationProviderId: provider.id,
         quotationItemId: item.id,
         unitPrice,
+        discountType,
+        discountValue: discountType === 'none' ? '0' : discountValue,
         notes: normalizedNotes,
       });
       onClose();
@@ -105,7 +128,7 @@ export function QuotePriceDialog({
         onPointerDownOutside={event => {if (busy) event.preventDefault();}}
       >
         <DialogHeader>
-          <DialogTitle>Novo preço</DialogTitle>
+          <DialogTitle>Nova condição comercial</DialogTitle>
           <DialogDescription>
             Registre uma nova versão sem apagar os preços informados anteriormente.
           </DialogDescription>
@@ -114,7 +137,10 @@ export function QuotePriceDialog({
         <div className="quote-price-context" aria-label="Contexto da negociação">
           <div><span>Material</span><strong>{item.materialName}</strong></div>
           <div><span>Fornecedor</span><strong>{provider.providerName}</strong></div>
-          <div><span>Preço atual</span><strong>{currentPrice ? moneyLabel(currentPrice) : 'Não informado'}</strong></div>
+          <div>
+            <span>Oferta atual</span>
+            <strong>{currentOffer ? moneyLabel(currentOffer.lineTotal) : currentPrice ? moneyLabel(currentPrice) : 'Não informada'}</strong>
+          </div>
         </div>
 
         <form className="quote-price-form" onSubmit={submit} aria-busy={busy}>
@@ -123,7 +149,7 @@ export function QuotePriceDialog({
             O novo valor será acrescentado ao histórico. Nenhuma versão anterior será apagada.
           </p>
           <fieldset disabled={busy}>
-            <Field label="Novo valor unitário *">
+            <Field label="Valor unitário bruto *">
               <CurrencyInput
                 autoFocus
                 value={unitPrice}
@@ -136,6 +162,57 @@ export function QuotePriceDialog({
                 aria-describedby={validationError ? 'quote-price-validation-error' : undefined}
               />
             </Field>
+            <div className="quote-price-discount-grid">
+              <Field label="Tipo de desconto">
+                <select
+                  value={discountType}
+                  onChange={event => {
+                    const value = event.target.value as QuoteOffer['discountType'];
+                    setDiscountType(value);
+                    if (value === 'none') setDiscountValue('');
+                    setValidationError('');
+                    setRequestError('');
+                  }}
+                >
+                  <option value="none">Sem desconto</option>
+                  <option value="percentage">Percentual sobre o item</option>
+                  <option value="amount">Valor fixo sobre o item</option>
+                </select>
+              </Field>
+              {discountType === 'percentage' ? (
+                <Field label="Percentual do desconto *">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={discountValue}
+                    onChange={event => {
+                      setDiscountValue(event.target.value);
+                      setValidationError('');
+                      setRequestError('');
+                    }}
+                    placeholder="Ex.: 7"
+                    aria-label="Percentual do desconto"
+                  />
+                </Field>
+              ) : discountType === 'amount' ? (
+                <Field label="Desconto total deste item *">
+                  <CurrencyInput
+                    value={discountValue}
+                    onValueChange={value => {
+                      setDiscountValue(value);
+                      setValidationError('');
+                      setRequestError('');
+                    }}
+                    aria-label="Valor fixo do desconto do item"
+                  />
+                </Field>
+              ) : null}
+            </div>
+            {discountType !== 'none' && (
+              <p className="quote-price-discount-note">
+                O desconto é aplicado ao subtotal completo deste material, considerando a quantidade solicitada.
+              </p>
+            )}
             <Field label="Observação (opcional)">
               <textarea
                 rows={3}
@@ -168,7 +245,11 @@ export function QuotePriceDialog({
                       <strong><time dateTime={entry.createdAt}>{timestampLabel(entry.createdAt)}</time></strong>
                       <small>{entry.notes || 'Sem observação'}</small>
                     </div>
-                    <strong>{moneyLabel(entry.unitPrice)}</strong>
+                    <div className="quote-history-values">
+                      <strong>{moneyLabel(entry.lineTotal)}</strong>
+                      <small>{discountLabel(entry.discountType, entry.discountValue, entry.discountAmount)}</small>
+                      <small>Bruto unitário: {moneyLabel(entry.unitPrice)}</small>
+                    </div>
                   </article>
                 ))}
               </div>
@@ -183,7 +264,7 @@ export function QuotePriceDialog({
             </button>
             <button className="btn company-primary" type="submit" disabled={busy}>
               {busy ? <Loader2 className="animate-spin" size={16}/> : <Save size={16}/>}
-              {busy ? 'Salvando…' : 'Registrar novo preço'}
+              {busy ? 'Salvando…' : 'Registrar condição'}
             </button>
           </footer>
         </form>

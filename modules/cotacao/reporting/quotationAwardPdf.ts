@@ -14,6 +14,9 @@ import type {Quote, QuoteItem, QuoteProvider} from '../types';
 export type QuotationAwardItem = QuoteItem & {
   materialImageUrl?: string | null;
   unitPrice: string;
+  discountType: 'none' | 'percentage' | 'amount';
+  discountValue: string;
+  discountAmount: string;
   lineTotal: string;
 };
 
@@ -28,11 +31,12 @@ export type QuotationAwardSnapshot = {
 };
 
 const COLUMNS = [
-  {label: 'Foto', width: 24},
-  {label: 'Produto aprovado', width: 76},
-  {label: 'Quantidade', width: 24},
-  {label: 'Valor unitário', width: 27},
-  {label: 'Valor total', width: 31},
+  {label: 'Foto', width: 22},
+  {label: 'Produto aprovado', width: 65},
+  {label: 'Quantidade', width: 22},
+  {label: 'Unitário bruto', width: 25},
+  {label: 'Desconto', width: 23},
+  {label: 'Total líquido', width: 25},
 ] as const;
 const HEADER_HEIGHT = 10;
 const ROW_HEIGHT = 25;
@@ -115,6 +119,9 @@ export function createQuotationAwardSnapshot(
         ...item,
         materialImageUrl: materialImages.get(item.materialId) ?? null,
         unitPrice: award.unitPrice,
+        discountType: award.discountType ?? 'none',
+        discountValue: award.discountValue ?? '0',
+        discountAmount: award.discountAmount ?? '0',
         lineTotal: award.lineTotal,
       }] : [];
     }),
@@ -301,10 +308,15 @@ export async function createQuotationAwardPdf(
     const cells = [
       `${item.quantity} ${item.unit}`.trim(),
       moneyLabel(item.unitPrice),
+      item.discountType === 'none'
+        ? '—'
+        : item.discountType === 'percentage'
+          ? `${item.discountValue.replace('.', ',')}%\n${moneyLabel(item.discountAmount)}`
+          : moneyLabel(item.discountAmount),
       moneyLabel(item.lineTotal),
     ];
     COLUMNS.slice(2).forEach((column, cellIndex) => {
-      doc.setFont('helvetica', cellIndex === 2 ? 'bold' : 'normal');
+      doc.setFont('helvetica', cellIndex === 3 ? 'bold' : 'normal');
       doc.setFontSize(cellIndex === 0 ? 7.1 : 6.8);
       doc.setTextColor(48, 78, 57);
       doc.text(cells[cellIndex], x + column.width / 2, top + ROW_HEIGHT / 2 + 1, {align: 'center'});

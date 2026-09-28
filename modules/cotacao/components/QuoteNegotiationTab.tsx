@@ -16,6 +16,7 @@ import type {
   QuoteItemAwardInput,
   QuoteNegotiation,
   QuoteNegotiationInput,
+  QuoteOffer,
   QuoteProvider,
 } from '../types';
 import {MaterialThumbnail} from './QuoteMaterialPicker';
@@ -38,6 +39,7 @@ type PriceEditor = {
   provider: QuoteProvider;
   history: QuoteNegotiation[];
   currentPrice: string;
+  currentOffer?: QuoteOffer;
 };
 
 function newestFirst(left: QuoteNegotiation, right: QuoteNegotiation) {
@@ -82,6 +84,12 @@ function timestampLabel(value: string) {
     dateStyle: 'short',
     timeStyle: 'short',
   }).format(date);
+}
+
+function discountLabel(type: QuoteOffer['discountType'], value: string) {
+  if (type === 'percentage') return `desc. ${value.replace('.', ',')}%`;
+  if (type === 'amount') return `desc. ${moneyLabel(value)}`;
+  return '';
 }
 
 function ProviderHeading({provider}: {provider: QuoteProvider}) {
@@ -228,6 +236,7 @@ export function QuoteNegotiationTab({
                       </th>
                       {quote.providers.map(provider => {
                         const currentPrice = provider.values[item.id] ?? '';
+                        const currentOffer = provider.offers?.[item.id];
                         const providerHistory = negotiationHistory(quote, item.id, provider.id);
                         const approvalKey = `${item.id}:${provider.id}`;
                         const selected = approvedProviderByItem[item.id] === provider.id;
@@ -244,15 +253,18 @@ export function QuoteNegotiationTab({
                                 provider,
                                 history: providerHistory,
                                 currentPrice,
+                                currentOffer,
                               })}
                               aria-label={`${currentPrice ? 'Alterar' : 'Informar'} preço de ${item.materialName} para ${provider.providerName}`}
                             >
                               <span className="sr-only">Novo preço</span>
                               <strong>{currentPrice ? moneyLabel(currentPrice) : 'Informar preço'}</strong>
                               <small>
-                                {providerHistory.length
-                                  ? `${providerHistory.length} ${providerHistory.length === 1 ? 'versão' : 'versões'}`
-                                  : 'Sem histórico'}
+                                {currentOffer?.discountType && currentOffer.discountType !== 'none'
+                                  ? `${discountLabel(currentOffer.discountType, currentOffer.discountValue)} · líquido ${moneyLabel(currentOffer.lineTotal)}`
+                                  : providerHistory.length
+                                    ? `${providerHistory.length} ${providerHistory.length === 1 ? 'versão' : 'versões'}`
+                                    : 'Sem histórico'}
                               </small>
                             </button>
                             {quote.status === 'open' ? (
@@ -283,7 +295,36 @@ export function QuoteNegotiationTab({
                   );
                 })}
               </tbody>
+              <tfoot>
+                <tr className="quote-matrix-totals-row">
+                  <th className="quote-matrix-material-column" scope="row">
+                    <strong>Totais por fornecedor</strong>
+                    <small>Valores líquidos após os descontos</small>
+                  </th>
+                  {quote.providers.map(provider => (
+                    <td key={`totals:${provider.id}`}>
+                      <div className="quote-matrix-provider-totals">
+                        <span>
+                          <small>Total dos itens</small>
+                          <strong>{moneyLabel(provider.total ?? '0')}</strong>
+                        </span>
+                        <span className="is-approved-total">
+                          <small>Total aprovado</small>
+                          <strong>{moneyLabel(provider.awardedTotal ?? '0')}</strong>
+                        </span>
+                      </div>
+                    </td>
+                  ))}
+                </tr>
+              </tfoot>
             </table>
+          </div>
+          <div className="quote-negotiation-approved-total" aria-live="polite">
+            <span>
+              <small>Total geral aprovado</small>
+              <strong>{moneyLabel(quote.awardedTotal)}</strong>
+            </span>
+            <small>{quote.awardedItemCount} de {quote.items.length} itens aprovados</small>
           </div>
           {approvalError && <p className="form-error" role="alert">{approvalError}</p>}
 
@@ -304,7 +345,14 @@ export function QuoteNegotiationTab({
                           {entry.notes ? ` · ${entry.notes}` : ''}
                         </small>
                       </div>
-                      <strong>{moneyLabel(entry.unitPrice)}</strong>
+                      <div className="quote-history-values">
+                        <strong>{moneyLabel(entry.lineTotal)}</strong>
+                        <small>
+                          {entry.discountType === 'none'
+                            ? `Bruto unitário: ${moneyLabel(entry.unitPrice)}`
+                            : `${discountLabel(entry.discountType, entry.discountValue)} · bruto unitário ${moneyLabel(entry.unitPrice)}`}
+                        </small>
+                      </div>
                     </article>
                   );
                 })}
@@ -321,6 +369,7 @@ export function QuoteNegotiationTab({
           item={priceEditor.item}
           provider={priceEditor.provider}
           currentPrice={priceEditor.currentPrice}
+          currentOffer={priceEditor.currentOffer}
           history={priceEditor.history}
           saving={saving}
           onClose={() => setPriceEditor(null)}

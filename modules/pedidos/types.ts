@@ -1,4 +1,5 @@
 export type PurchaseOrderStatus = 'open' | 'finished';
+export type PurchaseOrderDiscountType = 'none' | 'percentage' | 'amount';
 
 export type PurchaseOrderReference = {
   brand: string;
@@ -19,6 +20,10 @@ export type PurchaseOrderItem = {
   quantity: string;
   unit: string;
   unitPrice: string;
+  discountType: PurchaseOrderDiscountType;
+  discountValue: string;
+  lineSubtotal: string;
+  discountAmount: string;
   lineTotal: string;
   notes: string;
 };

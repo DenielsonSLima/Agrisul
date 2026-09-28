@@ -285,6 +285,8 @@ try {
  await db.exec(readFileSync(new URL('../migrations/20260924144222_quotation_export_projection.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('../migrations/20260924162702_quotation_details_update.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('../migrations/20260925114548_provider_contacts_for_purchase_orders.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260925192051_quotation_item_discounts.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260928110923_quotation_awarded_total_projection.sql',import.meta.url),'utf8'));
  await db.exec(`DO $$
   DECLARE v_projection jsonb;
   BEGIN
@@ -417,6 +419,8 @@ try {
  console.log('Purchase orders: atomic idempotent finalization, snapshots, payment fields, permissions and isolation passed');
  await db.exec(readFileSync(new URL('./quotation_item_awards.sql',import.meta.url),'utf8'));
  console.log('Quotation item awards: incremental scope, exact decisions, split orders, retries, permissions and isolation passed');
+ await db.exec(readFileSync(new URL('./quotation_item_discounts.sql',import.meta.url),'utf8'));
+ console.log('Quotation discounts: percentage/fixed calculations, history, retries, awards and immutable purchase-order snapshots passed');
  await db.exec(readFileSync(new URL('./material_categories.sql',import.meta.url),'utf8'));
  console.log('Material categories: normalized names, optional links, deletion guard, permissions and isolation passed');
 } catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
