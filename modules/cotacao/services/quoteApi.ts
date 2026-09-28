@@ -1,7 +1,7 @@
 import {getSupabaseBrowserClient} from '@/shared/supabase/client';
 import {rpcRequest,RpcError} from '@/shared/supabase/rpc';
 import {fetchWorkspaceId} from '@/shared/supabase/workspace';
-import type {Material,MaterialImageChange,MaterialInput,MaterialReference,MaterialReferenceInput,Quote,QuoteAddItemsInput,QuoteAddProvidersInput,QuoteDetailsInput,QuoteFinalizeInput,QuoteFinalizeResult,QuoteInput,QuoteItemAwardInput,QuoteNegotiationInput,QuoteRemoveItemInput,QuoteRemoveProviderInput,QuoteStatus} from '../types';
+import type {Material,MaterialImageChange,MaterialInput,MaterialReference,MaterialReferenceInput,Quote,QuoteAddItemsInput,QuoteAddProvidersInput,QuoteDetailsInput,QuoteFinalizeInput,QuoteFinalizeResult,QuoteInput,QuoteItemAwardInput,QuoteItemUnawardInput,QuoteNegotiationInput,QuoteRemoveItemInput,QuoteRemoveProviderInput,QuoteStatus} from '../types';
 
 export const MATERIAL_IMAGE_BUCKET='billing-material-images';
 
@@ -74,6 +74,7 @@ export const persistQuote = async (input: QuoteInput) => (await rpcRequest<{quot
 export const updateQuoteDetails = async (input: QuoteDetailsInput) => (await rpcRequest<{quote: Quote}>('quotations','update-details',input)).quote;
 export const recordQuoteNegotiation = async (input: QuoteNegotiationInput) => (await rpcRequest<{quote: Quote}>('quotations','record-negotiation',input)).quote;
 export const awardQuoteItem = async (input: QuoteItemAwardInput) => (await rpcRequest<{quote: Quote}>('quotations','award-item',input)).quote;
+export const unawardQuoteItem = async (input: QuoteItemUnawardInput) => (await rpcRequest<{quote: Quote}>('quotations','unaward-item',input)).quote;
 export const addQuoteItems = async (input: QuoteAddItemsInput) => (await rpcRequest<{quote: Quote}>('quotations','add-items',input)).quote;
 export const addQuoteProviders = async (input: QuoteAddProvidersInput) => (await rpcRequest<{quote: Quote}>('quotations','add-providers',input)).quote;
 export const removeQuoteItem = async (input: QuoteRemoveItemInput) => (await rpcRequest<{quote: Quote}>('quotations','remove-item',input)).quote;

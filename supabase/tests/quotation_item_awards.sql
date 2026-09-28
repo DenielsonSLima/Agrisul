@@ -219,6 +219,35 @@ BEGIN
   OR r->'quote'->'itemAwards'->0->>'providerId'<>quote_provider_a::text THEN
   RAISE EXCEPTION 'Restoring an award lost negotiation history: %',r;
  END IF;
+ -- The operator can deliberately return one material to a pending state.
+ r=public.billing_rpc('quotations','unaward-item',jsonb_build_object(
+  'id',quote_id,'quotationItemId',item_a));
+ IF r->'quote'->>'awardedItemCount'<>'0'
+  OR (r->'quote'->>'awardComplete')::boolean
+  OR jsonb_array_length(r->'quote'->'itemAwards')<>0
+  OR jsonb_array_length(r->'quote'->'negotiations')<>4
+  OR r->'quote'->'providers'->0->'values'->>item_a::text<>'10' THEN
+  RAISE EXCEPTION 'Removing an award changed price/history or kept the selection: %',r;
+ END IF;
+ -- Exact retry is idempotent and leaves the quotation pending.
+ r=public.billing_rpc('quotations','unaward-item',jsonb_build_object(
+  'id',quote_id,'quotationItemId',item_a));
+ IF r->'quote'->>'awardedItemCount'<>'0'
+  OR jsonb_array_length(r->'quote'->'itemAwards')<>0 THEN
+  RAISE EXCEPTION 'Unaward retry recreated or retained the decision: %',r;
+ END IF;
+ BEGIN
+  PERFORM public.billing_rpc('quotations','unaward-item',jsonb_build_object(
+   'id',quote_id,'quotationItemId',item_a,'unexpected',true));
+  RAISE EXCEPTION 'Unaward payload whitelist was bypassed';
+ EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+ r=public.billing_rpc('quotations','award-item',jsonb_build_object(
+  'id',quote_id,'quotationItemId',item_a,
+  'quotationProviderId',quote_provider_a));
+ IF r->'quote'->>'awardedItemCount'<>'1'
+  OR r->'quote'->'itemAwards'->0->>'providerId'<>quote_provider_a::text THEN
+  RAISE EXCEPTION 'Item could not be approved after clearing the selection: %',r;
+ END IF;
  -- A new price for the approved pair must preserve the append-only history but
  -- invalidate the decision. The operator must deliberately approve it again.
  r=public.billing_rpc('quotations','record-negotiation',jsonb_build_object(
@@ -334,6 +363,11 @@ BEGIN
   RAISE EXCEPTION 'Finished quotation accepted award changes';
  EXCEPTION WHEN check_violation THEN NULL; END;
  BEGIN
+  PERFORM public.billing_rpc('quotations','unaward-item',jsonb_build_object(
+   'id',quote_id,'quotationItemId',item_a));
+  RAISE EXCEPTION 'Finished quotation accepted award removal';
+ EXCEPTION WHEN check_violation THEN NULL; END;
+ BEGIN
   PERFORM public.billing_rpc('quotations','update-details',jsonb_build_object(
    'id',quote_id,'title','Alteração tardia','requestDate','2026-09-25',
    'requesterSignatureId',requester_b,'notes',''));
@@ -406,6 +440,11 @@ BEGIN
   PERFORM public.billing_rpc('quotations','award-item',jsonb_build_object(
    'id',quote_id,'quotationItemId',item_id,'quotationProviderId',provider_id));
   RAISE EXCEPTION 'Foreign quotation award was accepted';
+ EXCEPTION WHEN no_data_found THEN NULL; END;
+ BEGIN
+  PERFORM public.billing_rpc('quotations','unaward-item',jsonb_build_object(
+   'id',quote_id,'quotationItemId',item_id));
+  RAISE EXCEPTION 'Foreign quotation award removal was accepted';
  EXCEPTION WHEN no_data_found THEN NULL; END;
 END $$;
 
@@ -485,6 +524,12 @@ BEGIN
   RAISE EXCEPTION 'Read-only member changed an award';
  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
  BEGIN
+  PERFORM public.billing_rpc('quotations','unaward-item',jsonb_build_object(
+   'id',current_setting('test.award.quote')::uuid,
+   'quotationItemId',current_setting('test.award.item')::uuid));
+  RAISE EXCEPTION 'Read-only member removed an award';
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ BEGIN
   PERFORM public.billing_rpc('quotations','update-details',jsonb_build_object(
    'id',current_setting('test.award.quote')::uuid,'title','Sem permissão',
    'requestDate','2026-09-25','requesterSignatureId',gen_random_uuid(),'notes',''));
@@ -500,6 +545,12 @@ DO $$ BEGIN
    'quotationItemId',current_setting('test.award.item')::uuid,
    'quotationProviderId',current_setting('test.award.provider')::uuid));
   RAISE EXCEPTION 'Anonymous award was accepted';
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ BEGIN
+  PERFORM public.billing_rpc('quotations','unaward-item',jsonb_build_object(
+   'id',current_setting('test.award.quote')::uuid,
+   'quotationItemId',current_setting('test.award.item')::uuid));
+  RAISE EXCEPTION 'Anonymous award removal was accepted';
  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
 RESET ROLE;

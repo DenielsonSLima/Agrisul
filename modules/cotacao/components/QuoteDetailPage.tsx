@@ -8,7 +8,7 @@ import {notifications, useConfirmation} from '@/shared/feedback';
 import {ModuleLink, useModuleNavigation} from '@/shared/navigation/ModuleNavigation';
 import {dateLabel} from '@/shared/utils/presentation';
 import {useMaterials, useQuotationRequesters, useQuoteDetail, useQuoteMutations} from '../hooks/useQuotes';
-import type {Quote, QuoteDetailsInput, QuoteItem, QuoteItemAwardInput, QuoteNegotiationInput, QuoteProvider} from '../types';
+import type {Quote, QuoteDetailsInput, QuoteItem, QuoteItemAwardInput, QuoteItemUnawardInput, QuoteNegotiationInput, QuoteProvider} from '../types';
 import {QuoteDetailsDialog} from './QuoteDetailsDialog';
 import {listHref, QuotationBreadcrumb} from './QuoteShared';
 import {QuoteNegotiationTab} from './QuoteNegotiationTab';
@@ -164,6 +164,18 @@ function QuoteDetailContent({quote}: {quote: Quote}) {
     }
   };
 
+  const unapproveItem = async (input: Omit<QuoteItemUnawardInput, 'id'>) => {
+    try {
+      await mutations.unapproveItem({...input, id: quote.id});
+      setFinalizeError('');
+      notifications.deleted('Aprovação removida. O material ficou sem fornecedor selecionado.');
+    } catch (reason) {
+      const message = (reason as Error).message || 'Não foi possível remover a aprovação do material.';
+      notifications.error(message);
+      throw reason;
+    }
+  };
+
   const addMaterial = async (item: QuoteScopeItemInput) => {
     try {
       await mutations.addItems({id: quote.id, items: [item]});
@@ -305,6 +317,7 @@ function QuoteDetailContent({quote}: {quote: Quote}) {
             saving={mutations.negotiating || mutations.awarding}
             onRecord={recordNegotiation}
             onApproveItem={approveItem}
+            onUnapproveItem={unapproveItem}
             onAddMaterials={() => setAddingMaterial(true)}
           />
         </TabsContent>

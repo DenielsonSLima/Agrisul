@@ -1,7 +1,7 @@
 'use client';
 
 import {useMemo, useState} from 'react';
-import {Check, FileDown, History, Loader2, PackageOpen, Plus, ReceiptText} from 'lucide-react';
+import {Check, FileDown, History, Loader2, PackageOpen, Plus, ReceiptText, X} from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -9,6 +9,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {moneyLabel} from '@/shared/utils/presentation';
+import {useConfirmation} from '@/shared/feedback';
 import {PdfExportDialog} from '@/shared/reporting/PdfExportDialog';
 import {useWorkspaceCompany} from '@/shared/state/WorkspaceCompanyProvider';
 import {
@@ -21,6 +22,7 @@ import type {
   Quote,
   QuoteItem,
   QuoteItemAwardInput,
+  QuoteItemUnawardInput,
   QuoteNegotiation,
   QuoteNegotiationInput,
   QuoteOffer,
@@ -31,6 +33,7 @@ import {QuotePriceDialog} from './QuotePriceDialog';
 
 type NegotiationDraft = Omit<QuoteNegotiationInput, 'id'>;
 type AwardDraft = Omit<QuoteItemAwardInput, 'id'>;
+type UnawardDraft = Omit<QuoteItemUnawardInput, 'id'>;
 
 type QuoteNegotiationTabProps = {
   quote: Quote;
@@ -38,6 +41,7 @@ type QuoteNegotiationTabProps = {
   saving: boolean;
   onRecord: (input: NegotiationDraft) => Promise<void>;
   onApproveItem: (input: AwardDraft) => Promise<void>;
+  onUnapproveItem: (input: UnawardDraft) => Promise<void>;
   onAddMaterials: () => void;
 };
 
@@ -125,9 +129,11 @@ export function QuoteNegotiationTab({
   saving,
   onRecord,
   onApproveItem,
+  onUnapproveItem,
   onAddMaterials,
 }: QuoteNegotiationTabProps) {
   const {activeCompanyId} = useWorkspaceCompany();
+  const confirm = useConfirmation();
   const [priceEditor, setPriceEditor] = useState<PriceEditor | null>(null);
   const [pdf, setPdf] = useState<QuotationNegotiationSnapshot | null>(null);
   const [approvingKey, setApprovingKey] = useState('');
@@ -156,6 +162,27 @@ export function QuoteNegotiationTab({
       await onApproveItem({quotationItemId: item.id, quotationProviderId: provider.id});
     } catch (reason) {
       setApprovalError((reason as Error).message || 'Não foi possível aprovar o fornecedor para este item.');
+    } finally {
+      setApprovingKey('');
+    }
+  };
+
+  const unapproveItem = async (item: QuoteItem, provider: QuoteProvider) => {
+    if (saving || approvingKey || quote.status !== 'open') return;
+    const accepted = await confirm({
+      title: 'Remover aprovação?',
+      description: `${provider.providerName} deixará de ser o fornecedor aprovado para ${item.materialName}. O material ficará sem fornecedor selecionado até uma nova aprovação.`,
+      confirmLabel: 'Remover aprovação',
+      tone: 'destructive',
+    });
+    if (!accepted) return;
+    const key = `${item.id}:${provider.id}`;
+    setApprovalError('');
+    setApprovingKey(key);
+    try {
+      await onUnapproveItem({quotationItemId: item.id});
+    } catch (reason) {
+      setApprovalError((reason as Error).message || 'Não foi possível remover a aprovação do material.');
     } finally {
       setApprovingKey('');
     }
@@ -302,22 +329,38 @@ export function QuoteNegotiationTab({
                                 </>
                               )}
                             </button>
-                            {quote.status === 'open' ? (
+                            {quote.status === 'open' && selected ? (
+                              <button
+                                className="quote-matrix-approval selected is-remove"
+                                type="button"
+                                disabled={saving || !!approvingKey}
+                                title={`Remover a aprovação de ${provider.providerName} para ${item.materialName}`}
+                                aria-label={`Remover aprovação de ${provider.providerName} para ${item.materialName}`}
+                                onClick={() => void unapproveItem(item, provider)}
+                              >
+                                <span aria-live="polite">
+                                  {approving
+                                    ? <Loader2 className="animate-spin" size={13}/>
+                                    : <X size={13}/>}
+                                  {approving ? 'Removendo…' : 'Remover aprovação'}
+                                </span>
+                              </button>
+                            ) : quote.status === 'open' ? (
                               <label
-                                className={`quote-matrix-approval${selected ? ' selected' : ''}${cannotApprove ? ' disabled' : ''}`}
+                                className={`quote-matrix-approval${cannotApprove ? ' disabled' : ''}`}
                                 title={!currentPrice ? 'Informe um preço antes de aprovar.' : `Aprovar ${provider.providerName} para ${item.materialName}`}
                               >
                                 <input
                                   type="radio"
                                   name={`approved-provider-${item.id}`}
                                   value={provider.id}
-                                  checked={selected}
+                                  checked={false}
                                   disabled={saving || !!approvingKey || cannotApprove}
                                   onChange={() => void approveItem(item, provider)}
                                 />
                                 <span aria-live="polite">
-                                  {approving ? <Loader2 className="animate-spin" size={13}/> : selected ? <Check size={13}/> : null}
-                                  {approving ? 'Aprovando…' : selected ? 'Aprovado' : 'Aprovar'}
+                                  {approving ? <Loader2 className="animate-spin" size={13}/> : null}
+                                  {approving ? 'Aprovando…' : 'Aprovar'}
                                 </span>
                               </label>
                             ) : selected ? (

@@ -225,6 +225,12 @@ test('negotiation is a supplier matrix with per-item approval and accessible abb
   assert.match(source, /type="radio"/);
   assert.match(source, /name=\{`approved-provider-\$\{item\.id\}`\}/);
   assert.match(source, /onApproveItem\(\{quotationItemId: item\.id, quotationProviderId: provider\.id\}\)/);
+  assert.match(source, /title:\s*'Remover aprovação\?'/);
+  assert.match(source, /onUnapproveItem\(\{quotationItemId: item\.id\}\)/);
+  assert.match(source, /Remover aprovação/);
+  assert.match(source, /className="quote-matrix-approval selected is-remove"/);
+  assert.match(detail, /onUnapproveItem=\{unapproveItem\}/);
+  assert.match(detail, /notifications\.deleted\('Aprovação removida\./);
   assert.match(source, />Adicionar materiais</);
   assert.match(source, /onClick=\{onAddMaterials\}/);
   assert.match(source, /quote-matrix-price-values[\s\S]*?currentOffer\.netUnitPrice[\s\S]*?<del[\s\S]*?currentOffer\.unitPrice/);
@@ -322,10 +328,10 @@ test('open quotation scope can grow and shrink without replacing existing negoti
   assert.match(detail, /catalogError=\{providersQuery\.error\}/);
   assert.match(detail, /onReloadCatalog=\{providersQuery\.reload\}/);
 
-  for (const action of ['award-item', 'add-items', 'add-providers', 'remove-item', 'remove-provider']) {
+  for (const action of ['award-item', 'unaward-item', 'add-items', 'add-providers', 'remove-item', 'remove-provider']) {
     assert.match(api, new RegExp(`['"]quotations['"],['"]${action}['"]`));
   }
-  for (const mutation of ['approveItem', 'addItems', 'addProviders', 'removeItem', 'removeProvider']) {
+  for (const mutation of ['approveItem', 'unapproveItem', 'addItems', 'addProviders', 'removeItem', 'removeProvider']) {
     assert.match(hooks, new RegExp(`${mutation}:\\(input:`));
   }
 });

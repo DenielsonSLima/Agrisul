@@ -159,6 +159,11 @@ export type QuoteItemAwardInput = {
   quotationProviderId: string;
 };
 
+export type QuoteItemUnawardInput = {
+  id: string;
+  quotationItemId: string;
+};
+
 export type QuoteScopeItemInput = Pick<QuoteItem, 'id' | 'materialId' | 'quantity' | 'notes'>;
 export type QuoteScopeProviderInput = Pick<QuoteProvider, 'id' | 'providerId' | 'notes' | 'sentAt'>;
 export type QuoteAddItemsInput = { id: string; items: QuoteScopeItemInput[] };

@@ -288,6 +288,7 @@ try {
  await db.exec(readFileSync(new URL('../migrations/20260925192051_quotation_item_discounts.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('../migrations/20260928110923_quotation_awarded_total_projection.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('../migrations/20260928112852_quotation_gross_and_net_totals.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260928121100_quotation_item_unaward.sql',import.meta.url),'utf8'));
  await db.exec(`DO $$
   DECLARE v_projection jsonb;
   BEGIN
@@ -345,6 +346,7 @@ try {
  DECLARE v_rpc text:=pg_get_functiondef('public.billing_rpc(text,text,jsonb)'::regprocedure);
   v_authorize text:=pg_get_functiondef('billing_private.authorize_resource(text,text)'::regprocedure);
   v_negotiation_dispatch text:=pg_get_functiondef('billing_private.quotations_dispatch_before_item_awards(text,text,jsonb)'::regprocedure);
+  v_unaward_dispatch text:=pg_get_functiondef('billing_private.quotations_dispatch(text,text,jsonb)'::regprocedure);
   v_route text;v_is_definer boolean;v_config text[];v_rls boolean;v_replica "char";
  BEGIN
   FOREACH v_route IN ARRAY ARRAY[
@@ -364,6 +366,11 @@ try {
    OR strpos(v_negotiation_dispatch,'pg_advisory_xact_lock')=0
    OR strpos(v_negotiation_dispatch,'FOR SHARE')=0 THEN
    RAISE EXCEPTION 'Negotiation dispatcher lost its action or concurrency guards';
+  END IF;
+  IF strpos(v_unaward_dispatch,'''unaward-item''')=0
+   OR strpos(v_unaward_dispatch,'FOR UPDATE')=0
+   OR strpos(v_unaward_dispatch,'billing_quotation_item_awards')=0 THEN
+   RAISE EXCEPTION 'Unaward dispatcher lost its action or concurrency guards';
   END IF;
   SELECT c.relrowsecurity,c.relreplident INTO v_rls,v_replica
   FROM pg_class c WHERE c.oid='public.billing_quotation_negotiations'::regclass;
