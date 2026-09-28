@@ -17,3 +17,12 @@ export function decimalLabel(value: string | number | boolean | null | undefined
 export function moneyLabel(value: string | number | boolean | null | undefined) {
   return value === '' || value === null || value === undefined ? 'A apurar' : `R$ ${decimalLabel(value)}`;
 }
+
+export function loadPlotLabel(plotName: string | null | undefined) {
+  return plotName?.trim() || 'Sem talhão';
+}
+
+export function loadOriginLabel(farmName: string | null | undefined, plotName: string | null | undefined) {
+  const farm = farmName?.trim() || 'Fazenda não informada';
+  return `${farm} · ${loadPlotLabel(plotName)}`;
+}

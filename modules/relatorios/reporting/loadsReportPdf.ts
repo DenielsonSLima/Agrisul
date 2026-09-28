@@ -1,6 +1,6 @@
 import {drawReportPdfHeader,drawReportPdfWatermark,REPORT_MARGIN_MM} from '@/shared/reporting';
 import {loadReportImage} from '@/shared/reporting/loadReportImage';
-import {dateLabel,decimalLabel,moneyLabel,monthLabel} from '@/shared/utils/presentation';
+import {dateLabel,decimalLabel,loadPlotLabel,moneyLabel,monthLabel} from '@/shared/utils/presentation';
 import {reportMetricColumns} from '../catalog';
 import {reportCell,reportPeriod} from './reportPresentation';
 import type {LoadReportGroup,LoadReportRow,ReportBrand,ReportSnapshot} from '../types';
@@ -38,7 +38,7 @@ export async function createLoadsReportPdf(snapshot:ReportSnapshot,brand:ReportB
     const values=[dateLabel(load.loadedAt),load.farmName,decimalLabel(load.volume),decimalLabel(load.atr),moneyLabel(load.grossAmount),moneyLabel(load.discountAmount),moneyLabel(load.netAmount)];
     const cells=values.map((value,column)=>doc.splitTextToSize(value,widths[column]-4));
     const topHeight=Math.max(10,Math.max(...cells.map(lines=>lines.length))*3.4+4);
-    const detail=`Carga ${index+1} · ${load.billingPending?'A apurar':'Apurado'} · Talhão: ${load.plotName} · Documento: ${load.document||'—'} · Referência ATR: ${load.atrReferenceMonth?monthLabel(load.atrReferenceMonth):'—'} · Cotação: ${moneyLabel(load.atrQuote)}${load.notes?` · Observações: ${load.notes}`:''}`;
+    const detail=`Carga ${index+1} · ${load.billingPending?'A apurar':'Apurado'} · Talhão: ${loadPlotLabel(load.plotName)} · Documento: ${load.document||'—'} · Referência ATR: ${load.atrReferenceMonth?monthLabel(load.atrReferenceMonth):'—'} · Cotação: ${moneyLabel(load.atrQuote)}${load.notes?` · Observações: ${load.notes}`:''}`;
     const detailLines=doc.splitTextToSize(detail,contentWidth-7),detailHeight=Math.max(8,detailLines.length*3.2+4),height=topHeight+detailHeight;
     return {cells,topHeight,detailLines,detailHeight,height};
   };

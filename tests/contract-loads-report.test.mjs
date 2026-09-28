@@ -14,6 +14,8 @@ try{
  const model=loadsReportModel(data);
  assert.deepEqual(model.columns.slice(-3),['Faturamento','Desconto','Valor líquido']);
  assert.deepEqual(model.groups[0].rows[0].slice(-3).map(value=>value.replace(/\u00a0/g,' ')),['R$ 987,65','R$ 23,45','R$ 964,20'],'Financial columns preserve RPC amounts without client calculations');
+ const noPlot=loadsReportModel({...data,groups:[{...data.groups[0],loads:[{...loads[0],plotId:'',plotName:''}]}]});
+ assert.equal(noPlot.groups[0].rows[0][1],'Fazenda Aurora\nSem talhão','Contract PDF model must identify an optional missing plot without a blank line');
  const pending=loadsReportModel({...data,groups:[{...data.groups[0],loads:[{...loads[0],grossAmount:'',netAmount:'',billingPending:true}]}]});
  assert.deepEqual(pending.groups[0].rows[0].slice(-3).map(value=>value.replace(/\u00a0/g,' ')),['Pendente','R$ 23,45','Pendente'],'Missing ATR keeps the known discount visible');
  const stale=loadsReportModel({...data,groups:[{...data.groups[0],loads:[{...loads[0],grossAmount:undefined,discountAmount:undefined,netAmount:undefined,billingPending:undefined}]}]});
@@ -34,6 +36,8 @@ try{
   for(const amount of ['123.456,78','3.456,78','120.000,00'])assert.ok(commands.includes(amount),`Filtered KPI ${amount} appears in the generated PDF`);
   assert.equal(new TextDecoder().decode(new Uint8Array(doc.output('arraybuffer')).slice(0,4)),'%PDF');
  }
+ const noPlotPdf=await createContractTabPdf(contract,noPlot,brand);
+ assert.match(noPlotPdf.doc.internal.pages.flat().join('\n'),/Sem talhão/,'Exported load PDF must preserve the explicit missing-plot label');
  const empty=loadsReportModel({...data,groups:[],summary:{...data.summary,volume:'0',loadCount:0,farmCount:0,averageAtr:''}});
  const result=await createContractTabPdf(contract,empty,brand);assert.equal(result.doc.getNumberOfPages(),1);assert.match(result.doc.internal.pages.flat().join('\n'),/Nenhum carregamento/);
  const long=loadsReportModel({...data,groups:[{...data.groups[0],loads:[{...loads[0],notes:'Texto longo que precisa aparecer integralmente. '.repeat(180)+'FIM-DA-OBSERVACAO'}]}]});

@@ -10,7 +10,7 @@ import type {ContractMonthlyReportBrand} from './contractMonthlySummaryPdf';
 type Color=[number,number,number];
 type SummaryCard={label:string;value:string;hint:string;key?:string};
 type SummaryIcon='gauge'|'scale'|'package'|'truck'|'money'|'calendar';
-const palette={ink:[49,91,64],muted:[120,139,126],border:[220,232,224],surface:[249,252,250],green:[53,165,109],dark:[30,79,54],blue:[76,129,165],amber:[209,138,53]} satisfies Record<string,Color>;
+const palette={ink:[23,37,29],muted:[74,91,80],border:[204,219,209],surface:[249,252,250],green:[53,165,109],dark:[30,79,54],blue:[76,129,165],amber:[209,138,53]} satisfies Record<string,Color>;
 
 async function loadImage(url:string|null):Promise<ReportPdfImage|null>{
  if(!url)return null;
@@ -82,13 +82,13 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
   return {label,hint,size,value,height:4+label.length*2.9+value.length*size*.41+hint.length*2.3+2.5};
  };
  const metric=(item:SummaryCard,x:number,top:number,cardWidth:number,cardHeight:number,kind?:SummaryIcon)=>{
-  const dark=item.key==='pending',received=item.key==='received',textX=x+(kind?12:3.5);
-  panel(x,top,cardWidth,cardHeight,dark?palette.dark:received?[237,248,241]:[255,255,255],dark?palette.dark:palette.border);
+  const dark=item.key==='pending',received=item.key==='received',remaining=item.label==='Falta entregar',textX=x+(kind?12:3.5);
+  panel(x,top,cardWidth,cardHeight,dark?palette.dark:remaining?[255,244,242]:received?[237,248,241]:[255,255,255],dark?palette.dark:remaining?[247,192,184]:palette.border);
   if(kind)icon(kind,x+2.5,top+(cardHeight-7.5)/2);
   const {label,hint,size,value}=metricLayout(item,cardWidth,kind);
-  font(6.4,false,dark?[255,255,255]:palette.muted);doc.text(label,textX,top+4,{lineHeightFactor:1.2});
-  font(size,true,dark?[255,255,255]:received?[25,139,88]:palette.ink);doc.text(value,textX,top+4+label.length*2.9+size*.3,{lineHeightFactor:1.15});
-  font(5.7,false,dark?[180,210,191]:palette.muted);doc.text(hint,textX,top+cardHeight-2.5-(hint.length-1)*2.3,{lineHeightFactor:1.15});
+  font(6.4,false,dark?[255,255,255]:remaining?[180,35,24]:palette.muted);doc.text(label,textX,top+4,{lineHeightFactor:1.2});
+  font(size,true,dark?[255,255,255]:remaining?[180,35,24]:received?[25,139,88]:palette.ink);doc.text(value,textX,top+4+label.length*2.9+size*.3,{lineHeightFactor:1.15});
+  font(5.7,false,dark?[180,210,191]:remaining?[145,57,47]:palette.muted);doc.text(hint,textX,top+cardHeight-2.5-(hint.length-1)*2.3,{lineHeightFactor:1.15});
  };
  const hero=()=>{
   const gap=3,overviewWidth=content*.43,kpiWidth=(content-overviewWidth-gap*2)/2,copyX=margin+34,copyWidth=overviewWidth-38,valueWidth=(copyWidth-2)/2;
@@ -106,7 +106,7 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
   doc.setFillColor(228,242,233);doc.roundedRect(statusX,y+16,statusWidth,5,1.3,1.3,'F');font(6,false,[47,133,84]);doc.text(contract.status,statusX+statusWidth/2,y+19.3,{align:'center'});
   const contracted=Number(summary.totals.contractedVolume),loaded=Number(summary.totals.loadedVolume);
   const percent=contracted>0?Math.max(0,Math.min(100,loaded/contracted*100)):0;
-  const cx=margin+17,cy=y+39,radius=12;
+  const cx=margin+17,cy=y+39,radius=14;
   doc.setDrawColor(223,234,227);doc.setLineWidth(2.2);doc.circle(cx,cy,radius,'S');
   if(percent>0){
    doc.setDrawColor(...palette.green);doc.setLineWidth(2.2);doc.setLineCap('round');
@@ -114,7 +114,7 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
    for(let index=1;index<=segments;index++){const angle=-Math.PI/2+percent/100*Math.PI*2*index/segments,next:[number,number]=[cx+Math.cos(angle)*radius,cy+Math.sin(angle)*radius];doc.line(previous[0],previous[1],next[0],next[1]);previous=next;}
    doc.setLineCap('butt');
   }
-  doc.setFillColor(252,254,252);doc.setDrawColor(...palette.border);doc.setLineWidth(.2);doc.circle(cx,cy,10,'FD');
+  doc.setFillColor(252,254,252);doc.setDrawColor(...palette.border);doc.setLineWidth(.2);doc.circle(cx,cy,11.6,'FD');
   font(15,true);doc.text(new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1}).format(percent)+'%',cx,cy+.7,{align:'center'});font(5.9,false,palette.muted);doc.text('carregado',cx,cy+5,{align:'center'});
   const copy=lines(percent>0?'O contrato já está em andamento.':'O carregamento ainda não foi iniciado.',6.6,copyWidth);
   font(6.6,false,palette.muted);doc.text(copy,copyX,y+29,{lineHeightFactor:1.3});
@@ -141,38 +141,48 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
   const atrMinimum=atrValues.length?Math.min(...atrValues):0,atrMaximum=atrValues.length?Math.max(...atrValues):1,atrRange=atrMaximum-atrMinimum;
   const atrPadding=atrRange>0?atrRange*.08:Math.max(Math.abs(atrMaximum)*.03,.5),atrScaleMinimum=atrMinimum-atrPadding,atrScaleMaximum=atrMaximum+atrPadding;
   const period=`${formatContractDate(dailyLoads.filters.from)} a ${formatContractDate(dailyLoads.filters.to)}`;
+  const chartInk:Color=[18,18,18],chartSecondary:Color=[45,45,45],chartOrange:Color=[218,123,36];
+  const chartHeading=(top:number,padding:number)=>{
+   icon('truck',margin+padding,top+4);font(6,true,chartInk);doc.text('EVOLUÇÃO DOS CARREGAMENTOS',margin+padding+10.5,top+6.5);
+   font(9.5,true,chartInk);doc.text(granularityCopy.title,margin+padding+10.5,top+11);
+  };
   if(!rows.length){
-   ensure(34);panel(margin,y,content,30);heading(margin+4,y+4,'EVOLUÇÃO DOS CARREGAMENTOS',granularityCopy.title,'truck');
-   font(7,false,palette.muted);doc.text(`Período: ${period} · Nenhum carregamento no período selecionado.`,margin+4,y+23);y+=36;return;
+   ensure(34);panel(margin,y,content,30);chartHeading(y,4);
+   font(7,false,chartSecondary);doc.text(`Período: ${period} · Nenhum carregamento no período selecionado.`,margin+4,y+23);y+=36;return;
   }
-  for(const pageRows of contractDailyLoadsChartPages(rows)){
-   const padding=5,panelHeight=79;
-   ensure(panelHeight);panel(margin,y,content,panelHeight);heading(margin+padding,y+4,'EVOLUÇÃO DOS CARREGAMENTOS',granularityCopy.title,'truck');
-   font(5.8,false,palette.muted);doc.text(`Barras em toneladas e linha pontilhada do ${granularityCopy.atr.toLowerCase()} · Período: ${period}`,margin+padding,y+14);
-   const top=y+19,left=margin+padding+15,right=width-margin-padding-12,plotWidth=right-left,base=top+35,plotHeight=29,slot=plotWidth/pageRows.length;
-   panel(margin+padding,top,content-padding*2,54,palette.surface);
+  const chartPages=contractDailyLoadsChartPages(rows);
+  for(const [pageIndex,pageRows] of chartPages.entries()){
+   const padding=5,remaining=bottom-y,canUseFirstPageGap=pageIndex===0&&doc.getNumberOfPages()===1&&remaining>=58;
+   const panelHeight=canUseFirstPageGap?Math.min(70,remaining):70;
+   ensure(panelHeight);panel(margin,y,content,panelHeight);chartHeading(y,padding);
+   font(5.8,false,chartSecondary);doc.text(`Barras em toneladas e linha pontilhada do ${granularityCopy.atr.toLowerCase()} · Período: ${period}`,margin+padding,y+14);
+   const top=y+17,innerHeight=panelHeight-19,left=margin+padding+15,right=width-margin-padding-12,plotWidth=right-left;
+   const metricsY=y+panelHeight-3.5,legendY=metricsY-5,base=legendY-7.5,plotTop=top+4,plotHeight=Math.max(18,base-plotTop),slot=plotWidth/pageRows.length;
+   panel(margin+padding,top,content-padding*2,innerHeight,palette.surface);
    const maxVolume=Math.max(1,...pageRows.map(row=>row.volume));
    for(let index=0;index<=3;index++){
-    const gridY=base-plotHeight*index/3;doc.setDrawColor(227,237,231);doc.setLineWidth(.2);doc.setLineDashPattern([1,1.4],0);doc.line(left,gridY,right,gridY);doc.setLineDashPattern([],0);
-    font(5.5,false,palette.muted);doc.text(numberLabel(maxVolume*index/3),left-2,gridY+.8,{align:'right'});
+    const gridY=base-plotHeight*index/3;doc.setDrawColor(220,228,222);doc.setLineWidth(.2);doc.setLineDashPattern([1,1.4],0);doc.line(left,gridY,right,gridY);doc.setLineDashPattern([],0);
+    font(5.6,false,chartSecondary);doc.text(numberLabel(maxVolume*index/3),left-2,gridY+.8,{align:'right'});
    }
    const centers=pageRows.map((_,index)=>left+(index+.5)*slot);
    const atrY=(value:number)=>base-(value-atrScaleMinimum)/(atrScaleMaximum-atrScaleMinimum)*plotHeight;
    const atrPoints=pageRows.map((row,index)=>{const value=row.averageAtr;return value===null||!Number.isFinite(value)?null:{x:centers[index],y:atrY(value),label:`ATR ${formatAtr(row.averageAtrText)}`};});
    pageRows.forEach((row,index)=>{
-    const center=centers[index],barWidth=Math.min(8,slot*.45),barHeight=row.volume/maxVolume*plotHeight;
-    doc.setFillColor(84,168,115);doc.roundedRect(center-barWidth/2,base-barHeight,barWidth,barHeight,Math.min(1,barHeight/2),Math.min(1,barHeight/2),'F');
-    font(5.2,true,[82,107,90]);doc.text(numberLabel(row.volume),center,base-barHeight-1.2,{align:'center'});
-    font(5.4,false,palette.muted);doc.text(row.label,center,base+4.2,{align:'center'});
+    const center=centers[index],barWidth=Math.min(5.4,slot*.32),barHeight=row.volume/maxVolume*plotHeight;
+    doc.setFillColor(84,168,115);doc.roundedRect(center-barWidth/2,base-barHeight,barWidth,barHeight,Math.min(.7,barHeight/2),Math.min(.7,barHeight/2),'F');
+    font(5.6,true,chartInk);doc.text(numberLabel(row.volume),center,base-barHeight-1.1,{align:'center'});
+    font(5.6,true,chartInk);doc.text(row.label,center,base+3.8,{align:'center'});
    });
-   doc.setDrawColor(236,177,111);doc.setLineWidth(.7);doc.setLineDashPattern([1.2,1],0);let previousAtr:{x:number;y:number}|null=null;
+   doc.setDrawColor(...chartOrange);doc.setLineWidth(.65);doc.setLineDashPattern([1.2,1],0);let previousAtr:{x:number;y:number}|null=null;
    atrPoints.forEach(point=>{if(!point){previousAtr=null;return;}if(previousAtr)doc.line(previousAtr.x,previousAtr.y,point.x,point.y);previousAtr=point;});doc.setLineDashPattern([],0);
-   atrPoints.forEach(point=>{if(!point)return;doc.setFillColor(255,255,255);doc.setDrawColor(236,177,111);doc.circle(point.x,point.y,1,'FD');font(4.7,true,[145,71,0]);doc.text(point.label,point.x+1.7,point.y-1.5);});
-   if(atrValues.length){font(4.8,false,[145,71,0]);doc.text(formatAtr(String(atrScaleMaximum)),right+2,top+1);doc.text(formatAtr(String(atrScaleMinimum)),right+2,base+.8);}
-   font(5.3,false,[84,168,115]);doc.text(`■ ${granularityCopy.quantity}`,margin+padding+3,top+50);const atrLegendX=margin+padding+42,atrLegendY=top+48.8;doc.setDrawColor(236,177,111);doc.setLineWidth(.7);doc.setLineDashPattern([1.2,1],0);doc.line(atrLegendX,atrLegendY,atrLegendX+7,atrLegendY);doc.setLineDashPattern([],0);font(5.3,false,[145,71,0]);doc.text(`${granularityCopy.atr} (kg/t)`,atrLegendX+9,top+50);
+   atrPoints.forEach(point=>{if(!point)return;doc.setFillColor(255,255,255);doc.setDrawColor(...chartOrange);doc.circle(point.x,point.y,.9,'FD');font(5.3,true,chartInk);doc.text(point.label,point.x+1.7,point.y-1.5);});
+   if(atrValues.length){font(5.2,true,chartInk);doc.text(formatAtr(String(atrScaleMaximum)),right+2,plotTop+.8);doc.text(formatAtr(String(atrScaleMinimum)),right+2,base+.8);}
+   const quantityLegendX=margin+padding+3;doc.setFillColor(84,168,115);doc.rect(quantityLegendX,legendY-1.6,2.8,2,'F');font(5.3,true,chartInk);doc.text(granularityCopy.quantity,quantityLegendX+4,legendY);
+   const atrLegendX=margin+padding+39;doc.setDrawColor(...chartOrange);doc.setLineWidth(.65);doc.setLineDashPattern([1.2,1],0);doc.line(atrLegendX,legendY-1,atrLegendX+7,legendY-1);doc.setLineDashPattern([],0);font(5.3,true,chartInk);doc.text(`${granularityCopy.atr} (kg/t)`,atrLegendX+9,legendY);
    const averageVolume=granularity==='day'?dailyLoads.summary.averageDailyVolume:String(rows.reduce((total,row)=>total+row.volume,0)/rows.length);
-   const metrics=[`Média ${granularityCopy.average} ${formatContractVolume(averageVolume)}`,`Volume ${formatContractVolume(dailyLoads.summary.volume)}`,`ATR médio ${formatAtr(dailyLoads.summary.averageAtr)} kg/t`,`${dailyLoads.summary.monthCount} meses movimentados`];
-   font(5.5,false,palette.muted);doc.text(metrics.join('  ·  '),width-margin-padding-3,top+50,{align:'right'});
+   const monthCount=Number(dailyLoads.summary.monthCount),monthMetric=monthCount===1?'1 mês movimentado':`${monthCount} meses movimentados`;
+   const metrics=[`Média ${granularityCopy.average} ${formatContractVolume(averageVolume)}`,`Volume ${formatContractVolume(dailyLoads.summary.volume)}`,`ATR médio ${formatAtr(dailyLoads.summary.averageAtr)} kg/t`,monthMetric];
+   font(5.3,true,chartInk);doc.text(metrics.join('  ·  '),width-margin-padding-3,metricsY,{align:'right'});
    y+=panelHeight+6;
   }
  };
@@ -216,37 +226,46 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
    const criterion='ATR '+formatAtrCriterion(contract.atrPriceType,contract.atrPeriodType);font(6.2,false,[47,133,84]);
    const criterionWidth=doc.getTextWidth(criterion)+5;
    doc.setFillColor(235,246,239);doc.roundedRect(width-margin-padding-criterionWidth,y+5,criterionWidth,5.5,1.3,1.3,'F');doc.text(criterion,width-margin-padding-2.5,y+8.6,{align:'right'});
-   const top=y+17,left=margin+padding+24,right=width-margin-padding-5,plotWidth=right-left,base=top+47,plotHeight=36,slot=plotWidth/pageRows.length;
-   panel(margin+padding,top,content-padding*2,63,palette.surface);font(7.3,true);doc.text(`Faturamento bruto e líquido por ${granularityCopy.noun}`,margin+padding+3,top+5);font(5.5,false,palette.muted);doc.text(`Barra total: faturado bruto · Preenchimento interno: líquido · Período: ${periodLabel}`,margin+padding+3,top+8.6);
+   const top=y+17,left=margin+padding+24,right=width-margin-padding-5,plotWidth=right-left,base=top+44.5,plotHeight=33.5,slot=plotWidth/pageRows.length;
+   const chartInk:Color=[22,28,24];
+   panel(margin+padding,top,content-padding*2,63,palette.surface);font(7.5,true,chartInk);doc.text(`Faturamento bruto e líquido por ${granularityCopy.noun}`,margin+padding+3,top+5);font(5.7,true,chartInk);doc.text(`Barra total: faturado bruto · Preenchimento interno: líquido · Período: ${periodLabel}`,margin+padding+3,top+8.6);
    const hasPositiveGross=pageRows.some(row=>row.gross!==null&&Number.isFinite(row.gross)&&row.gross>0);
    const maximum=hasPositiveGross?Math.max(...pageRows.map(row=>row.gross??0)):0;
-   const magnitude=hasPositiveGross?10**Math.floor(Math.log10(maximum)):1,scale=hasPositiveGross?Math.ceil(maximum/magnitude*2)/2*magnitude:1;
+   const magnitude=hasPositiveGross?10**Math.floor(Math.log10(maximum)):1,scaleStep=magnitude/10,scale=hasPositiveGross?Math.ceil(maximum*1.12/scaleStep)*scaleStep:1;
+   const centeredChartLabel=(value:string,x:number,labelY:number,maxWidth:number,startSize:number,minSize:number,color:Color=chartInk)=>{
+    let size=startSize;font(size,true,color);while(size>minSize&&doc.getTextWidth(value)>maxWidth){size=Math.max(minSize,size-.2);font(size,true,color);}doc.text(value,x,labelY,{align:'center'});
+   };
    for(let index=0;index<=4;index++){
     const gridY=base-plotHeight*index/4;doc.setDrawColor(227,237,231);doc.setLineWidth(.2);doc.setLineDashPattern([1,1.4],0);doc.line(left,gridY,right,gridY);doc.setLineDashPattern([],0);
-    if(hasPositiveGross||index===0){font(5.1,false,palette.muted);doc.text(moneyLabel(hasPositiveGross?scale*index/4:0),left-2,gridY+.8,{align:'right'});}
+    if(hasPositiveGross||index===0){font(5.3,true,chartInk);doc.text(moneyLabel(hasPositiveGross?scale*index/4:0),left-2,gridY+.8,{align:'right'});}
    }
    const centers=pageRows.map((_,index)=>left+(index+.5)*slot);
    pageRows.forEach((row,index)=>{
-    const center=centers[index],barWidth=Math.min(19,slot*.68);
+    const center=centers[index],barWidth=Math.min(11.5,slot*.44),barX=center-barWidth/2;
     if(row.gross!==null&&Number.isFinite(row.gross)&&row.gross>0){
      const grossHeight=row.gross/scale*plotHeight;
-     doc.setFillColor(180,218,194);doc.setDrawColor(117,185,140);doc.setLineWidth(.25);doc.roundedRect(center-barWidth/2,base-grossHeight,barWidth,grossHeight,Math.min(1,barWidth/8),Math.min(1,grossHeight/2),'FD');
-     font(4.6,true,[63,103,78]);doc.text(moneyLabel(row.gross),center,base-grossHeight-1.1,{align:'center'});
-     if(row.net!==null&&Number.isFinite(row.net)&&row.net>=0){
-      const netHeight=row.net/scale*plotHeight,netWidth=barWidth*.72;
-      if(netHeight>0){doc.setFillColor(...palette.dark);doc.roundedRect(center-netWidth/2,base-netHeight,netWidth,netHeight,Math.min(.8,netWidth/8),Math.min(.8,netHeight/2),'F');}
-      const netY=netHeight>=4?base-netHeight+3:base-netHeight-1;
-      font(4.2,true,netHeight>=4?[255,255,255]:palette.dark);doc.text(moneyLabel(row.net),center,netY,{align:'center'});
+     const radius=Math.min(.9,barWidth/8,grossHeight/2);
+     doc.setFillColor(180,218,194);doc.setDrawColor(74,139,96);doc.setLineWidth(.32);doc.roundedRect(barX,base-grossHeight,barWidth,grossHeight,radius,radius,'FD');
+     if(row.net!==null&&Number.isFinite(row.net)){
+      const netHeight=Math.min(grossHeight,Math.max(0,row.net)/scale*plotHeight),netRadius=Math.min(.9,barWidth/8,netHeight/2);
+      if(netHeight>0){doc.setFillColor(...palette.dark);doc.roundedRect(barX,base-netHeight,barWidth,netHeight,netRadius,netRadius,'F');}
      }
-    }else if(row.gross===null){font(4.8,true,[145,93,35]);doc.text('Faturamento pendente',center,base-2,{align:'center'});}
-    else{
-     font(4.6,true,[63,103,78]);doc.text(moneyLabel(0),center,base-3.2,{align:'center'});
-     font(4.2,true,palette.dark);doc.text(`Líquido ${moneyLabel(row.net??0)}`,center,base-.8,{align:'center'});
+     doc.setDrawColor(74,139,96);doc.setLineWidth(.32);doc.roundedRect(barX,base-grossHeight,barWidth,grossHeight,radius,radius,'S');
+     centeredChartLabel(`Bruto ${moneyLabel(row.gross)}`,center,base-grossHeight-1,slot-1,5.1,4.4);
+    }else if(row.gross===null){
+     doc.setDrawColor(...palette.amber);doc.setLineWidth(.45);doc.setLineDashPattern([1,1],0);doc.line(barX,base-.3,barX+barWidth,base-.3);doc.setLineDashPattern([],0);
+     centeredChartLabel('Faturamento pendente',center,base-2,slot-1,4.8,4.2,[126,73,18]);
     }
-    font(5.3,true,palette.ink);doc.text(row.label,center,base+4,{align:'center'});font(4.7,false,palette.muted);doc.text(`${numberLabel(row.volume)} t`,center,base+6.6,{align:'center'});
+    else{
+     doc.setFillColor(225,239,230);doc.setDrawColor(74,139,96);doc.setLineWidth(.3);doc.roundedRect(barX,base-1.1,barWidth,1.1,.35,.35,'FD');
+     centeredChartLabel(`Bruto ${moneyLabel(0)}`,center,base-2.2,slot-1,4.8,4.2);
+    }
+    font(5.6,true,chartInk);doc.text(row.label,center,base+3.6,{align:'center'});font(5,true,chartInk);doc.text(`${numberLabel(row.volume)} t`,center,base+6.2,{align:'center'});
+    const netLabel=row.gross===null?'Líquido pendente':`Líquido ${moneyLabel(row.net??0)}`;
+    centeredChartLabel(netLabel,center,base+8.8,slot-1,4.9,4.3,row.gross===null?[126,73,18]:chartInk);
    });
-   const legendY=top+60;doc.setFillColor(180,218,194);doc.setDrawColor(117,185,140);doc.rect(margin+padding+3,legendY-1.6,3,2,'FD');font(5.2,false,[63,103,78]);doc.text('Faturado bruto (barra total)',margin+padding+7,legendY);
-   const legendX=margin+padding+49;doc.setFillColor(...palette.dark);doc.rect(legendX,legendY-1.6,3,2,'F');font(5.2,false,palette.dark);doc.text('Líquido (preenchimento interno)',legendX+4,legendY);
+   const legendY=top+60;doc.setFillColor(180,218,194);doc.setDrawColor(74,139,96);doc.rect(margin+padding+3,legendY-1.7,3.2,2.1,'FD');font(5.4,true,chartInk);doc.text('Faturado bruto (barra total)',margin+padding+7.3,legendY);
+   const legendX=margin+padding+51;doc.setFillColor(...palette.dark);doc.rect(legendX,legendY-1.7,3.2,2.1,'F');font(5.4,true,chartInk);doc.text('Líquido (preenchimento interno)',legendX+4.3,legendY);
    y+=panelHeight+6;
   }
  };

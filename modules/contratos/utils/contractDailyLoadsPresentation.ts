@@ -57,9 +57,7 @@ export const contractDailyLoadGranularityCopy:Record<ContractDailyLoadGranularit
 
 export function defaultContractDailyLoadPeriod(today=new Date()):ContractDailyLoadPeriod{
  const end=new Date(Date.UTC(today.getFullYear(),today.getMonth(),today.getDate()));
- const startMonth=new Date(Date.UTC(end.getUTCFullYear(),end.getUTCMonth()-6,1));
- const lastDayOfStartMonth=new Date(Date.UTC(startMonth.getUTCFullYear(),startMonth.getUTCMonth()+1,0)).getUTCDate();
- const start=new Date(Date.UTC(startMonth.getUTCFullYear(),startMonth.getUTCMonth(),Math.min(end.getUTCDate(),lastDayOfStartMonth)));
+ const start=shiftDate(end,-14);
  return {from:inputDate(start),to:inputDate(end),granularity:'day'};
 }
 

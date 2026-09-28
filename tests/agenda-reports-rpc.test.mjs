@@ -70,13 +70,14 @@ try {
  assert.ok(doc.getNumberOfPages()>1);
  const pdf=doc.internal.pages.slice(1).flat().join('\n');assert.ok(pdf.includes('REPORT-84'));assert.ok(pdf.includes('FINAL-ROW'));assert.ok(pdf.includes('765,00'));
  const loads=Array.from({length:45},(_,index)=>({id:String(index),contractId:'contract-a',farmId:'farm-a',plotId:'plot-a',loadedAt:'2026-09-15',farmName:index%2?'Fazenda B':'Fazenda A',plotName:'Talhão 01',document:`DOC-${index}`,notes:index===44?'OBSERVACAO-FINAL '.repeat(40):'',volume:'10',atr:'150',atrReferenceMonth:'2026-08',atrQuote:'1.2',grossAmount:'1800',discountAmount:'20',netAmount:'1780',billingPending:false}));
+ loads[0]={...loads[0],plotId:'',plotName:''};
  const loadTotals={loadCount:45,volume:'450',averageAtr:'150',grossAmount:'81000',discountAmount:'900',netAmount:'80100',billingPending:false,pendingLoadCount:0};
  const loadData={kind:'loads',scope:'company',period:{from:'2026-09-15',to:'2026-09-15'},filters:{...loadFilters,farmName:'Fazenda A',plotName:'Talhão 01'},origins:[],total:45,totals:loadTotals,groups:[{contractId:'contract-a',contractNumber:'CTR-LOAD',contractTitle:'Safra',clientName:'Cliente PDF',totals:loadTotals,loads}]};
  const loadResult=await createReportPdf({data:loadData,month:'2026-09',companyId:'a'},
   {company:null,header:{variant:'compact',logoAlignment:'left',showCnpj:true,showContact:true},watermark:{imageUrl:null,opacity:15,size:60},issuer:{id:'a',name:'Teste',email:''},issuedAt:new Date('2026-09-16T12:00:00Z')});
  assert.ok(loadResult.doc.getNumberOfPages()>1);
  const loadPdf=loadResult.doc.internal.pages.slice(1).flat().join('\n');
- assert.ok(loadPdf.includes('DOC-44'));assert.ok(loadPdf.includes('OBSERVACAO-FINAL'));assert.ok(loadPdf.includes('Subtotal'));assert.ok(loadPdf.includes('CTR-LOAD'));
+ assert.ok(loadPdf.includes('DOC-44'));assert.ok(loadPdf.includes('OBSERVACAO-FINAL'));assert.ok(loadPdf.includes('Subtotal'));assert.ok(loadPdf.includes('CTR-LOAD'));assert.ok(loadPdf.includes('Sem talhão'));
  console.log('PASS: RPC contracts, decimal transport, cancellation, error propagation, mutation/Realtime invalidation, account isolation, removed navigation and multipage PDF.');
 } finally {
  client.clear();delete globalThis.__overviewRpc;

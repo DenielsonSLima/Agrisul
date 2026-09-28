@@ -1,7 +1,7 @@
 import type {jsPDF as JsPdf} from 'jspdf';
 import {drawReportPdfHeader,drawReportPdfWatermark,REPORT_MARGIN_MM,type ReportPdfBrand} from '@/shared/reporting';
 import {loadReportImage} from '@/shared/reporting/loadReportImage';
-import {dateLabel,decimalLabel,monthLabel} from '@/shared/utils/presentation';
+import {dateLabel,decimalLabel,loadPlotLabel,monthLabel} from '@/shared/utils/presentation';
 import type {PlanningExportSnapshot} from '../types';
 
 type Column={label:string;width:number;align?:'left'|'right'};
@@ -48,7 +48,7 @@ export async function createPlanningPdf(snapshot:PlanningExportSnapshot,brand:Re
  table('Resumo diário',[{label:'Dia',width:45},{label:'Plantio',width:45},{label:'Manejo',width:45},{label:'Perdas',width:45},{label:'Colheita',width:45},{label:'Cargas',width:44}],data.dailySummary.map(item=>[dateLabel(item.date),`${decimalLabel(item.plantedAreaHa)} ha`,`${decimalLabel(item.managedAreaHa)} ha`,`${decimalLabel(item.lostAreaHa)} ha`,`${decimalLabel(item.harvestedTons)} t`,String(item.loadCount)]));
  table('Resumo mensal',[{label:'Mês',width:45},{label:'Plantio',width:45},{label:'Manejo',width:45},{label:'Perdas',width:45},{label:'Colheita',width:45},{label:'Cargas',width:44}],data.monthlySummary.map(item=>[monthLabel(item.month),`${decimalLabel(item.plantedAreaHa)} ha`,`${decimalLabel(item.managedAreaHa)} ha`,`${decimalLabel(item.lostAreaHa)} ha`,`${decimalLabel(item.harvestedTons)} t`,String(item.loadCount)]));
 
- const activities=[...data.fieldLogs.map(item=>({date:item.occurredOn,type:kindLabel[item.kind],farm:item.farmName,plot:item.plotName,amount:`${decimalLabel(item.areaHa)} ha`,detail:item.voidedAt?`Anulado: ${item.voidReason}`:[item.practiceName,item.notes].filter(Boolean).join(' · ')||'Sem observações'})),...data.harvestLoads.map(item=>({date:item.loadedAt,type:'Colheita',farm:item.farmName,plot:item.plotName,amount:`${decimalLabel(item.volumeTons)} t`,detail:`Contrato ${item.contractNumber||'sem número'}${item.document?' · '+item.document:''}${item.notes?' · '+item.notes:''}`}))].sort((a,b)=>b.date.localeCompare(a.date));
+ const activities=[...data.fieldLogs.map(item=>({date:item.occurredOn,type:kindLabel[item.kind],farm:item.farmName,plot:item.plotName,amount:`${decimalLabel(item.areaHa)} ha`,detail:item.voidedAt?`Anulado: ${item.voidReason}`:[item.practiceName,item.notes].filter(Boolean).join(' · ')||'Sem observações'})),...data.harvestLoads.map(item=>({date:item.loadedAt,type:'Colheita',farm:item.farmName,plot:loadPlotLabel(item.plotName),amount:`${decimalLabel(item.volumeTons)} t`,detail:`Contrato ${item.contractNumber||'sem número'}${item.document?' · '+item.document:''}${item.notes?' · '+item.notes:''}`}))].sort((a,b)=>b.date.localeCompare(a.date));
  table('Diário de campo e carregamentos',[{label:'Data',width:24},{label:'Tipo',width:29},{label:'Fazenda',width:43},{label:'Talhão',width:39},{label:'Quantidade',width:27},{label:'Detalhes',width:107}],activities.map(item=>[dateLabel(item.date),item.type,item.farm,item.plot,item.amount,item.detail]));
 
  const pages=doc.getNumberOfPages(),emitted=new Intl.DateTimeFormat('pt-BR',{dateStyle:'short',timeStyle:'short'}).format(brand.issuedAt);

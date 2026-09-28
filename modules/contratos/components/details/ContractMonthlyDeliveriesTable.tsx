@@ -1,5 +1,6 @@
 import {useId,useState} from 'react';
 import {ChevronDown,Loader2,RotateCcw,Truck} from 'lucide-react';
+import {loadPlotLabel} from '@/shared/utils/presentation';
 import type {BillingContract,ContractLoadsData,ContractPricedLoad} from '../../types';
 import {formatAtr,formatAtrQuote,formatContractDate,formatContractLoadAmount,formatContractMonth,formatContractVolume} from '../../utils/contractFormat';
 import {contractMonthlyDeliveryRows} from '../../utils/contractMonthlyDeliveries';
@@ -53,7 +54,7 @@ export function ContractMonthlyDeliveriesTable({contract,data,loading=false,erro
 function LoadTable({loads}:{loads:ContractPricedLoad[]}){
  return <div className={styles.loadScroll} tabIndex={0} role="region" aria-label="Detalhes dos carregamentos"><table className={styles.loadTable}><thead><tr><th scope="col">Data</th><th scope="col">Origem</th><th scope="col">Quantidade</th><th scope="col">ATR</th><th scope="col">Cotação / referência</th><th scope="col">Faturamento</th><th scope="col">Desconto</th><th scope="col">Valor líquido</th><th scope="col">Documento / observações</th></tr></thead><tbody>{loads.map(load=><tr key={load.id}>
   <td data-label="Data"><time dateTime={load.loadedAt}>{formatContractDate(load.loadedAt)}</time></td>
-  <td data-label="Origem"><strong>{load.farmName}</strong><small>{load.plotName}</small></td>
+  <td data-label="Origem"><strong>{load.farmName}</strong><small className={!load.plotId.trim()?styles.missingPlot:undefined}>{loadPlotLabel(load.plotName)}</small></td>
   <td data-label="Quantidade">{formatContractVolume(load.volume)}</td>
   <td data-label="ATR">{formatAtr(load.atr)}</td>
   <td data-label="Cotação / referência"><span>{formatAtrQuote(load.atrQuote)}</span><small>{load.atrReferenceMonth?`Ref. ${formatContractMonth(load.atrReferenceMonth)}`:'Referência indisponível'}</small></td>

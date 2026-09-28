@@ -33,7 +33,7 @@ export function ContractDailyLoadsChart({period,onPeriod,query}:{period:Contract
    <label><span>Data inicial</span><input type="date" min="1900-01-01" max="9999-12-31" value={from} aria-invalid={!!periodError} onChange={event=>onPeriod({...period,from:event.target.value})}/></label>
    <label><span>Data final</span><input type="date" min="1900-01-01" max="9999-12-31" value={to} aria-invalid={!!periodError} onChange={event=>onPeriod({...period,to:event.target.value})}/></label>
    <div className="contract-daily-loads-filter-actions">
-    <button className="btn" type="button" onClick={resetPeriod}><CalendarRange size={15}/>Últimos 6 meses</button>
+    <button className="btn" type="button" onClick={resetPeriod}><CalendarRange size={15}/>Últimos 15 dias</button>
     <div className="contract-daily-loads-granularity" role="group" aria-label="Forma de visualizar">
      {contractDailyLoadGranularities.map(value=><button key={value} type="button" aria-pressed={granularity===value} onClick={()=>onPeriod({...period,granularity:value})}>{contractDailyLoadGranularityCopy[value].option}</button>)}
     </div>

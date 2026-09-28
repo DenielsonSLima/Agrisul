@@ -1,6 +1,7 @@
 import type {jsPDF as JsPdf} from 'jspdf';
 import {drawReportPdfHeader,drawReportPdfWatermark,REPORT_MARGIN_MM,type ReportPdfImage} from '@/shared/reporting';
 import {formatCnpj} from '@/shared/utils/cnpj';
+import {loadPlotLabel} from '@/shared/utils/presentation';
 import type {ContractsReportBrand} from './contractsPdf';
 import type {BillingContract,ContractLoadsData} from '../types';
 import {formatAtr,formatAtrCriterion,formatAtrQuote,formatContractBilling,formatContractLoadAmount,formatContractDate,formatContractMonth,formatContractVolume} from '../utils/contractFormat';
@@ -18,7 +19,7 @@ export function loadsReportModel(data:ContractLoadsData):ContractTabReport{
    {label:'Descontos',value:formatContractLoadAmount(summary.discountAmount),tone:'discount'},
    {label:'Valor líquido',value:formatContractLoadAmount(summary.netAmount,summary.billingPending),tone:'net'}],
   columns:['Data','Fazenda / talhão','Documento / observações','Quantidade (t)','ATR (kg/t)','Faturamento','Desconto','Valor líquido'],widths:[.09,.16,.18,.10,.07,.14,.12,.14],
-  groups:data.groups.map(group=>({title:filters.groupBy==='month'?formatContractMonth(group.label):group.label,subtitle:`${group.loadCount} carregamentos · ${formatContractVolume(group.volume)} · ATR médio ${formatAtr(group.averageAtr)}`,rows:group.loads.map(load=>[formatContractDate(load.loadedAt),`${load.farmName}\n${load.plotName}`,[load.document,load.notes].filter(Boolean).join('\n')||'—',formatContractVolume(load.volume),formatAtr(load.atr),formatContractLoadAmount(load.grossAmount,load.billingPending),formatContractLoadAmount(load.discountAmount),formatContractLoadAmount(load.netAmount,load.billingPending)])}))};
+  groups:data.groups.map(group=>({title:filters.groupBy==='month'?formatContractMonth(group.label):group.label,subtitle:`${group.loadCount} carregamentos · ${formatContractVolume(group.volume)} · ATR médio ${formatAtr(group.averageAtr)}`,rows:group.loads.map(load=>[formatContractDate(load.loadedAt),`${load.farmName}\n${loadPlotLabel(load.plotName)}`,[load.document,load.notes].filter(Boolean).join('\n')||'—',formatContractVolume(load.volume),formatAtr(load.atr),formatContractLoadAmount(load.grossAmount,load.billingPending),formatContractLoadAmount(load.discountAmount),formatContractLoadAmount(load.netAmount,load.billingPending)])}))};
 }
 export function financialReportModel(contract:BillingContract):ContractTabReport{
  if(contract.financialSummary){const summary=contract.financialSummary;

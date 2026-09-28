@@ -1,7 +1,7 @@
 import type {jsPDF as JsPdf} from 'jspdf';
 import {drawReportPdfHeader,drawReportPdfWatermark,REPORT_MARGIN_MM,type ReportPdfBrand} from '@/shared/reporting';
 import {loadReportImage} from '@/shared/reporting/loadReportImage';
-import {dateLabel,decimalLabel,monthLabel} from '@/shared/utils/presentation';
+import {dateLabel,decimalLabel,loadPlotLabel,monthLabel} from '@/shared/utils/presentation';
 import type {PlanningExportSnapshot} from '../types';
 
 type Column={label:string;width:number;align?:'left'|'right'};
@@ -52,7 +52,7 @@ export async function createPlanningDiaryPdf(snapshot:PlanningExportSnapshot,bra
  table('Máquinas, equipes e ordens',[{label:'Data',width:22},{label:'Operador',width:36},{label:'Turno',width:20},{label:'Horário',width:30},{label:'Equipamento',width:50},{label:'Implemento',width:40},{label:'Horímetro',width:35},{label:'Ordens',width:36}],bulletinRows);
  const materialRows=fieldLogs.flatMap(item=>(item.details?.materials??[]).map(material=>[dateLabel(item.occurredOn),item.farmName,item.plotName,item.practiceName||kindLabel[item.kind],material.code||'—',material.description,`${material.quantity||'—'}${material.unit?' '+material.unit:''}`,material.recommendedDose||'—']));
  table('Materiais e insumos aplicados',[{label:'Data',width:22},{label:'Fazenda',width:40},{label:'Talhão',width:30},{label:'Serviço',width:45},{label:'Código',width:22},{label:'Material',width:45},{label:'Quantidade',width:25,align:'right'},{label:'Dose',width:40}],materialRows);
- table('Carregamentos da colheita',[{label:'Data',width:24},{label:'Fazenda',width:46},{label:'Talhão',width:38},{label:'Quantidade',width:30,align:'right'},{label:'Contrato',width:35},{label:'Documento',width:40},{label:'Observações',width:56}],harvestLoads.map(item=>[dateLabel(item.loadedAt),item.farmName,item.plotName,`${decimalLabel(item.volumeTons)} t`,item.contractNumber||'Sem número',item.document||'—',item.notes||'—']));
+ table('Carregamentos da colheita',[{label:'Data',width:24},{label:'Fazenda',width:46},{label:'Talhão',width:38},{label:'Quantidade',width:30,align:'right'},{label:'Contrato',width:35},{label:'Documento',width:40},{label:'Observações',width:56}],harvestLoads.map(item=>[dateLabel(item.loadedAt),item.farmName,loadPlotLabel(item.plotName),`${decimalLabel(item.volumeTons)} t`,item.contractNumber||'Sem número',item.document||'—',item.notes||'—']));
 
  const pages=doc.getNumberOfPages(),emitted=new Intl.DateTimeFormat('pt-BR',{dateStyle:'short',timeStyle:'short'}).format(brand.issuedAt);
  for(let page=1;page<=pages;page++){doc.setPage(page);doc.setDrawColor('#e5ebe7');doc.line(margin,height-margin-4,width-margin,height-margin-4);doc.setFont('helvetica','normal');doc.setFontSize(6.5);doc.setTextColor('#7f8f84');doc.text(short(doc,`Emitido por ${brand.issuer.name||brand.issuer.email} · ${emitted}`,content-25),margin,height-margin);doc.text(`${page} / ${pages}`,width-margin,height-margin,{align:'right'});}

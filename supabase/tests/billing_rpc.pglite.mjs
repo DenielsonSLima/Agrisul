@@ -457,4 +457,9 @@ try {
  await db.exec(readFileSync(new URL('./contract_deletion.sql',import.meta.url),'utf8'));
  console.log('Contract deletion: strict scope, permissions, complete cascade and sibling preservation passed');
 } catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
+try {
+ await db.exec(readFileSync(new URL('../migrations/20260928195730_contract_load_optional_plot.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./contract_load_optional_plot.sql',import.meta.url),'utf8'));
+ console.log('Optional load plots: required farm, safe optional plot, detail, list, reports, agenda, executive totals and isolation passed');
+} catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
 await db.close();

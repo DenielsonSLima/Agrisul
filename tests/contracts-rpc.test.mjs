@@ -36,6 +36,9 @@ try{
   const loadDialog=await readFile('modules/contratos/components/details/ContractLoadDialog.tsx','utf8');
   assert.match(loadDialog,/role="status"/);
   assert.match(loadDialog,/todo o excedente será incluído normalmente no faturamento/);
+  assert.match(loadDialog,/Talhão de origem \(opcional\)/);
+  assert.match(loadDialog,/value==='__without_plot__'\?'':value/,'the selector must let an existing load return to no plot');
+  assert.doesNotMatch(loadDialog,/disabled=\{[^}]*!data\.plotId/,'plot must not block saving a load');
   const controller=new AbortController();
   const filters={companyId:'company-id',bucket:'open',search:'Usina',from:'2026-09-01',to:'2026-09-30'};
   assert.deepEqual(await api.fetchContracts(filters,controller.signal),{contracts:[snapshot],counts:{open:1,finished:0},total:1});
@@ -61,8 +64,15 @@ try{
   const load={loadedAt:'2026-09-15',farmId:'farm-id',plotId:'plot-id',volume:'120,125',atr:'121,500000',document:'ROM-1',notes:''};
   assert.equal((await api.persistContractLoad('contract-id','company-id',load)).id,'load-id');
   assert.deepEqual(calls.at(-1).payload,{...load,contractId:'contract-id',companyId:'company-id'});
+  const loadWithoutPlot={...load,plotId:'',document:'SEM-TALHAO'};
+  assert.equal((await api.persistContractLoad('contract-id','company-id',loadWithoutPlot)).id,'load-id');
+  assert.deepEqual(calls.at(-1).payload,{...loadWithoutPlot,contractId:'contract-id',companyId:'company-id'},'Empty plotId must reach the RPC unchanged');
   assert.deepEqual(await api.deleteContractLoad('contract-id','company-id','load-id'),{id:'load-id',deleted:true});
   assert.deepEqual(calls.at(-1).payload,{contractId:'contract-id',companyId:'company-id',id:'load-id'});
+  const loadsTab=await readFile('modules/contratos/components/details/ContractLoadsTab.tsx','utf8');
+  assert.match(loadsTab,/loadPlotLabel\(load\.plotName\)/,'Loads without a plot must have an explicit visible label');
+  assert.match(loadsTab,/description:`O registro[\s\S]+loadOriginLabel\(load\.farmName,load\.plotName\)[\s\S]+será excluído/,'Deletion confirmation must describe the optional origin without an empty separator');
+  assert.match(loadsTab,/confirmLabel:'Excluir carregamento',tone:'destructive'/);
   const detail=await readFile('modules/contratos/components/ContractDetail.tsx','utf8');
   assert.match(detail,/title:`Excluir contrato/);
   assert.match(detail,/tone:'destructive'/);

@@ -41,6 +41,11 @@ try{
  assert.match(pdfSource,/row\.averageAtr/,'The PDF daily line must use the server-calculated ATR for each day');
  assert.match(pdfSource,/setLineDashPattern\(\[1\.2,1\],0\)/,'The PDF daily ATR line must be dotted');
  assert.match(pdfSource,/contractDailyLoadsChartRows\(dailyLoads,granularity\)/,'The PDF must aggregate the chart with the selected screen granularity');
+ const pdfDailyChartSource=pdfSource.slice(pdfSource.indexOf(' const dailyChart=()=>'),pdfSource.indexOf(' const financialOverview=()=>'));
+ assert.match(pdfDailyChartSource,/canUseFirstPageGap=pageIndex===0&&doc\.getNumberOfPages\(\)===1&&remaining>=58/,'The first operational chart must reuse the available space on page one');
+ assert.match(pdfDailyChartSource,/barWidth=Math\.min\(5\.4,slot\*\.32\)/,'The operational PDF chart must keep narrow bars');
+ assert.match(pdfDailyChartSource,/chartInk:Color=\[18,18,18\]/,'The operational PDF chart must use high-contrast black text');
+ assert.match(pdfDailyChartSource,/doc\.rect\(quantityLegendX,legendY-1\.6,2\.8,2,'F'\)/,'The operational PDF legend must draw a real quantity swatch');
  const pdfSectionOrder=['hero();','financialOverview();','dailyChart();','charts();'].map(call=>pdfSource.indexOf(call));
  assert.ok(pdfSectionOrder.every((position,index)=>position>=0&&(index===0||position>pdfSectionOrder[index-1])),'The PDF must mirror the screen order: operational, financial, load evolution and delivery/billing summary');
  const pdfFinancialChartSource=pdfSource.slice(pdfSource.indexOf(' const charts=()=>'),pdfSource.indexOf(' const table='));
@@ -49,11 +54,17 @@ try{
  assert.doesNotMatch(pdfFinancialChartSource,/atrValues|atrScaleMinimum|const points=|granularityCopy\.atr|point\.label|setLineDashPattern\(\[1\.2,1\],0\)/,'The lower PDF financial chart must not draw an ATR series, axis, point label or legend');
  assert.match(pdfFinancialChartSource,/for\(let offset=0;offset<rows\.length;offset\+=6\)[\s\S]+rows\.slice\(offset,offset\+6\)/,'The line-free financial chart must paginate in non-overlapping blocks');
  assert.doesNotMatch(pdfFinancialChartSource,/contractDailyLoadsChartPages/,'Financial pagination must not repeat a boundary bucket after removing its line');
+ assert.match(pdfFinancialChartSource,/barWidth=Math\.min\(11\.5,slot\*\.44\),barX=center-barWidth\/2[\s\S]+roundedRect\(barX,base-grossHeight,barWidth,grossHeight[\s\S]+roundedRect\(barX,base-netHeight,barWidth,netHeight/,'Gross and net must use the same narrow x position and width in the composed PDF bar');
+ assert.doesNotMatch(pdfFinancialChartSource,/netWidth|center-netWidth/,'The net amount must never become a narrower or side-by-side PDF bar');
  assert.match(pdfFinancialChartSource,/Faturamento pendente[\s\S]+Líquido \$\{moneyLabel\(row\.net\?\?0\)\}/,'The PDF financial chart must render explicit pending and zero states');
  assert.match(pdfFinancialChartSource,/const hasPositiveGross=pageRows\.some[\s\S]+if\(hasPositiveGross\|\|index===0\)[\s\S]+moneyLabel\(hasPositiveGross\?scale\*index\/4:0\)/,'An all-zero or pending PDF page must print only the R$ 0 axis tick');
  assert.match(pdfSource,/contractLoadFinancialChartRows\(dailyLoads,granularity\)/,'The PDF financial chart must reuse the selected upper period and granularity');
  assert.match(pdfSource,/Faturado bruto \(barra total\)/,'The PDF legend must explain that gross is the complete bar');
  assert.match(pdfSource,/Líquido \(preenchimento interno\)/,'The PDF legend must explain that net is drawn inside gross');
+ assert.match(pdfFinancialChartSource,/barWidth=Math\.min\(11\.5,slot\*\.44\),barX=center-barWidth\/2/,'The PDF financial bars must stay narrow');
+ assert.doesNotMatch(pdfFinancialChartSource,/netWidth/,'The net fill must use exactly the same width as the gross bar');
+ assert.match(pdfFinancialChartSource,/roundedRect\(barX,base-grossHeight,barWidth,grossHeight/,'The gross outline must use the shared composite-bar geometry');
+ assert.match(pdfFinancialChartSource,/roundedRect\(barX,base-netHeight,barWidth,netHeight/,'The net fill must use the shared composite-bar geometry');
  assert.doesNotMatch(pdfSource,/value>=1000[^\n]+['"]k['"]|['"] mil['"]|['"] mi['"]/,'The PDF financial chart must not abbreviate currency values');
  assert.doesNotMatch(pdfSource,/variationPercent|Variação percentual/,'The PDF must not reuse the obsolete percentage series');
  assert.match(detailSource,/dailyPeriod=\{dailyPeriod\}/,'The summary PDF must receive the daily period currently selected on screen');
@@ -97,6 +108,12 @@ try{
   assert.ok(!commands.includes('Variação percentual'),orientation+' kept the obsolete percentage legend');
   assert.doesNotMatch(commands,/A ajustar|Dados essenciais|Condições do contrato/);
   assert.ok(doc.getNumberOfPages()>2);
+  if(orientation==='portrait'){
+   const firstPageCommands=doc.internal.pages[1].join('\n');
+   const firstPageOrder=['Avanço do carregamento','Da entrega ao recebimento','Quantidade carregada por dia'].map(text=>firstPageCommands.indexOf(text));
+   assert.ok(firstPageOrder.every((position,index)=>position>=0&&(index===0||position>firstPageOrder[index-1])),'Portrait page one must contain operational, financial and load-evolution panels in the screen order');
+   for(const text of ['15/09','16/09','ATR 120,00','ATR 122,50'])assert.ok(firstPageCommands.includes(text),'Portrait page-one load evolution lost '+text);
+  }
   for(const page of doc.internal.pages.slice(1))for(const command of page){
    if(!command.includes(' Tj')||/Emitido por|Página/.test(command))continue;
    const position=command.match(/[-\d.]+ ([-\d.]+) Td/),leading=command.match(/([-\d.]+) TL/);

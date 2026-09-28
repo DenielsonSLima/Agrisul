@@ -37,6 +37,9 @@ test('expandable monthly table has native button semantics and responsive load d
  assert.match(source,/role="region" aria-label=\{`Carregamentos de \$\{monthLabel\}`\}/);
  assert.match(source,/<th scope="row">/);assert.match(source,/<th scope="col">Data<\/th>/);
  for(const field of ['load.loadedAt','load.volume','load.atr','load.atrQuote','load.atrReferenceMonth','load.grossAmount','load.discountAmount','load.netAmount','load.document','load.notes'])assert.match(source,new RegExp(field.replace('.','\\.')));
+ assert.match(source,/loadPlotLabel\(load\.plotName\)/,'Expanded load details must label records without a plot');
+ assert.match(source,/!load\.plotId\.trim\(\)\?styles\.missingPlot/,'The missing-plot state must remain visually distinct');
+ assert.match(css,/\.missingPlot\{/);
  assert.match(css,/@media\(max-width:650px\)/);assert.match(css,/content:attr\(data-label\)/);
 });
 
