@@ -1,18 +1,21 @@
 .contract-summary-tab .contract-summary-hero-compact{grid-template-columns:minmax(300px,.95fr) minmax(0,1.25fr);gap:12px}
-.contract-summary-hero-compact .contract-volume-overview{display:flex;flex-direction:column;padding:18px;border-radius:12px}
-.contract-summary-hero-compact .contract-summary-section-heading{gap:9px}
-.contract-summary-hero-compact .contract-summary-section-heading h3{font-size:14px}
-.contract-summary-hero-compact .contract-summary-section-heading small{font-size:8px}
-.contract-summary-hero-compact .contract-summary-icon{width:32px;height:32px;border-radius:9px}
-.contract-summary-hero-compact .contract-volume-body{flex:1;align-items:stretch;flex-direction:column;gap:14px;margin-top:16px}
-.contract-summary-hero-compact .contract-progress-ring{align-self:center;width:112px;height:112px;padding:8px}
-.contract-summary-hero-compact .contract-progress-ring>span{border-width:5px}
-.contract-summary-hero-compact .contract-progress-ring strong{font-size:22px}
-.contract-summary-hero-compact .contract-progress-ring small{font-size:9px}
-.contract-summary-hero-compact .contract-volume-copy{display:flex;flex:1;width:100%;flex-direction:column}.contract-summary-hero-compact .contract-volume-copy>p{margin-bottom:12px;font-size:11px;text-align:center}
-.contract-summary-hero-compact .contract-volume-values{gap:10px}
-.contract-summary-hero-compact .contract-volume-values strong{font-size:15px}
-.contract-summary-hero-compact .contract-volume-copy>.contract-progress{height:6px;margin-top:auto}
+.contract-summary-hero-compact .contract-volume-overview{display:flex;flex-direction:column;padding:21px 22px 20px;border-radius:12px}
+.contract-summary-hero-compact .contract-summary-section-heading{gap:10px}
+.contract-summary-hero-compact .contract-summary-section-heading h3{font-size:16px;line-height:1.3}
+.contract-summary-hero-compact .contract-summary-section-heading small{font-size:9px}
+.contract-summary-hero-compact .contract-summary-icon{width:36px;height:36px;border-radius:10px}
+.contract-summary-hero-compact .contract-volume-body{display:flex;flex:1;align-items:center;justify-content:center;flex-direction:column;gap:20px;margin-top:12px;padding:8px 5px 3px}
+.contract-summary-hero-compact .contract-progress-ring{align-self:center;width:160px;height:160px;padding:11px;box-shadow:0 10px 28px #28633c24}
+.contract-summary-hero-compact .contract-progress-ring>span{border-width:7px}
+.contract-summary-hero-compact .contract-progress-ring strong{font-size:30px;line-height:1.05;letter-spacing:-1px}
+.contract-summary-hero-compact .contract-progress-ring small{margin-top:5px;font-size:10px;font-weight:650}
+.contract-summary-hero-compact .contract-volume-copy{display:grid;flex:none;gap:13px;width:100%;max-width:520px}.contract-summary-hero-compact .contract-volume-copy>p{margin:0;font-size:12px;font-weight:550;line-height:1.5;text-align:center}
+.contract-summary-hero-compact .contract-volume-values{gap:0;width:100%}
+.contract-summary-hero-compact .contract-volume-values>span{padding:2px 16px}
+.contract-summary-hero-compact .contract-volume-values>span+span{border-left:1px solid #d5e4da}
+.contract-summary-hero-compact .contract-volume-values small{font-size:11px;font-weight:650}
+.contract-summary-hero-compact .contract-volume-values strong{margin-top:5px;font-size:18px;line-height:1.25}
+.contract-summary-hero-compact .contract-volume-copy>.contract-progress{height:9px;margin:2px 16px 0;background:#d7e8dd;box-shadow:inset 0 1px 2px #1e553719}
 .contract-summary-hero-compact .contract-summary-kpis{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(4,minmax(0,1fr));gap:8px;min-width:0}
 .contract-summary-hero-compact .contract-summary-kpis article{flex-direction:row;align-items:center;gap:10px;padding:10px 12px;border-radius:9px}
 .contract-summary-hero-compact .contract-kpi-icon{width:30px;height:30px;border-radius:8px}
@@ -31,7 +34,7 @@
 .contract-summary-hero-compact .contract-sale-per-ton dt{color:#829187;font-size:9px;line-height:1.25}
 .contract-summary-hero-compact .contract-sale-per-ton dd{margin:2px 0 0;color:#315b40;font-size:13px;font-weight:650;line-height:1.3;font-variant-numeric:tabular-nums;white-space:nowrap}
 @media(max-width:1100px){.contract-summary-tab .contract-summary-hero-compact{grid-template-columns:1fr}}
-@media(max-width:650px){.contract-summary-hero-compact .contract-volume-body{gap:12px}.contract-summary-hero-compact .contract-progress-ring{width:96px;height:96px}.contract-summary-hero-compact .contract-volume-values{grid-template-columns:repeat(2,minmax(0,1fr))}.contract-summary-hero-compact .contract-volume-values strong{font-size:14px}.contract-summary-hero-compact .contract-summary-kpis{grid-template-columns:1fr}.contract-summary-hero-compact .contract-summary-kpis article{padding:10px;gap:7px}.contract-summary-hero-compact .contract-kpi-icon{display:grid}.contract-summary-hero-compact .contract-summary-kpis strong{font-size:15px}.contract-summary-hero-compact .contract-sale-per-ton dl{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.contract-summary-hero-compact .contract-sale-per-ton dl>div+div{padding:0 0 0 7px;border-top:0;border-left:1px solid #dce8e0}.contract-summary-hero-compact .contract-sale-per-ton dd{font-size:12px}}
+@media(max-width:650px){.contract-summary-hero-compact .contract-volume-overview{padding:18px 16px}.contract-summary-hero-compact .contract-summary-section-heading h3{font-size:15px}.contract-summary-hero-compact .contract-volume-body{gap:16px;margin-top:10px;padding-inline:0}.contract-summary-hero-compact .contract-progress-ring{width:136px;height:136px;padding:9px}.contract-summary-hero-compact .contract-progress-ring>span{border-width:6px}.contract-summary-hero-compact .contract-progress-ring strong{font-size:26px}.contract-summary-hero-compact .contract-volume-copy{gap:11px}.contract-summary-hero-compact .contract-volume-values{grid-template-columns:repeat(2,minmax(0,1fr))}.contract-summary-hero-compact .contract-volume-values>span{padding-inline:9px}.contract-summary-hero-compact .contract-volume-values strong{font-size:15px}.contract-summary-hero-compact .contract-volume-copy>.contract-progress{height:8px;margin-inline:9px}.contract-summary-hero-compact .contract-summary-kpis{grid-template-columns:1fr;grid-template-rows:none}.contract-summary-hero-compact .contract-summary-kpis article{padding:10px;gap:7px}.contract-summary-hero-compact .contract-kpi-icon{display:grid}.contract-summary-hero-compact .contract-summary-kpis strong{font-size:15px}.contract-summary-hero-compact .contract-sale-per-ton dl{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.contract-summary-hero-compact .contract-sale-per-ton dl>div+div{padding:0 0 0 7px;border-top:0;border-left:1px solid #dce8e0}.contract-summary-hero-compact .contract-sale-per-ton dd{font-size:12px}}
 .contract-summary-money-scroll{margin:18px 0 12px;overflow-x:auto;scrollbar-width:thin;scrollbar-color:#b9d1c3 transparent}
 .contract-summary-money-scroll:focus-visible{outline:2px solid #26875b;outline-offset:3px}
 .contract-summary-money-grid{display:grid;grid-template-columns:repeat(6,minmax(128px,1fr));gap:8px;margin:0}

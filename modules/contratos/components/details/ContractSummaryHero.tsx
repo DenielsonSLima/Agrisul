@@ -26,7 +26,7 @@ export function ContractSummaryHero({contract,summary}:{contract:BillingContract
   <div className="contract-summary-kpis" role="group" aria-label="Quantidades e saldos do contrato">
    {quantities.map((item,index)=>{const Icon=item.icon,balance=balances[index];return <Fragment key={item.label}>
     <article className={item.className||undefined}><span className="contract-kpi-icon"><Icon size={17}/></span><div><small>{item.label}</small><strong>{item.value}</strong><p>{item.hint}</p></div></article>
-    {balance?<article className={'summary-money-'+balance.key}><div><small>{balance.label}</small><strong>{balance.value}</strong><p>{balance.hint}</p></div></article>:<article className="contract-sale-per-ton"><span className="contract-kpi-icon"><BadgeDollarSign size={17}/></span><div><small>{summary.salePerTon.label}</small><dl><div><dt>Bruto</dt><dd>{summary.salePerTon.gross}</dd></div><div><dt>Líquido após descontos</dt><dd>{summary.salePerTon.net}</dd></div></dl></div></article>}
+    {balance?<article className={'summary-money-'+balance.key}><div><small>{balance.label}</small><strong>{balance.value}</strong><p>{balance.hint}</p></div></article>:<article className="contract-sale-per-ton"><span className="contract-kpi-icon"><BadgeDollarSign size={17}/></span><div><small>{summary.salePerTon.label}</small><dl><div><dt>Bruto</dt><dd>{summary.salePerTon.gross}</dd></div><div><dt>Líquido</dt><dd>{summary.salePerTon.net}</dd></div></dl></div></article>}
    </Fragment>;})}
   </div>
  </div>;

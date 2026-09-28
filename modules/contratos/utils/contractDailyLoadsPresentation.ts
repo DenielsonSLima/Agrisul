@@ -15,6 +15,11 @@ export type ContractDailyLoadsChartRow={
  averageAtrText:string;
  averageAtr:number|null;
 };
+export type ContractLoadFinancialChartRow=ContractDailyLoadsChartRow&{
+ gross:number|null;
+ net:number|null;
+ billingPending:boolean;
+};
 
 const inputDate=(date:Date)=>{
  const year=date.getUTCFullYear(),month=String(date.getUTCMonth()+1).padStart(2,'0'),day=String(date.getUTCDate()).padStart(2,'0');
@@ -83,6 +88,34 @@ export function contractDailyLoadsChartRows(data:ContractDailyLoadsData,granular
    key,date:key,endDate:inputDate(bucket.end),label:bucket.label,
    volume:bucket.volume,volumeText:preciseNumberText(bucket.volume),loadCount:bucket.loadCount,
    averageAtrText:granularity==='day'?bucket.dailyAtrText:averageAtr===null?'':preciseNumberText(averageAtr),averageAtr,
+  };
+ });
+}
+
+export function contractLoadFinancialChartRows(data:ContractDailyLoadsData,granularity:ContractDailyLoadGranularity='day'):ContractLoadFinancialChartRow[]{
+ const buckets=new Map<string,{start:Date;end:Date;label:string;volume:number;loadCount:number;weightedAtr:number;atrVolume:number;gross:number;net:number;billingPending:boolean}>();
+ for(const group of data.groups){
+  for(const load of group.loads){
+   const bucket=bucketFor(load.loadedAt,granularity),key=inputDate(bucket.start),volume=Number(load.volume),atr=nullableNumber(load.atr),gross=nullableNumber(load.grossAmount),net=nullableNumber(load.netAmount);
+   const current=buckets.get(key)??{...bucket,volume:0,loadCount:0,weightedAtr:0,atrVolume:0,gross:0,net:0,billingPending:false};
+   current.loadCount+=1;
+   if(Number.isFinite(volume)){
+    current.volume+=volume;
+    if(atr!==null){current.weightedAtr+=atr*volume;current.atrVolume+=volume;}
+   }
+   current.billingPending=current.billingPending||load.billingPending||gross===null||net===null;
+   if(gross!==null)current.gross+=gross;
+   if(net!==null)current.net+=net;
+   buckets.set(key,current);
+  }
+ }
+ return [...buckets.entries()].sort(([left],[right])=>left.localeCompare(right)).map(([key,bucket])=>{
+  const averageAtr=bucket.atrVolume>0?bucket.weightedAtr/bucket.atrVolume:null;
+  return {
+   key,date:key,endDate:inputDate(bucket.end),label:bucket.label,
+   volume:bucket.volume,volumeText:preciseNumberText(bucket.volume),loadCount:bucket.loadCount,
+   averageAtrText:averageAtr===null?'':preciseNumberText(averageAtr),averageAtr,
+   gross:bucket.billingPending?null:bucket.gross,net:bucket.billingPending?null:bucket.net,billingPending:bucket.billingPending,
   };
  });
 }

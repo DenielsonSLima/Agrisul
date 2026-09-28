@@ -3,8 +3,6 @@
 import {useId,useMemo} from 'react';
 import {Bar,CartesianGrid,ComposedChart,LabelList,Line,ResponsiveContainer,Tooltip,XAxis,YAxis} from 'recharts';
 import {BarChart3,CalendarRange,Gauge,Loader2,RefreshCw,Truck,Weight} from 'lucide-react';
-import {useContractLoads} from '../../hooks/useContractLoads';
-import type {ContractLoadFilters} from '../../types';
 import {formatAtr,formatContractDate,formatContractVolume} from '../../utils/contractFormat';
 import {contractDailyLoadGranularities,contractDailyLoadGranularityCopy,contractDailyLoadPeriodError,contractDailyLoadsChartRows,defaultContractDailyLoadPeriod,type ContractDailyLoadGranularity,type ContractDailyLoadPeriod,type ContractDailyLoadsChartRow,type ContractDailyLoadsData} from '../../utils/contractDailyLoadsPresentation';
 import './contract-daily-loads-chart.css';
@@ -15,12 +13,12 @@ const atrAxisLabel=(value:unknown)=>`${new Intl.NumberFormat('pt-BR',{maximumFra
 const periodRange=(row:ContractDailyLoadsChartRow)=>row.date===row.endDate?formatContractDate(row.date):`${formatContractDate(row.date)} a ${formatContractDate(row.endDate)}`;
 const slotWidth:Record<ContractDailyLoadGranularity,number>={day:102,week:116,fortnight:138,month:112};
 
-export function ContractDailyLoadsChart({contractId,period,onPeriod}:{contractId:string;period:ContractDailyLoadPeriod;onPeriod:(period:ContractDailyLoadPeriod)=>void}){
+type ContractDailyLoadsQuery={data?:ContractDailyLoadsData;loading:boolean;error:string;reload:()=>Promise<void>};
+
+export function ContractDailyLoadsChart({period,onPeriod,query}:{period:ContractDailyLoadPeriod;onPeriod:(period:ContractDailyLoadPeriod)=>void;query:ContractDailyLoadsQuery}){
  const titleId=useId(),descriptionId=useId();
  const {from,to}=period,granularity=period.granularity??'day',copy=contractDailyLoadGranularityCopy[granularity];
  const periodError=contractDailyLoadPeriodError({from,to});
- const filters:ContractLoadFilters={search:'',from,to,groupBy:'day'};
- const query=useContractLoads(contractId,filters,!periodError);
  const data=query.data as ContractDailyLoadsData|undefined;
  const rows=useMemo(()=>data?contractDailyLoadsChartRows(data,granularity):[],[data,granularity]);
  const resetPeriod=()=>onPeriod({...defaultContractDailyLoadPeriod(),granularity});

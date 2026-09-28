@@ -16,7 +16,7 @@ const inputWithNotes=(contract:BillingContract,notes:string):ContractInput=>({
  atrPriceType:contract.atrPriceType,atrPeriodType:contract.atrPeriodType,value:contract.value,notes,
 });
 
-export function ContractSummaryTab({contract,onBusy,monthlyPeriod,onMonthlyPeriod,dailyPeriod,onDailyPeriod}:{contract:BillingContract;onBusy?:(busy:boolean)=>void;monthlyPeriod:ContractMonthlyPeriod;onMonthlyPeriod:(period:ContractMonthlyPeriod)=>void;dailyPeriod:ContractDailyLoadPeriod;onDailyPeriod:(period:ContractDailyLoadPeriod)=>void}){
+export function ContractSummaryTab({contract,onBusy,monthlyPeriod,dailyPeriod,onDailyPeriod}:{contract:BillingContract;onBusy?:(busy:boolean)=>void;monthlyPeriod:ContractMonthlyPeriod;dailyPeriod:ContractDailyLoadPeriod;onDailyPeriod:(period:ContractDailyLoadPeriod)=>void}){
  const mutation=useContractsMutation(),summary=contractSummaryDetails(contract);
  const [notes,setNotes]=useState(contract.notes),[saving,setSaving]=useState(false),[error,setError]=useState('');
  const mounted=useRef(true),cleanNotes=notes.trim(),dirty=cleanNotes!==contract.notes;
@@ -33,7 +33,7 @@ export function ContractSummaryTab({contract,onBusy,monthlyPeriod,onMonthlyPerio
  return <div className="contract-detail-tab contract-summary-tab">
   <ContractSummaryHero contract={contract} summary={summary}/>
 
-  <ContractSummaryFinancialOverview contract={contract} monthlyPeriod={monthlyPeriod} onMonthlyPeriod={onMonthlyPeriod} dailyPeriod={dailyPeriod} onDailyPeriod={onDailyPeriod}/>
+  <ContractSummaryFinancialOverview contract={contract} monthlyPeriod={monthlyPeriod} dailyPeriod={dailyPeriod} onDailyPeriod={onDailyPeriod}/>
 
   <div className="contract-summary-content">
    <section className="contract-summary-section contract-conditions-panel"><div className="contract-summary-section-heading"><span className="contract-summary-icon"><CalendarDays size={18}/></span><div><small>Dados essenciais</small><h3>Condições do contrato</h3></div></div><dl className="contract-condition-grid">{summary.conditions.map(item=><div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl></section>

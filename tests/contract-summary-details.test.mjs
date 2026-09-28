@@ -30,6 +30,7 @@ try{
  const heroSource=await readFile('modules/contratos/components/details/ContractSummaryHero.tsx','utf8');
  const pdfSource=await readFile('modules/contratos/reporting/contractSummaryPdfDocument.ts','utf8');
  const detailSource=await readFile('modules/contratos/components/ContractDetail.tsx','utf8');
+ const summaryFinancialSource=await readFile('modules/contratos/components/details/ContractSummaryFinancialOverview.tsx','utf8');
  const reportDialogSource=await readFile('modules/contratos/components/ContractMonthlyReportDialog.tsx','utf8');
  const monthlyChartsSource=await readFile('modules/contratos/components/details/ContractMonthlyCharts.tsx','utf8');
  const heroOrder=['Quantidade do contrato','Quantidade entregue','summary.operationalItems[3].label','Falta entregar'].map(value=>heroSource.indexOf(value));
@@ -42,14 +43,17 @@ try{
  assert.match(pdfSource,/contractDailyLoadsChartRows\(dailyLoads,granularity\)/,'The PDF must aggregate the chart with the selected screen granularity');
  assert.match(pdfSource,/`ATR \$\{formatAtr\(row\.averageAtrText\)\}`[\s\S]+row\.label/,'The PDF must place the bucket ATR between its bar and period label');
  assert.doesNotMatch(pdfSource,/labelTop|point\.label/,'The PDF must not duplicate ATR values in point callouts');
- assert.match(pdfSource,/if\(points\.length>1\)[^\n]+setLineDashPattern\(\[1\.2,1\],0\)/,'The monthly ATR line must use the same dotted treatment');
+ assert.ok((pdfSource.match(/setLineDashPattern\(\[1\.2,1\],0\)/g)?.length??0)>=2,'Both PDF ATR lines must use the same dotted treatment');
+ assert.match(pdfSource,/contractLoadFinancialChartRows\(dailyLoads,granularity\)/,'The PDF financial chart must reuse the selected upper period and granularity');
+ assert.match(pdfSource,/Faturado bruto \(barra total\)/,'The PDF legend must explain that gross is the complete bar');
+ assert.match(pdfSource,/Líquido \(dentro\)/,'The PDF legend must explain that net is drawn inside gross');
+ assert.doesNotMatch(pdfSource,/value>=1000[^\n]+['"]k['"]|['"] mil['"]|['"] mi['"]/,'The PDF financial chart must not abbreviate currency values');
  assert.doesNotMatch(pdfSource,/variationPercent|Variação percentual/,'The PDF must not reuse the obsolete percentage series');
  assert.match(detailSource,/dailyPeriod=\{dailyPeriod\}/,'The summary PDF must receive the daily period currently selected on screen');
  assert.match(detailSource,/onDailyPeriod=\{changeDailyPeriod\}/,'The daily date filter must synchronize the monthly summary');
- assert.match(detailSource,/setMonthlyPeriod\(contractMonthlyPeriodFromDateRange\(period\)\)/,'The synchronized monthly summary must use the selected start and end months');
- assert.match(detailSource,/useState<ContractMonthlyPeriod>\(\(\)=>contractMonthlyPeriodFromDateRange\(dailyPeriod\)\)/,'The initial monthly summary must match the initial daily date range');
- assert.match(detailSource,/onMonthlyPeriod=\{changeMonthlyPeriod\}/,'The monthly filter must synchronize the daily date range');
- assert.match(detailSource,/setDailyPeriod\(current=>\(\{\.\.\.current,\.\.\.contractMonthlyDateFilters\(period\)\}\)\)/,'Monthly changes must preserve the current chart granularity while updating its exact dates');
+ assert.match(detailSource,/const monthlyPeriod=contractMonthlyPeriodFromDateRange\(dailyPeriod\)/,'The monthly tables must derive their month range from the single upper filter');
+ assert.doesNotMatch(detailSource,/useState<ContractMonthlyPeriod>/,'There must not be a second period state for the lower summary');
+ assert.match(summaryFinancialSource,/<ContractMonthlyCharts data=\{dailyLoads\.data\} period=\{dailyPeriod\}/,'The lower financial chart must consume the same filtered loads and granularity as the upper chart');
  assert.match(monthlyChartsSource,/stroke="#d97706"[^>]+strokeOpacity=\{\.52\}[^>]+strokeDasharray="6 5"/,'The monthly ATR series must use the same translucent dotted orange treatment as the load chart');
  assert.match(monthlyChartsSource,/\|ATR \$\{formatAtr\([^}]+\)\} kg\/t/,'Each monthly x-axis label must show its ATR between the chart and month');
  assert.match(reportDialogSource,/\{search:'',from:dailyPeriod\.from,to:dailyPeriod\.to,groupBy:'day'\}/,'The PDF query must use the visible dates without sending presentation granularity to the RPC');
@@ -70,13 +74,15 @@ try{
  assert.equal(noFinance.financialItems.find(item=>item.key==='received').value,'—');
  assert.deepEqual(noFinance.salePerTon,{label:'Valor de venda por tonelada',gross:'—',net:'—'});
  const brand={orientation:'portrait',header:{variant:'detailed',logoAlignment:'left',showCnpj:true,showContact:true},company:null,watermark:{imageUrl:null,opacity:15,size:60},issuer:{id:'user',name:'Responsável',email:'responsavel@example.test'},issuedAt:new Date('2026-09-15T12:00:00Z')};
- const dailyLoads={filters:{search:'',from:'2026-09-01',to:'2026-09-30',groupBy:'day'},summary:{loadCount:2,volume:'250',farmCount:1,plotCount:1,activeDayCount:2,monthCount:1,averageDailyVolume:'125',averageAtr:'121.5',firstLoadedAt:'2026-09-15',lastLoadedAt:'2026-09-16',grossAmount:'150000.75',discountAmount:'2000.25',netAmount:'148000.50',billingPending:false},monthlyVolumes:[{month:'2026-09',volume:'250',loadCount:2}],groups:[{key:'2026-09-15',label:'2026-09-15',loadCount:1,volume:'100',averageAtr:'120',loads:[]},{key:'2026-09-16',label:'2026-09-16',loadCount:1,volume:'150',averageAtr:'122.5',loads:[]}]};
+ const pricedLoad=(id,loadedAt,volume,atr,grossAmount,discountAmount,netAmount)=>({id,contractId:contract.id,loadedAt,farmId:'farm',plotId:'plot',farmName:'Fazenda teste',plotName:'Talhão teste',volume,atr,atrReferenceMonth:'2026-09',atrQuote:'1.2',grossAmount,discountAmount,netAmount,billingPending:false,document:'',notes:'',createdAt:'',updatedAt:''});
+ const firstLoad=pricedLoad('load-1','2026-09-15','100','120','60000.30','800.10','59200.20'),secondLoad=pricedLoad('load-2','2026-09-16','150','122.5','90000.45','1200.15','88800.30');
+ const dailyLoads={filters:{search:'',from:'2026-09-01',to:'2026-09-30',groupBy:'day'},summary:{loadCount:2,volume:'250',farmCount:1,plotCount:1,activeDayCount:2,monthCount:1,averageDailyVolume:'125',averageAtr:'121.5',firstLoadedAt:'2026-09-15',lastLoadedAt:'2026-09-16',grossAmount:'150000.75',discountAmount:'2000.25',netAmount:'148000.50',billingPending:false},monthlyVolumes:[{month:'2026-09',volume:'250',loadCount:2}],groups:[{key:'2026-09-15',label:'2026-09-15',loadCount:1,volume:'100',averageAtr:'120',loads:[firstLoad]},{key:'2026-09-16',label:'2026-09-16',loadCount:1,volume:'150',averageAtr:'122.5',loads:[secondLoad]}]};
  const dailyDayPeriod={from:'2026-09-01',to:'2026-09-30',granularity:'day'};
  const longContract={...contract,notes:('Orientação comercial detalhada. '.repeat(120)+'FIM-DAS-OBSERVACOES'),financialSummary:{...contract.financialSummary,payments:Array.from({length:45},(_,index)=>({...payment,id:'payment-'+index,document:'RECIBO-'+String(index).padStart(3,'0'),notes:index===4?'Detalhes do comprovante. '.repeat(40)+'FIM-DO-COMPROVANTE':'Entrada confirmada.'})),discounts:[{...discount,notes:'Condições do acordo. '.repeat(45)+'FIM-DO-ACORDO'}]}};
  for(const orientation of ['portrait','landscape']){
   const {doc}=await createContractMonthlySummaryPdf(longContract,{...brand,orientation},undefined,dailyLoads,dailyDayPeriod);
   const commands=doc.internal.pages.flat().join('\n');
-  for(const text of ['Avanço do carregamento','Quantidade carregada por dia','ATR médio diário','120,00','122,50','Média diária 125,00 t','15/09','16/09','Valor de venda por tonelada','Bruto','600,00/t','Líquido após descontos:','592,00/t','Da entrega ao recebimento','Entregas, faturamento e entradas','Faturamento, líquido e ATR por mês','ATR médio','Quantidade entregue','Acordos de desconto','Valor por tonelada','Meses de aplicação','Base entregue','Desconto total','Adiantamentos','Recebimentos','Estornos','Total recebido','Crédito do contrato','Falta entregar','25.000,15','35.000,35','60.000,50','88.000,00','8,001/t','Ago/2026','Out/2026','RECIBO-044','FIM-DO-COMPROVANTE','FIM-DO-ACORDO','FIM-DAS-OBSERVACOES'])assert.ok(commands.includes(text),orientation+' lost '+text);
+  for(const text of ['Avanço do carregamento','Quantidade carregada por dia','ATR médio diário','120,00','122,50','Média diária 125,00 t','15/09','16/09','Valor de venda por tonelada','Bruto','600,00/t','Líquido:','592,00/t','Da entrega ao recebimento','Entregas, faturamento e entradas','Faturamento bruto, líquido e ATR por dia','Faturado bruto','Líquido','R$ 60.000,30','R$ 59.200,20','ATR médio','Quantidade entregue','Acordos de desconto','Valor por tonelada','Meses de aplicação','Base entregue','Desconto total','Adiantamentos','Recebimentos','Estornos','Total recebido','Crédito do contrato','Falta entregar','25.000,15','35.000,35','60.000,50','88.000,00','8,001/t','Ago/2026','Out/2026','RECIBO-044','FIM-DO-COMPROVANTE','FIM-DO-ACORDO','FIM-DAS-OBSERVACOES'])assert.ok(commands.includes(text),orientation+' lost '+text);
   assert.ok(!commands.includes('Variação percentual'),orientation+' kept the obsolete percentage legend');
   assert.doesNotMatch(commands,/A ajustar|Dados essenciais|Condições do contrato/);
   assert.ok(doc.getNumberOfPages()>2);
@@ -90,7 +96,7 @@ try{
  const weeklyPeriod={...dailyDayPeriod,granularity:'week'};
  const intervalContract={...contract,financialSummary:{...contract.financialSummary,payments:[],refunds:[],discounts:[]}};
  const {doc:weeklyDoc}=await createContractMonthlySummaryPdf(intervalContract,brand,{from:'2026-08',to:'2026-10'},dailyLoads,weeklyPeriod),weeklyCommands=weeklyDoc.internal.pages.flat().join('\n');
- for(const text of ['Quantidade carregada por semana','ATR médio semanal','ATR 121,50','Média semanal 250,00 t','Período: 01/09/2026 a 30/09/2026'])assert.ok(weeklyCommands.includes(text),'Weekly PDF lost '+text);
+ for(const text of ['Quantidade carregada por semana','ATR médio semanal','ATR 121,50','Média semanal 250,00 t','Faturamento bruto, líquido e ATR por semana','R$ 150.000,75','R$ 148.000,50','Período: 01/09/2026 a 30/09/2026'])assert.ok(weeklyCommands.includes(text),'Weekly PDF lost '+text);
  assert.ok(!weeklyCommands.includes('Out/2026'),'The shared daily interval must exclude October from the PDF monthly summary');
  const nineDayLoads={...dailyLoads,summary:{...dailyLoads.summary,loadCount:9,volume:'450',activeDayCount:9,averageDailyVolume:'50',averageAtr:'114'},groups:Array.from({length:9},(_,index)=>({key:`2026-09-${String(index+1).padStart(2,'0')}`,label:`2026-09-${String(index+1).padStart(2,'0')}`,loadCount:1,volume:'50',averageAtr:String(110+index),loads:[]}))};
  const {doc:pagedDoc}=await createContractMonthlySummaryPdf(contract,brand,undefined,nineDayLoads,dailyDayPeriod),pagedCommands=pagedDoc.internal.pages.flat().join('\n');

@@ -10,7 +10,7 @@ const directory=await mkdtemp(join(tmpdir(),'contract-daily-loads-'));
 try{
  const output=join(directory,'presentation.mjs');
  await build({stdin:{contents:`export * from './modules/contratos/utils/contractDailyLoadsPresentation';`,resolveDir:process.cwd()},outfile:output,bundle:true,platform:'node',format:'esm'});
- const {defaultContractDailyLoadPeriod,contractDailyLoadGranularities,contractDailyLoadPeriodError,contractDailyLoadsChartPages,contractDailyLoadsChartRows}=await import(pathToFileURL(output));
+ const {defaultContractDailyLoadPeriod,contractDailyLoadGranularities,contractDailyLoadPeriodError,contractDailyLoadsChartPages,contractDailyLoadsChartRows,contractLoadFinancialChartRows}=await import(pathToFileURL(output));
  assert.deepEqual(contractDailyLoadGranularities,['day','week','fortnight','month']);
  assert.deepEqual(defaultContractDailyLoadPeriod(new Date(2026,8,28,18,30)),{from:'2026-03-28',to:'2026-09-28',granularity:'day'});
  assert.deepEqual(defaultContractDailyLoadPeriod(new Date(2026,7,31,18,30)),{from:'2026-02-28',to:'2026-08-31',granularity:'day'},'Clamp the start day when the target month is shorter');
@@ -33,6 +33,18 @@ try{
  const months=contractDailyLoadsChartRows(data,'month');
  assert.deepEqual(months.map(row=>[row.date,row.endDate,row.label,row.volume,row.loadCount]),[['2026-09-01','2026-09-30','Set/2026',28.5,4]]);
  assert.deepEqual(contractDailyLoadsChartRows({...data,groups:[{...data.groups[0],averageAtr:''}]}).map(row=>row.averageAtr),[null],'Missing ATR stays absent instead of becoming zero');
+ const financialData={...data,groups:[
+  {...data.groups[0],loads:[{loadedAt:'2026-09-20',volume:'6.25',atr:'122.5',grossAmount:'1000.25',netAmount:'800.2',billingPending:false}]},
+  {...data.groups[1],loads:[{loadedAt:'2026-09-22',volume:'12.5',atr:'130',grossAmount:'2000.75',netAmount:'1600.3',billingPending:false}]},
+  {...data.groups[2],loads:[{loadedAt:'2026-09-18',volume:'4.75',atr:'118',grossAmount:'750',netAmount:'600',billingPending:false},{loadedAt:'2026-09-18',volume:'5',atr:'120.722105',grossAmount:'',netAmount:'',billingPending:true}]},
+ ]};
+ const dailyFinancial=contractLoadFinancialChartRows(financialData,'day');
+ assert.deepEqual(dailyFinancial.map(row=>[row.date,row.gross,row.net,row.billingPending]),[['2026-09-18',null,null,true],['2026-09-20',1000.25,800.2,false],['2026-09-22',2000.75,1600.3,false]],'Pending prices stay unavailable only in their own bucket');
+ const weeklyFinancial=contractLoadFinancialChartRows(financialData,'week');
+ assert.deepEqual(weeklyFinancial.map(row=>[row.date,row.gross,row.net,row.billingPending]),[['2026-09-14',null,null,true],['2026-09-21',2000.75,1600.3,false]],'Financial values follow the same week buckets as the upper chart');
+ assert.ok(Math.abs(weeklyFinancial[0].averageAtr-((4.75*118+5*120.722105+6.25*122.5)/16))<1e-9,'Financial chart ATR must be weighted from the individual loads');
+ const monthlyFinancial=contractLoadFinancialChartRows(financialData,'month');
+ assert.deepEqual(monthlyFinancial.map(row=>[row.label,row.volume,row.loadCount]),[['Set/2026',28.5,4]],'Daily loads roll up into the selected monthly visualization');
  const sixteenDays=Array.from({length:16},(_,index)=>`day-${index+1}`),pdfPages=contractDailyLoadsChartPages(sixteenDays);
  assert.deepEqual(pdfPages,[sixteenDays.slice(0,8),sixteenDays.slice(7,15),sixteenDays.slice(14,16)],'Every PDF page after the first must repeat the previous final bar so the ATR line remains continuous');
  assert.deepEqual(contractDailyLoadsChartPages(sixteenDays.slice(0,8)),[sixteenDays.slice(0,8)],'A full final page must not create an extra overlap-only page');

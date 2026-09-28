@@ -3,19 +3,19 @@ import type {BillingContract} from '../../types';
 import {useContractLoads} from '../../hooks/useContractLoads';
 import {contractSummaryDetails,summaryReceivedNote,type SummaryTable} from '../../utils/contractSummaryDetails';
 import {formatAtrCriterion} from '../../utils/contractFormat';
-import {contractMonthlyDateFilters,contractMonthlyPeriodError,filterContractMonths,type ContractMonthlyPeriod} from '../../utils/contractMonthlyPeriod';
+import {contractMonthlyDateFilters,contractMonthlyPeriodError,type ContractMonthlyPeriod} from '../../utils/contractMonthlyPeriod';
 import {ContractDailyLoadsChart} from './ContractDailyLoadsChart';
 import {ContractMonthlyBalancesTable} from './ContractMonthlyBalancesTable';
 import {ContractMonthlyDeliveriesTable} from './ContractMonthlyDeliveriesTable';
 import {ContractMonthlyCharts} from './ContractMonthlyCharts';
-import type {ContractDailyLoadPeriod} from '../../utils/contractDailyLoadsPresentation';
+import {contractDailyLoadPeriodError,type ContractDailyLoadPeriod} from '../../utils/contractDailyLoadsPresentation';
 import '../../summary-details.css';
 
-export function ContractSummaryFinancialOverview({contract,monthlyPeriod,onMonthlyPeriod,dailyPeriod,onDailyPeriod}:{contract:BillingContract;monthlyPeriod:ContractMonthlyPeriod;onMonthlyPeriod:(period:ContractMonthlyPeriod)=>void;dailyPeriod:ContractDailyLoadPeriod;onDailyPeriod:(period:ContractDailyLoadPeriod)=>void}){
+export function ContractSummaryFinancialOverview({contract,monthlyPeriod,dailyPeriod,onDailyPeriod}:{contract:BillingContract;monthlyPeriod:ContractMonthlyPeriod;dailyPeriod:ContractDailyLoadPeriod;onDailyPeriod:(period:ContractDailyLoadPeriod)=>void}){
  const summary=contractSummaryDetails(contract);
- const periodError=contractMonthlyPeriodError(monthlyPeriod),dateFilters=contractMonthlyDateFilters(monthlyPeriod);
+ const periodError=contractMonthlyPeriodError(monthlyPeriod),dailyPeriodError=contractDailyLoadPeriodError(dailyPeriod),dateFilters=contractMonthlyDateFilters(monthlyPeriod);
  const monthlyLoads=useContractLoads(contract.id,{search:'',...dateFilters,groupBy:'month'},!periodError);
- const filteredChartMonths=filterContractMonths(summary.chartMonths,monthlyPeriod);
+ const dailyLoads=useContractLoads(contract.id,{search:'',from:dailyPeriod.from,to:dailyPeriod.to,groupBy:'day'},!dailyPeriodError);
  const financialItems=summary.financialItems.filter(item=>item.key!=='received'&&item.key!=='pending'&&item.key!=='credit');
  return <>
   <section className="contract-summary-section contract-summary-financial-overview" aria-label="Resumo financeiro de todo o contrato">
@@ -24,10 +24,10 @@ export function ContractSummaryFinancialOverview({contract,monthlyPeriod,onMonth
    <p className="contract-summary-detail-note">{summaryReceivedNote}</p>
    {summary.notice&&<p className="contract-summary-detail-notice" role="status">{summary.notice}</p>}
   </section>
-  <ContractDailyLoadsChart contractId={contract.id} period={dailyPeriod} onPeriod={onDailyPeriod}/>
+  <ContractDailyLoadsChart period={dailyPeriod} onPeriod={onDailyPeriod} query={dailyLoads}/>
   <section className="contract-summary-section contract-monthly-panel">
    <div className="contract-summary-section-heading"><span className="contract-summary-icon"><CalendarDays size={18}/></span><div><small>Resumo mensal</small><h3>Entregas, faturamento e entradas</h3></div><span className="contract-atr-criterion">ATR {formatAtrCriterion(contract.atrPriceType,contract.atrPeriodType)}</span></div>
-   <ContractMonthlyCharts months={filteredChartMonths} period={monthlyPeriod} onPeriod={onMonthlyPeriod} error={periodError}/>
+   <ContractMonthlyCharts data={dailyLoads.data} period={dailyPeriod} loading={dailyLoads.loading} error={dailyPeriodError||dailyLoads.error}/>
    {summary.months.length?<>
     <ContractMonthlyDeliveriesTable contract={contract} period={monthlyPeriod} data={monthlyLoads.data} loading={monthlyLoads.loading} error={periodError||monthlyLoads.error} onRetry={periodError?undefined:monthlyLoads.reload}/>
     <ContractMonthlyBalancesTable contract={contract} period={monthlyPeriod}/>

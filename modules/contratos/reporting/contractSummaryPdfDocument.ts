@@ -2,7 +2,7 @@ import {drawReportPdfHeader,drawReportPdfWatermark,REPORT_MARGIN_MM,type ReportP
 import {formatCnpj} from '@/shared/utils/cnpj';
 import type {BillingContract,ContractLoadsData} from '../types';
 import {contractSummaryDetails,summaryReceivedNote,type SummaryTable} from '../utils/contractSummaryDetails';
-import {contractDailyLoadGranularityCopy,contractDailyLoadsChartPages,contractDailyLoadsChartRows,type ContractDailyLoadPeriod} from '../utils/contractDailyLoadsPresentation';
+import {contractDailyLoadGranularityCopy,contractDailyLoadsChartPages,contractDailyLoadsChartRows,contractLoadFinancialChartRows,type ContractDailyLoadPeriod,type ContractLoadFinancialChartRow} from '../utils/contractDailyLoadsPresentation';
 import {formatAtr,formatAtrCriterion,formatContractDate,formatContractMonth,formatContractVolume} from '../utils/contractFormat';
 import {filterContractMonths,monthIsInContractPeriod,type ContractMonthlyPeriod} from '../utils/contractMonthlyPeriod';
 import type {ContractMonthlyReportBrand} from './contractMonthlySummaryPdf';
@@ -93,7 +93,7 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
  const hero=()=>{
   const gap=3,overviewWidth=content*.43,kpiWidth=(content-overviewWidth-gap*2)/2,copyX=margin+34,copyWidth=overviewWidth-38,valueWidth=(copyWidth-2)/2;
   const quantities=[summary.operationalItems[0],summary.operationalItems[1],summary.operationalItems[3],summary.operationalItems[2]],money=summary.financialItems.filter(item=>item.key==='received'||item.key==='pending'||item.key==='credit'),balances:SummaryCard[]=[
-   money[0],money[1],{label:summary.salePerTon.label,value:`Bruto ${summary.salePerTon.gross}`,hint:`Líquido após descontos: ${summary.salePerTon.net}`},money[2],
+   money[0],money[1],{label:summary.salePerTon.label,value:`Bruto ${summary.salePerTon.gross}`,hint:`Líquido: ${summary.salePerTon.net}`},money[2],
   ];
   const copyValues=[quantities[1],quantities[0]].map(item=>{const size=fitValue(item.value,valueWidth,8.5);return {size,value:lines(item.value,size,valueWidth,true)};});
   const copyExtra=(Math.max(...copyValues.map(item=>item.value.length))-1)*3.5;
@@ -195,45 +195,63 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
   y+=panelHeight+6;
  };
  const charts=()=>{
-  const numberLabel=(value:number)=>new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1}).format(value);
-  const moneyLabel=(value:number)=>'R$ '+(value>=1000000?numberLabel(value/1000000)+' mi':value>=1000?numberLabel(value/1000)+' mil':numberLabel(value));
+  const granularity=dailyPeriod?.granularity??'month',granularityCopy=contractDailyLoadGranularityCopy[granularity];
+  const numberLabel=(value:number)=>new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(value);
+  const moneyLabel=(value:number)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',minimumFractionDigits:2,maximumFractionDigits:2}).format(value).replace(/\u00a0/g,' ');
   const periodLabel=dailyPeriod?.from&&dailyPeriod?.to?`${formatContractDate(dailyPeriod.from)} a ${formatContractDate(dailyPeriod.to)}`:effectiveMonthlyPeriod?`${formatContractMonth(effectiveMonthlyPeriod.from)} a ${formatContractMonth(effectiveMonthlyPeriod.to)}`:'Todo o contrato';
-  if(!filteredMonths.length){
+  const rows:ContractLoadFinancialChartRow[]=dailyLoads?contractLoadFinancialChartRows(dailyLoads,granularity):filteredMonths.map(row=>{
+   const volumeText=row.finance?.loadedVolume??row.production?.loadedVolume??'0',averageAtrText=row.finance?.averageAtr??row.production?.averageLoadAtr??'',averageAtr=Number(averageAtrText);
+   const billingPending=row.finance?.billingPending??row.production?.billingPending??false;
+   return {key:row.month,date:`${row.month}-01`,endDate:`${row.month}-01`,label:formatContractMonth(row.month),volume:Number(volumeText),volumeText,loadCount:0,averageAtrText,averageAtr:Number.isFinite(averageAtr)&&averageAtr>0?averageAtr:null,gross:billingPending?null:Number(row.finance?.grossAmount??row.production?.billingAmount??0),net:billingPending?null:Number(row.finance?.netAmount??0),billingPending};
+  });
+  if(!rows.length){
    ensure(34);panel(margin,y,content,30);heading(margin+4,y+4,'RESUMO MENSAL','Entregas, faturamento e entradas','calendar');
    font(7,false,palette.muted);doc.text(`Período: ${periodLabel} · Nenhuma movimentação no período selecionado.`,margin+4,y+23);y+=36;return;
   }
-  // Keep every selected month readable by continuing the combined chart in new panels.
-  for(let offset=0;offset<filteredMonths.length;offset+=10){
-   const rows=filteredMonths.slice(offset,offset+10),padding=5,panelHeight=83;
+  // The PDF mirrors the single screen filter and keeps every selected bucket readable.
+  for(const pageRows of contractDailyLoadsChartPages(rows,6)){
+   const padding=5,panelHeight=87;
    ensure(panelHeight);panel(margin,y,content,panelHeight);
    heading(margin+padding,y+4,'RESUMO MENSAL','Entregas, faturamento e entradas','calendar');
    const criterion='ATR '+formatAtrCriterion(contract.atrPriceType,contract.atrPeriodType);font(6.2,false,[47,133,84]);
    const criterionWidth=doc.getTextWidth(criterion)+5;
    doc.setFillColor(235,246,239);doc.roundedRect(width-margin-padding-criterionWidth,y+5,criterionWidth,5.5,1.3,1.3,'F');doc.text(criterion,width-margin-padding-2.5,y+8.6,{align:'right'});
-   const top=y+17,left=margin+padding+18,right=width-margin-padding-13,plotWidth=right-left,base=top+43,plotHeight=34,slot=plotWidth/rows.length;
-   panel(margin+padding,top,content-padding*2,59,palette.surface);font(7.3,true);doc.text('Faturamento, líquido e ATR por mês',margin+padding+3,top+5);font(5.5,false,palette.muted);doc.text(`Quantidade entregue abaixo de cada mês · Período: ${periodLabel}`,margin+padding+3,top+8.6);
-   const gross=rows.map(row=>row.finance?(row.finance.billingPending?null:Number(row.finance.grossAmount)):row.production?.billingPending?null:Number(row.production?.billingAmount??0));
-   const net=rows.map(row=>row.finance?.billingPending?null:Number(row.finance?.netAmount??0));
-   const atr=rows.map(row=>{const value=Number(row.finance?.averageAtr??row.production?.averageLoadAtr??'');return Number.isFinite(value)&&value>0?value:null;});
-   const maximum=Math.max(1,...[...gross,...net].filter((value):value is number=>value!==null&&Number.isFinite(value)));
-   const maxAtr=Math.max(1,...atr.filter((value):value is number=>value!==null&&Number.isFinite(value)));
-    const magnitude=10**Math.floor(Math.log10(maximum)),scale=Math.ceil(maximum/magnitude*2)/2*magnitude;
-    for(let index=0;index<=4;index++){
-     const gridY=base-plotHeight*index/4;doc.setDrawColor(227,237,231);doc.setLineWidth(.2);doc.setLineDashPattern([1,1.4],0);doc.line(left,gridY,left+plotWidth,gridY);doc.setLineDashPattern([],0);
-     font(5.8,false,palette.muted);doc.text(moneyLabel(scale*index/4),left-2,gridY+.8,{align:'right'});font(5.8,false,palette.amber);doc.text(numberLabel(maxAtr*index/4),right+2,gridY+.8);
-    }
-   const points:[number,number][]=[];
-    rows.forEach((row,index)=>{
-     const barWidth=Math.min(5.2,slot*.3),center=left+(index+.5)*slot;
-     [gross[index],net[index]].forEach((value,seriesIndex)=>{if(value===null||!Number.isFinite(value)||value<=0)return;const barHeight=value/scale*plotHeight,barX=center+(seriesIndex?0:-barWidth);doc.setFillColor(...(seriesIndex?palette.dark:[117,185,140] as Color));doc.roundedRect(barX,base-barHeight,barWidth*.9,barHeight,Math.min(.7,barHeight/2),Math.min(.7,barHeight/2),'F');font(4.8,false,seriesIndex?palette.dark:[89,128,104]);doc.text(numberLabel(value>=1000?value/1000:value)+(value>=1000?'k':''),barX+barWidth*.45,base-barHeight-1,{align:'center'});});
-     if(atr[index]!==null)points.push([center,base-(atr[index] as number)/maxAtr*plotHeight]);
-     if(atr[index]!==null){font(4.7,true,[145,71,0]);doc.text(`ATR ${formatAtr(String(atr[index]))}`,center,base+3.2,{align:'center'});}
-     font(5.8,false,palette.muted);doc.text(formatContractMonth(row.month),center,base+6,{align:'center'});font(4.9,false,palette.muted);doc.text(`${numberLabel(Number(row.finance?.loadedVolume??row.production?.loadedVolume??0))} t`,center,base+8.7,{align:'center'});
-    });
-   if(points.length>1){doc.setDrawColor(...palette.amber);doc.setLineWidth(.7);doc.setLineDashPattern([1.2,1],0);for(let index=1;index<points.length;index++)doc.line(points[index-1][0],points[index-1][1],points[index][0],points[index][1]);doc.setLineDashPattern([],0);}
-   points.forEach(point=>{doc.setFillColor(255,255,255);doc.setDrawColor(...palette.amber);doc.setLineWidth(.6);doc.circle(point[0],point[1],1,'FD');});
-   const legends=[{label:'Faturado bruto',color:[117,185,140] as Color},{label:'Valor líquido',color:palette.dark},{label:'ATR médio',color:palette.amber},{label:'Quantidade entregue',color:palette.muted}];let legendX=margin+padding+3;
-   legends.forEach(item=>{doc.setFillColor(...item.color);doc.circle(legendX+1,top+56,.8,'F');font(5.4,false,item.color);doc.text(item.label,legendX+3,top+56.7);legendX+=doc.getTextWidth(item.label)+8;});
+   const top=y+17,left=margin+padding+24,right=width-margin-padding-14,plotWidth=right-left,base=top+45,plotHeight=33,slot=plotWidth/pageRows.length;
+   panel(margin+padding,top,content-padding*2,63,palette.surface);font(7.3,true);doc.text(`Faturamento bruto, líquido e ATR por ${granularityCopy.noun}`,margin+padding+3,top+5);font(5.5,false,palette.muted);doc.text(`Barra total: bruto · Preenchimento interno: líquido · Período: ${periodLabel}`,margin+padding+3,top+8.6);
+   const maximum=Math.max(1,...pageRows.map(row=>row.gross??0));
+   const magnitude=10**Math.floor(Math.log10(maximum)),scale=Math.ceil(maximum/magnitude*2)/2*magnitude;
+   const atrValues=pageRows.map(row=>row.averageAtr).filter((value):value is number=>value!==null&&Number.isFinite(value));
+   const atrMinimum=atrValues.length?Math.min(...atrValues):0,atrMaximum=atrValues.length?Math.max(...atrValues):1,atrRange=atrMaximum-atrMinimum;
+   const atrPadding=atrRange>0?atrRange*.08:Math.max(Math.abs(atrMaximum)*.03,.5),atrScaleMinimum=atrMinimum-atrPadding,atrScaleMaximum=atrMaximum+atrPadding;
+   for(let index=0;index<=4;index++){
+    const gridY=base-plotHeight*index/4;doc.setDrawColor(227,237,231);doc.setLineWidth(.2);doc.setLineDashPattern([1,1.4],0);doc.line(left,gridY,right,gridY);doc.setLineDashPattern([],0);
+    font(5.1,false,palette.muted);doc.text(moneyLabel(scale*index/4),left-2,gridY+.8,{align:'right'});
+    if(atrValues.length){font(5.1,false,palette.amber);doc.text(formatAtr(String(atrScaleMinimum+(atrScaleMaximum-atrScaleMinimum)*index/4)),right+2,gridY+.8);}
+   }
+   const centers=pageRows.map((_,index)=>left+(index+.5)*slot),atrY=(value:number)=>base-(value-atrScaleMinimum)/(atrScaleMaximum-atrScaleMinimum)*plotHeight;
+   const points=pageRows.map((row,index)=>row.averageAtr===null?null:{x:centers[index],y:atrY(row.averageAtr)});
+   pageRows.forEach((row,index)=>{
+    const center=centers[index],barWidth=Math.min(16,slot*.62);
+    if(row.gross!==null&&Number.isFinite(row.gross)&&row.gross>0){
+     const grossHeight=row.gross/scale*plotHeight;
+     doc.setFillColor(180,218,194);doc.setDrawColor(117,185,140);doc.setLineWidth(.25);doc.roundedRect(center-barWidth/2,base-grossHeight,barWidth,grossHeight,Math.min(1,barWidth/8),Math.min(1,grossHeight/2),'FD');
+     font(4.6,true,[63,103,78]);doc.text(moneyLabel(row.gross),center,base-grossHeight-1.1,{align:'center'});
+     if(row.net!==null&&Number.isFinite(row.net)&&row.net>=0){
+      const netHeight=row.net/scale*plotHeight,netWidth=barWidth*.72;
+      doc.setFillColor(...palette.dark);doc.roundedRect(center-netWidth/2,base-netHeight,netWidth,netHeight,Math.min(.8,netWidth/8),Math.min(.8,netHeight/2),'F');
+      const netY=netHeight>=4?base-netHeight+3:base-netHeight-1;
+      font(4.2,true,netHeight>=4?[255,255,255]:palette.dark);doc.text(moneyLabel(row.net),center,netY,{align:'center'});
+     }
+    }else{font(4.8,true,palette.muted);doc.text('Pendente',center,base-2,{align:'center'});}
+    if(row.averageAtr!==null){font(4.6,true,[145,71,0]);doc.text(`ATR ${formatAtr(row.averageAtrText)}`,center,base+3.2,{align:'center'});}
+    font(5.3,true,palette.ink);doc.text(row.label,center,base+6,{align:'center'});font(4.7,false,palette.muted);doc.text(`${numberLabel(row.volume)} t`,center,base+8.6,{align:'center'});
+   });
+   doc.setDrawColor(236,177,111);doc.setLineWidth(.7);doc.setLineDashPattern([1.2,1],0);let previousPoint:{x:number;y:number}|null=null;
+   points.forEach(point=>{if(!point){previousPoint=null;return;}if(previousPoint)doc.line(previousPoint.x,previousPoint.y,point.x,point.y);previousPoint=point;});doc.setLineDashPattern([],0);
+   points.forEach(point=>{if(!point)return;doc.setFillColor(255,255,255);doc.setDrawColor(236,177,111);doc.setLineWidth(.6);doc.circle(point.x,point.y,1,'FD');});
+   const legendY=top+60;doc.setFillColor(180,218,194);doc.setDrawColor(117,185,140);doc.rect(margin+padding+3,legendY-1.6,3,2,'FD');font(5.2,false,[63,103,78]);doc.text('Faturado bruto (barra total)',margin+padding+7,legendY);
+   let legendX=margin+padding+49;doc.setFillColor(...palette.dark);doc.rect(legendX,legendY-1.6,3,2,'F');font(5.2,false,palette.dark);doc.text('Líquido (dentro)',legendX+4,legendY);
+   legendX+=38;doc.setDrawColor(236,177,111);doc.setLineWidth(.7);doc.setLineDashPattern([1.2,1],0);doc.line(legendX,legendY-1,legendX+7,legendY-1);doc.setLineDashPattern([],0);font(5.2,false,[145,71,0]);doc.text(granularityCopy.atr,legendX+9,legendY);
    y+=panelHeight+6;
   }
  };
