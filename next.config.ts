@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Keep the repository's project-specific AGENTS.md under source control.
+  agentRules: false,
 };
 
 export default nextConfig;

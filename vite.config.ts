@@ -7,7 +7,8 @@ export default defineConfig(({ command }) => ({
   server: {
     host: "127.0.0.1",
     port: 5173,
-    open: true,
+    // Avoid overlapping a browser request with the RSC environments booting.
+    open: false,
   },
   ssr: {
     // Keep tslib as native ESM in the Node bundle. Bundling its UMD fallback

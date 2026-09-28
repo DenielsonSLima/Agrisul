@@ -1,6 +1,5 @@
 import type {ReportPdfBrand} from '@/shared/reporting/types';
 import type {QuotationRequestSnapshot} from './quotationRequestPdf';
-import QuotationRequestPdfWorker from './quotationRequestPdf.worker?worker';
 
 type PdfWorkerOptions = {signal?: AbortSignal};
 type WorkerResponse = {
@@ -30,7 +29,10 @@ export function createQuotationRequestPdfInWorker(
       return;
     }
 
-    const worker = new QuotationRequestPdfWorker();
+    const worker = new Worker(
+      new URL('./quotationRequestPdf.worker.ts', import.meta.url),
+      {type: 'module'},
+    );
     const cleanup = () => {
       options.signal?.removeEventListener('abort', abort);
       worker.terminate();
