@@ -1,3 +1,4 @@
+import {FunctionsFetchError,FunctionsHttpError,FunctionsRelayError} from '@supabase/supabase-js';
 import { getSupabaseBrowserClient } from './client';
 
 export class RpcError extends Error {
@@ -40,10 +41,17 @@ export async function functionRequest<T>(name:string,body:Record<string,unknown>
   const client=getSupabaseBrowserClient();
   const {data,error}=await client.functions.invoke(name,{body});
   if(error){
-    let message='Não foi possível concluir a operação.';
-    const context=(error as {context?:Response}).context;
-    if(context){try{const payload=await context.clone().json() as {error?:string};if(payload.error)message=payload.error;}catch{}}
-    throw new RpcError(message,context?.status??503,(error as {code?:string}).code);
+    const errorName=error.name;
+    if(error instanceof FunctionsHttpError||errorName==='FunctionsHttpError'){
+      const response=error.context as Response;let payload:{error?:unknown;message?:unknown;msg?:unknown;code?:unknown}={};
+      try{payload=await response.clone().json();}catch{}
+      const serverMessage=[payload.error,payload.message,payload.msg].find(value=>typeof value==='string'&&value.trim()) as string|undefined;
+      const message=response.status===401?'Sua sessão expirou. Entre novamente.':response.status===404?'O serviço solicitado não está disponível.':serverMessage??'Não foi possível concluir a operação.';
+      throw new RpcError(message,response.status||503,typeof payload.code==='string'?payload.code:error.name);
+    }
+    if(error instanceof FunctionsFetchError||errorName==='FunctionsFetchError')throw new RpcError('Não foi possível conectar ao serviço. Verifique sua conexão e tente novamente.',503,error.name);
+    if(error instanceof FunctionsRelayError||errorName==='FunctionsRelayError')throw new RpcError('O serviço está temporariamente indisponível. Tente novamente.',503,error.name);
+    throw new RpcError('Não foi possível concluir a operação.',503,(error as {code?:string}).code);
   }
   return data as T;
 }

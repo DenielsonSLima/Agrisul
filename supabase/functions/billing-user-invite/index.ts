@@ -1,14 +1,19 @@
 import {createClient} from 'npm:@supabase/supabase-js@2.115.0';
+import {createInviteOriginPolicy} from './cors.ts';
 
 type InviteBody={email?:unknown;accessProfileId?:unknown;requestId?:unknown};
 const supabaseUrl=Deno.env.get('SUPABASE_URL')??'';
 const anonKey=Deno.env.get('SUPABASE_ANON_KEY')??'';
 const serviceKey=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')??'';
-const appUrl=(Deno.env.get('APP_URL')??'http://localhost:5173').replace(/\/$/,'');
+const originPolicy=createInviteOriginPolicy({
+ appUrl:Deno.env.get('APP_URL')??undefined,
+ allowedOrigins:Deno.env.get('APP_ALLOWED_ORIGINS')??undefined,
+ vercelProject:Deno.env.get('APP_VERCEL_PROJECT')??undefined,
+ vercelTeam:Deno.env.get('APP_VERCEL_TEAM')??undefined,
+});
 
 function cors(origin:string|null){
- const allowed=origin===appUrl?origin:appUrl;
- return {'Access-Control-Allow-Origin':allowed,'Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type','Access-Control-Allow-Methods':'POST, OPTIONS','Vary':'Origin'};
+ return originPolicy.headers(origin);
 }
 function reply(origin:string|null,status:number,body:Record<string,unknown>){
  return new Response(JSON.stringify(body),{status,headers:{...cors(origin),'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
@@ -22,6 +27,7 @@ function publicInviteError(message:string){
 
 Deno.serve(async request=>{
  const origin=request.headers.get('Origin');
+ if(!originPolicy.isAllowed(origin))return reply(origin,403,{error:'Origem não autorizada.'});
  if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors(origin)});
  if(request.method!=='POST')return reply(origin,405,{error:'Método não permitido.'});
  if(!supabaseUrl||!anonKey||!serviceKey)return reply(origin,503,{error:'O serviço de convites não está configurado.'});
@@ -42,7 +48,7 @@ Deno.serve(async request=>{
  const attemptId=crypto.randomUUID();
  const admin=createClient(supabaseUrl,serviceKey,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
  const {data:invited,error:inviteError}=await admin.auth.admin.inviteUserByEmail(email,{
-  redirectTo:`${appUrl}/auth/confirm`,
+  redirectTo:`${originPolicy.redirectBase(origin)}/auth/confirm`,
   data:{billing_invitation_id:invitationId,onboarding_required:true},
  });
  if(inviteError){

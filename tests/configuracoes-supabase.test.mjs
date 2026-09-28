@@ -9,11 +9,19 @@ const {build}=require(require.resolve('esbuild',{paths:[require.resolve('vite')]
 const temporary=await mkdtemp(join(tmpdir(),'billing-config-test-'));
 try{
  const output=join(temporary,'services.mjs');
- await build({stdin:{contents:`export * from './modules/configuracoes/empresas/services/companyApi'; export * from './modules/configuracoes/services/settingsService'; export * from './modules/configuracoes/marca-dagua/services/watermarkApi'; export * from './modules/configuracoes/usuarios/services/usersApi'; export * from './modules/configuracoes/perfis-acesso/services/accessProfilesApi'; export * from './modules/configuracoes/cabecalho-relatorios/services/reportHeaderApi'; export * from './shared/reporting/companyBrand';`,resolveDir:process.cwd()},outfile:output,bundle:true,platform:'node',format:'esm',plugins:[{name:'supabase-fixtures',setup(builder){
+ await build({stdin:{contents:`export * from './modules/configuracoes/empresas/services/companyApi'; export * from './modules/configuracoes/services/settingsService'; export * from './modules/configuracoes/marca-dagua/services/watermarkApi'; export * from './modules/configuracoes/usuarios/services/usersApi'; export * from './modules/configuracoes/perfis-acesso/services/accessProfilesApi'; export * from './modules/configuracoes/cabecalho-relatorios/services/reportHeaderApi'; export * from './shared/reporting/companyBrand'; export * from './supabase/functions/billing-user-invite/cors';`,resolveDir:process.cwd()},outfile:output,bundle:true,platform:'node',format:'esm',plugins:[{name:'supabase-fixtures',setup(builder){
   builder.onResolve({filter:/^@\/shared\/supabase\/(rpc|client)$/},args=>({path:args.path,namespace:'fixture'}));
   builder.onLoad({filter:/.*/,namespace:'fixture'},args=>({contents:args.path.endsWith('/rpc')?'export class RpcError extends Error{constructor(message,status=400){super(message);this.status=status}};export const rpcRequest=(...args)=>globalThis.configRpc(...args);export const functionRequest=(...args)=>globalThis.configFunction(...args);':'export const getSupabaseBrowserClient=()=>globalThis.configClient;'}));
  }}]});
  const api=await import(pathToFileURL(output));
+ const originPolicy=api.createInviteOriginPolicy();
+ assert.equal(originPolicy.isAllowed('https://agrisul-rnh8hvxi7-denielson-limas-projects.vercel.app'),true);
+ assert.equal(originPolicy.isAllowed('https://agrisul-denielson-limas-projects.vercel.app'),true);
+ assert.equal(originPolicy.isAllowed('http://127.0.0.1:5173'),true);
+ assert.equal(originPolicy.isAllowed('https://outro-projeto.vercel.app'),false);
+ assert.equal(originPolicy.headers('https://agrisul-rnh8hvxi7-denielson-limas-projects.vercel.app')['Access-Control-Allow-Origin'],'https://agrisul-rnh8hvxi7-denielson-limas-projects.vercel.app');
+ assert.equal(originPolicy.headers('https://outro-projeto.vercel.app')['Access-Control-Allow-Origin'],undefined);
+ assert.equal(originPolicy.redirectBase('https://agrisul-rnh8hvxi7-denielson-limas-projects.vercel.app'),'https://agrisul-rnh8hvxi7-denielson-limas-projects.vercel.app');
  const workspaceId='11111111-1111-4111-8111-111111111111';
  const calls=[];const uploads=[];const signs=[];const removals=[];let session={user:{id:'owner-a'},access_token:'test-session'};
  globalThis.configClient={auth:{getSession:async()=>({data:{session},error:null})},storage:{from(bucket){assert.ok(['billing-watermarks','billing-company-logos'].includes(bucket));return{upload:async(path,file,options)=>{uploads.push({bucket,path,file,options});return{error:null}},remove:async paths=>{removals.push({bucket,paths});return{error:null}},createSignedUrl:async(path,seconds)=>{signs.push({bucket,path,seconds});return{data:{signedUrl:'https://signed.example.test/'+path},error:null}},createSignedUrls:async(paths,seconds)=>{signs.push({bucket,paths,seconds});return{data:paths.map(path=>({path,signedUrl:'https://signed.example.test/'+path,error:null})),error:null}}}}}};
@@ -82,5 +90,17 @@ try{
  session={user:{id:'owner-a'},access_token:'test-session'};
  globalThis.configRpc=async()=>{throw new Error('Validação do servidor');};
  await assert.rejects(api.persistSettings({name:'',company:'',compact:false,email:''}),/Validação do servidor/);
- console.log('Passed: configuration RPC envelopes, company logo signing/upload/cleanup, auth-derived email, private images, explicit removal, authentication and server errors.');
+ const rpcOutput=join(temporary,'rpc.mjs');
+ await build({stdin:{contents:`export * from './shared/supabase/rpc';`,resolveDir:process.cwd()},outfile:rpcOutput,bundle:true,platform:'node',format:'esm',plugins:[{name:'function-client-fixture',setup(builder){
+  builder.onResolve({filter:/^\.\/client$/},args=>args.importer.endsWith('shared\\supabase\\rpc.ts')||args.importer.endsWith('shared/supabase/rpc.ts')?{path:'function-client',namespace:'fixture'}:null);
+  builder.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:'export const getSupabaseBrowserClient=()=>globalThis.functionClient;'}));
+ }}]});
+ const rpcApi=await import(pathToFileURL(rpcOutput));
+ const invoke=async error=>{globalThis.functionClient={functions:{invoke:async()=>({data:null,error})}};return rpcApi.functionRequest('billing-user-invite',{});};
+ await assert.rejects(invoke({name:'FunctionsHttpError',context:Response.json({error:'Limite de e-mails atingido.'},{status:429})}),error=>error.status===429&&error.message==='Limite de e-mails atingido.');
+ await assert.rejects(invoke({name:'FunctionsHttpError',context:Response.json({message:'Missing function'},{status:404})}),error=>error.status===404&&error.message==='O serviço solicitado não está disponível.');
+ await assert.rejects(invoke({name:'FunctionsHttpError',context:Response.json({message:'Invalid JWT'},{status:401})}),error=>error.status===401&&error.message==='Sua sessão expirou. Entre novamente.');
+ await assert.rejects(invoke({name:'FunctionsFetchError',context:new TypeError('Failed to fetch')}),/Não foi possível conectar ao serviço/);
+ await assert.rejects(invoke({name:'FunctionsRelayError',context:{}}),/temporariamente indisponível/);
+ console.log('Passed: configuration RPC envelopes, invite CORS, function errors, company logo signing/upload/cleanup, auth-derived email, private images, explicit removal, authentication and server errors.');
 }finally{await rm(temporary,{recursive:true,force:true});delete globalThis.configRpc;delete globalThis.configFunction;delete globalThis.configClient;}
