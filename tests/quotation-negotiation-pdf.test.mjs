@@ -171,7 +171,10 @@ test('negotiation tab exposes the complete landscape report with preview and dow
   assert.match(report, /Valor total/);
   assert.match(report, /Total com desconto/);
   assert.match(report, /Valor aprovado/);
-  assert.match(report, /Aprovado com desconto/);
+  assert.match(report, /provider\.awardedItemCount/);
+  assert.match(report, /itens aprovados/);
+  assert.match(report, /Total aprovado com desconto/);
+  assert.match(report, /roundedRect\(x \+ 1\.5/);
   assert.doesNotMatch(report, /Number\([^)]*unitPrice/);
   assert.match(tab, />Exportar PDF</);
   assert.match(tab, /createQuotationNegotiationSnapshot/);

@@ -1,7 +1,7 @@
 'use client';
 
 import {useMemo, useState} from 'react';
-import {Check, FileDown, History, Loader2, PackageOpen, Plus, ReceiptText, X} from 'lucide-react';
+import {Check, FileDown, History, Loader2, PackageOpen, Plus, ReceiptText, Trash2, X} from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -43,6 +43,8 @@ type QuoteNegotiationTabProps = {
   onApproveItem: (input: AwardDraft) => Promise<void>;
   onUnapproveItem: (input: UnawardDraft) => Promise<void>;
   onAddMaterials: () => void;
+  onRemoveMaterial: (item: QuoteItem) => Promise<void>;
+  removingItemId: string;
 };
 
 type PriceEditor = {
@@ -131,6 +133,8 @@ export function QuoteNegotiationTab({
   onApproveItem,
   onUnapproveItem,
   onAddMaterials,
+  onRemoveMaterial,
+  removingItemId,
 }: QuoteNegotiationTabProps) {
   const {activeCompanyId} = useWorkspaceCompany();
   const confirm = useConfirmation();
@@ -281,6 +285,23 @@ export function QuoteNegotiationTab({
                             <strong>{item.materialName}</strong>
                             <small>{references || 'Sem referência cadastrada'}</small>
                             <span className="quote-matrix-material-quantity">{item.quantity} {item.unit}</span>
+                            {quote.status === 'open' && (
+                              <button
+                                className="quote-matrix-remove-material"
+                                type="button"
+                                disabled={saving || !!approvingKey || !item.canRemove}
+                                title={item.canRemove
+                                  ? `Remover ${item.materialName} da cotação`
+                                  : item.removeBlockedReason}
+                                aria-label={`Remover ${item.materialName} da cotação`}
+                                onClick={() => void onRemoveMaterial(item)}
+                              >
+                                {removingItemId === item.id
+                                  ? <Loader2 className="animate-spin" size={12}/>
+                                  : <Trash2 size={12}/>}
+                                {removingItemId === item.id ? 'Removendo…' : 'Remover item'}
+                              </button>
+                            )}
                           </div>
                         </div>
                       </th>

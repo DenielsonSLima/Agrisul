@@ -337,16 +337,27 @@ test('open quotation scope can grow and shrink without replacing existing negoti
 });
 
 test('material and supplier removal controls use RPC-calculated permissions', async () => {
-  const [summary, providers] = await Promise.all([
+  const [detail, summary, negotiation, providers] = await Promise.all([
+    readComponent('QuoteDetailPage'),
     readComponent('QuoteSummaryTab'),
+    readComponent('QuoteNegotiationTab'),
     readComponent('QuoteProvidersTab'),
   ]);
 
+  assert.match(detail, /Também serão apagados/);
+  assert.match(detail, /O cadastro do material será mantido/);
+  assert.match(detail, /onRemoveMaterial=\{removeMaterial\}/);
+  assert.match(detail, /removingItemId=\{removingItemId\}/);
   assert.match(summary, /onRemoveMaterial/);
   assert.match(summary, /const cannotRemove = !item\.canRemove/);
   assert.match(summary, /item\.removeBlockedReason/);
   assert.doesNotMatch(summary, /quote\.negotiations\.some\(entry => entry\.itemId === item\.id\)/);
   assert.match(summary, /aria-label=\{`Remover \$\{item\.materialName\} da cotação`\}/);
+  assert.match(negotiation, /className="quote-matrix-remove-material"/);
+  assert.match(negotiation, /'Remover item'/);
+  assert.match(negotiation, /!item\.canRemove/);
+  assert.match(negotiation, /item\.removeBlockedReason/);
+  assert.match(negotiation, /onRemoveMaterial\(item\)/);
   assert.match(providers, /onRemoveProvider/);
   assert.match(providers, /disabled=\{addingProviders \|\| !provider\.canRemove\}/);
   assert.match(providers, /provider\.removeBlockedReason/);

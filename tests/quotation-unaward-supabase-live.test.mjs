@@ -72,6 +72,12 @@ try {
     unit: 'UN',
     application: 'Teste isolado',
   })).material;
+  const removableMaterial = (await rpc(owner.client, 'materials', 'save', {
+    name: 'Material temporário para remoção',
+    internalCode: `REMOVE-${randomUUID().slice(0, 8)}`,
+    unit: 'PAR',
+    application: 'Teste isolado de remoção',
+  })).material;
   const provider = (await rpc(owner.client, 'service-providers', 'save', {
     documentType: 'CNPJ',
     document: '04773159000523',
@@ -88,6 +94,7 @@ try {
     email: 'unaward@example.invalid',
   })).provider;
   const quotationItemId = randomUUID();
+  const removableItemId = randomUUID();
   const quotationProviderId = randomUUID();
   const saved = await rpc(owner.client, 'quotations', 'save', {
     title: 'Cotação temporária para desaprovação',
@@ -96,14 +103,24 @@ try {
     requester: 'IGNORADO',
     requesterSignatureId: signature.id,
     notes: 'Teste remoto isolado',
-    items: [{
-      id: quotationItemId,
-      materialId: material.id,
-      materialName: 'IGNORADO',
-      quantity: '2',
-      unit: 'IGNORADO',
-      notes: '',
-    }],
+    items: [
+      {
+        id: quotationItemId,
+        materialId: material.id,
+        materialName: 'IGNORADO',
+        quantity: '2',
+        unit: 'IGNORADO',
+        notes: '',
+      },
+      {
+        id: removableItemId,
+        materialId: removableMaterial.id,
+        materialName: 'IGNORADO',
+        quantity: '3',
+        unit: 'IGNORADO',
+        notes: '',
+      },
+    ],
     providers: [{
       id: quotationProviderId,
       providerId: provider.id,
@@ -112,7 +129,7 @@ try {
       providerPhone: '',
       notes: '',
       sentAt: null,
-      values: {[quotationItemId]: ''},
+      values: {[quotationItemId]: '', [removableItemId]: ''},
     }],
   });
   const quotationId = saved.quote.id;
@@ -140,7 +157,7 @@ try {
     quotationItemId,
   });
   assert.equal(cleared.quote.awardedItemCount, 0);
-  assert.equal(cleared.quote.pendingAwardCount, 1);
+  assert.equal(cleared.quote.pendingAwardCount, 2);
   assert.equal(cleared.quote.awardedGrossTotal, '0');
   assert.equal(cleared.quote.awardedTotal, '0');
   assert.equal(cleared.quote.itemAwards.length, 0);
@@ -173,8 +190,80 @@ try {
     quotationProviderId,
   });
   assert.equal(restored.quote.awardedItemCount, 1);
+  assert.equal(restored.quote.pendingAwardCount, 1);
   assert.equal(restored.quote.awardedTotal, '18.6');
-  console.log('PASS: remote unaward clears only the decision, preserves prices/history, recalculates totals and enforces isolation.');
+
+  await rpc(owner.client, 'quotations', 'record-negotiation', {
+    id: quotationId,
+    quotationProviderId,
+    quotationItemId: removableItemId,
+    unitPrice: '5.00',
+    discountType: 'none',
+    discountValue: '0',
+    notes: 'Preço do item removível',
+    requestId: randomUUID(),
+  });
+  const fullyAwarded = await rpc(owner.client, 'quotations', 'award-item', {
+    id: quotationId,
+    quotationItemId: removableItemId,
+    quotationProviderId,
+  });
+  assert.equal(fullyAwarded.quote.awardedItemCount, 2);
+  assert.equal(fullyAwarded.quote.pendingAwardCount, 0);
+  assert.equal(fullyAwarded.quote.awardedGrossTotal, '35');
+  assert.equal(fullyAwarded.quote.awardedTotal, '33.6');
+  assert.equal(
+    fullyAwarded.quote.items.find(item => item.id === removableItemId)?.canRemove,
+    true,
+  );
+
+  await assert.rejects(
+    rpc(outsider.client, 'quotations', 'remove-item', {
+      id: quotationId,
+      quotationItemId: removableItemId,
+    }),
+    error => error.code === 'P0002',
+  );
+  await assert.rejects(
+    rpc(anonymous, 'quotations', 'remove-item', {
+      id: quotationId,
+      quotationItemId: removableItemId,
+    }),
+    error => error.code === '42501' || error.code === '28000',
+  );
+  const directItemDelete = await owner.client
+    .from('billing_quotation_items')
+    .delete()
+    .eq('id', removableItemId);
+  assert.equal(directItemDelete.error?.code, '42501');
+
+  const removed = await rpc(owner.client, 'quotations', 'remove-item', {
+    id: quotationId,
+    quotationItemId: removableItemId,
+  });
+  assert.equal(removed.quote.items.length, 1);
+  assert.equal(removed.quote.negotiations.length, 1);
+  assert.equal(removed.quote.itemAwards.length, 1);
+  assert.equal(removed.quote.providers[0].offers[removableItemId], undefined);
+  assert.equal(removed.quote.awardedItemCount, 1);
+  assert.equal(removed.quote.pendingAwardCount, 0);
+  assert.equal(removed.quote.awardedGrossTotal, '20');
+  assert.equal(removed.quote.awardedTotal, '18.6');
+
+  const removedAgain = await rpc(owner.client, 'quotations', 'remove-item', {
+    id: quotationId,
+    quotationItemId: removableItemId,
+  });
+  assert.equal(removedAgain.quote.items.length, 1);
+  assert.equal(removedAgain.quote.negotiations.length, 1);
+  await assert.rejects(
+    rpc(owner.client, 'quotations', 'remove-item', {
+      id: quotationId,
+      quotationItemId,
+    }),
+    error => error.code === '23514',
+  );
+  console.log('PASS: remote unaward and item removal preserve totals, clear only linked quotation data and enforce isolation.');
 } finally {
   for (const client of clients) await client.removeAllChannels();
   const failures = [];

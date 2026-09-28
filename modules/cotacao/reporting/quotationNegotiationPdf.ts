@@ -31,7 +31,7 @@ const MATERIAL_COLUMN_WIDTH = 62;
 const MIN_PROVIDER_COLUMN_WIDTH = 42;
 const TABLE_HEADER_HEIGHT = 14;
 const ITEM_ROW_HEIGHT = 15.5;
-const TOTALS_ROW_HEIGHT = 28;
+const TOTALS_ROW_HEIGHT = 32;
 const GENERAL_TOTALS_HEIGHT = 17;
 
 const safeFilePart = (value: string, maxLength = 80) => {
@@ -402,21 +402,33 @@ export async function createQuotationNegotiationPdf(
     let x = margin + MATERIAL_COLUMN_WIDTH;
     providers.forEach(provider => {
       doc.line(x, top, x, top + TOTALS_ROW_HEIGHT);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(5.8);
+      doc.setTextColor(48, 101, 65);
+      doc.text(
+        `${provider.awardedItemCount ?? 0} de ${snapshot.items.length} itens aprovados`,
+        x + 2.5,
+        top + 4.5,
+      );
       const rows = [
         ['Valor total', provider.grossTotal ?? provider.total ?? '0'],
         ['Total com desconto', provider.total ?? '0'],
         ['Valor aprovado', provider.awardedGrossTotal ?? provider.awardedTotal ?? '0'],
-        ['Aprovado com desconto', provider.awardedTotal ?? '0'],
+        ['Total aprovado com desconto', provider.awardedTotal ?? '0'],
       ] as const;
       rows.forEach(([label, value], index) => {
-        const lineY = top + 5.2 + index * 5.8;
+        const lineY = top + 9.5 + index * 6;
+        if (index === 3) {
+          doc.setFillColor(218, 240, 225);
+          doc.roundedRect(x + 1.5, lineY - 4.2, providerWidth - 3, 5.7, 1, 1, 'F');
+        }
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(5.1);
-        doc.setTextColor(99, 119, 105);
+        doc.setFontSize(index >= 2 ? 5.7 : 5.4);
+        doc.setTextColor(index === 3 ? 42 : 88, index === 3 ? 105 : 112, index === 3 ? 61 : 96);
         doc.text(label, x + 2.5, lineY);
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(index === 3 ? 6.4 : 5.8);
-        doc.setTextColor(index === 3 ? 31 : 47, index === 3 ? 112 : 80, index === 3 ? 65 : 56);
+        doc.setFontSize(index === 3 ? 7.8 : index === 2 ? 6.8 : 6.4);
+        doc.setTextColor(index === 3 ? 22 : 43, index === 3 ? 115 : 82, index === 3 ? 64 : 56);
         doc.text(moneyLabel(value), x + providerWidth - 2.5, lineY, {align: 'right'});
       });
       x += providerWidth;

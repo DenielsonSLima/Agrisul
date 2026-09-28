@@ -204,9 +204,17 @@ function QuoteDetailContent({quote}: {quote: Quote}) {
 
   const removeMaterial = async (item: QuoteItem) => {
     if (quote.status !== 'open' || mutations.scopeSaving) return;
+    const priceCount = quote.providers.filter(provider => Boolean(provider.values[item.id])).length;
+    const historyCount = quote.negotiations.filter(entry => entry.itemId === item.id).length;
+    const hasApproval = (quote.itemAwards ?? []).some(entry => entry.itemId === item.id);
+    const linkedData = [
+      priceCount ? `${priceCount} ${priceCount === 1 ? 'preço atual' : 'preços atuais'}` : '',
+      historyCount ? `${historyCount} ${historyCount === 1 ? 'versão do histórico' : 'versões do histórico'}` : '',
+      hasApproval ? 'a aprovação registrada' : '',
+    ].filter(Boolean);
     const accepted = await confirm({
       title: 'Remover material da cotação?',
-      description: `${item.materialName} será removido somente desta cotação. O cadastro do material será mantido.`,
+      description: `${item.materialName} será removido somente desta cotação.${linkedData.length ? ` Também serão apagados ${linkedData.join(', ')} vinculados a este item.` : ''} O cadastro do material será mantido.`,
       confirmLabel: 'Remover material',
       tone: 'destructive',
     });
@@ -314,11 +322,13 @@ function QuoteDetailContent({quote}: {quote: Quote}) {
           <QuoteNegotiationTab
             quote={quote}
             materials={materialsQuery.materials}
-            saving={mutations.negotiating || mutations.awarding}
+            saving={mutations.negotiating || mutations.awarding || mutations.scopeSaving}
             onRecord={recordNegotiation}
             onApproveItem={approveItem}
             onUnapproveItem={unapproveItem}
             onAddMaterials={() => setAddingMaterial(true)}
+            onRemoveMaterial={removeMaterial}
+            removingItemId={removingItemId}
           />
         </TabsContent>
         <TabsContent value="providers" className="quote-detail-tab-content">

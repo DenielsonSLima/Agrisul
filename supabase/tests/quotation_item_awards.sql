@@ -20,6 +20,7 @@ DECLARE
  quote_id uuid;
  item_a uuid:='96000000-0000-4000-8000-000000000011';
  item_b uuid:='96000000-0000-4000-8000-000000000012';
+ item_c uuid:='96000000-0000-4000-8000-000000000013';
  quote_provider_a uuid:='96000000-0000-4000-8000-000000000020';
  quote_provider_b uuid:='96000000-0000-4000-8000-000000000021';
  payload jsonb;
@@ -179,11 +180,46 @@ BEGIN
  PERFORM public.billing_rpc('quotations','record-negotiation',jsonb_build_object(
   'id',quote_id,'quotationProviderId',quote_provider_b,
   'quotationItemId',item_b,'unitPrice','25.00','notes','Alternativa B'));
- BEGIN
-  PERFORM public.billing_rpc('quotations','remove-item',jsonb_build_object(
-   'id',quote_id,'quotationItemId',item_b));
-  RAISE EXCEPTION 'Item with negotiation history was removed';
- EXCEPTION WHEN check_violation THEN NULL; END;
+ r=public.billing_rpc('quotations','add-items',jsonb_build_object(
+  'id',quote_id,'items',jsonb_build_array(jsonb_build_object(
+   'id',item_c,'materialId',material_b,'quantity','4',
+   'notes','Remoção destrutiva isolada'))));
+ PERFORM public.billing_rpc('quotations','record-negotiation',jsonb_build_object(
+  'id',quote_id,'quotationProviderId',quote_provider_a,
+  'quotationItemId',item_c,'unitPrice','8.00','notes','Preço removível A'));
+ PERFORM public.billing_rpc('quotations','record-negotiation',jsonb_build_object(
+  'id',quote_id,'quotationProviderId',quote_provider_b,
+  'quotationItemId',item_c,'unitPrice','7.00','notes','Preço removível B'));
+ r=public.billing_rpc('quotations','award-item',jsonb_build_object(
+  'id',quote_id,'quotationItemId',item_c,
+  'quotationProviderId',quote_provider_b));
+ IF NOT (r->'quote'->'items'->2->>'canRemove')::boolean THEN
+  RAISE EXCEPTION 'Priced and approved item was not exposed as removable: %',r;
+ END IF;
+ r=public.billing_rpc('quotations','remove-item',jsonb_build_object(
+  'id',quote_id,'quotationItemId',item_c));
+ IF jsonb_array_length(r->'quote'->'items')<>2
+  OR jsonb_array_length(r->'quote'->'negotiations')<>4
+  OR jsonb_array_length(r->'quote'->'itemAwards')<>0
+  OR r->'quote'->'providers'->0->'values' ? item_c::text
+  OR r->'quote'->'providers'->1->'values' ? item_c::text
+  OR EXISTS(SELECT 1 FROM public.billing_quotation_negotiations
+    WHERE owner_id=auth.uid() AND quotation_id=quote_id
+     AND quotation_item_id=item_c)
+  OR EXISTS(SELECT 1 FROM public.billing_quotation_provider_values
+    WHERE owner_id=auth.uid() AND quotation_id=quote_id
+     AND quotation_item_id=item_c)
+  OR EXISTS(SELECT 1 FROM public.billing_quotation_item_awards
+    WHERE owner_id=auth.uid() AND quotation_id=quote_id
+     AND quotation_item_id=item_c) THEN
+  RAISE EXCEPTION 'Removing a priced item did not clear only its linked data: %',r;
+ END IF;
+ r=public.billing_rpc('quotations','remove-item',jsonb_build_object(
+  'id',quote_id,'quotationItemId',item_c));
+ IF jsonb_array_length(r->'quote'->'items')<>2
+  OR jsonb_array_length(r->'quote'->'negotiations')<>4 THEN
+  RAISE EXCEPTION 'Priced item removal retry was not idempotent: %',r;
+ END IF;
  BEGIN
   PERFORM public.billing_rpc('quotations','remove-provider',jsonb_build_object(
    'id',quote_id,'quotationProviderId',quote_provider_b));
@@ -358,6 +394,11 @@ BEGIN
   RAISE EXCEPTION 'Finished quotation accepted scope changes';
  EXCEPTION WHEN check_violation THEN NULL; END;
  BEGIN
+  PERFORM public.billing_rpc('quotations','remove-item',jsonb_build_object(
+   'id',quote_id,'quotationItemId',item_a));
+  RAISE EXCEPTION 'Finished quotation accepted item removal';
+ EXCEPTION WHEN check_violation THEN NULL; END;
+ BEGIN
   PERFORM public.billing_rpc('quotations','award-item',jsonb_build_object(
    'id',quote_id,'quotationItemId',item_a,'quotationProviderId',quote_provider_b));
   RAISE EXCEPTION 'Finished quotation accepted award changes';
@@ -446,6 +487,11 @@ BEGIN
    'id',quote_id,'quotationItemId',item_id));
   RAISE EXCEPTION 'Foreign quotation award removal was accepted';
  EXCEPTION WHEN no_data_found THEN NULL; END;
+ BEGIN
+  PERFORM public.billing_rpc('quotations','remove-item',jsonb_build_object(
+   'id',quote_id,'quotationItemId',item_id));
+  RAISE EXCEPTION 'Foreign quotation item removal was accepted';
+ EXCEPTION WHEN no_data_found THEN NULL; END;
 END $$;
 
 RESET ROLE;
@@ -530,6 +576,12 @@ BEGIN
   RAISE EXCEPTION 'Read-only member removed an award';
  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
  BEGIN
+  PERFORM public.billing_rpc('quotations','remove-item',jsonb_build_object(
+   'id',current_setting('test.award.quote')::uuid,
+   'quotationItemId',current_setting('test.award.item')::uuid));
+  RAISE EXCEPTION 'Read-only member removed a quotation item';
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ BEGIN
   PERFORM public.billing_rpc('quotations','update-details',jsonb_build_object(
    'id',current_setting('test.award.quote')::uuid,'title','Sem permissão',
    'requestDate','2026-09-25','requesterSignatureId',gen_random_uuid(),'notes',''));
@@ -551,6 +603,12 @@ DO $$ BEGIN
    'id',current_setting('test.award.quote')::uuid,
    'quotationItemId',current_setting('test.award.item')::uuid));
   RAISE EXCEPTION 'Anonymous award removal was accepted';
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ BEGIN
+  PERFORM public.billing_rpc('quotations','remove-item',jsonb_build_object(
+   'id',current_setting('test.award.quote')::uuid,
+   'quotationItemId',current_setting('test.award.item')::uuid));
+  RAISE EXCEPTION 'Anonymous quotation item removal was accepted';
  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
 RESET ROLE;
