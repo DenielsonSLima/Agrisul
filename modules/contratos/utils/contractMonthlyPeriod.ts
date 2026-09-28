@@ -1,4 +1,5 @@
 export type ContractMonthlyPeriod={from:string;to:string};
+type ContractDateRange={from:string;to:string};
 
 const monthValue=(date:Date)=>`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
 const validMonth=(value:string)=>/^(?:19|[2-9][0-9])[0-9]{2}-(?:0[1-9]|1[0-2])$/.test(value);
@@ -7,6 +8,10 @@ export function defaultContractMonthlyPeriod(today=new Date()):ContractMonthlyPe
  const end=new Date(today.getFullYear(),today.getMonth(),1),start=new Date(end);
  start.setMonth(start.getMonth()-5);
  return {from:monthValue(start),to:monthValue(end)};
+}
+
+export function contractMonthlyPeriodFromDateRange(period:ContractDateRange):ContractMonthlyPeriod{
+ return {from:period.from.slice(0,7),to:period.to.slice(0,7)};
 }
 
 export function contractMonthlyPeriodError(period:ContractMonthlyPeriod){

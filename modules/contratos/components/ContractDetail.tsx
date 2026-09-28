@@ -19,12 +19,12 @@ import {financialReportModel,loadsReportModel,type ContractTabReport} from '../r
 import type {BillingContract} from '../types';
 import {notifications,useConfirmation} from '@/shared/feedback';
 import {formatContractBilling,formatContractVolume} from '../utils/contractFormat';
-import {defaultContractMonthlyPeriod,type ContractMonthlyPeriod} from '../utils/contractMonthlyPeriod';
+import {contractMonthlyDateFilters,contractMonthlyPeriodFromDateRange,type ContractMonthlyPeriod} from '../utils/contractMonthlyPeriod';
 import {defaultContractDailyLoadPeriod,type ContractDailyLoadPeriod} from '../utils/contractDailyLoadsPresentation';
 
 export function ContractDetail({id,editing,saved}:{id:string;editing:boolean;saved:boolean}){
  const m=useContracts(id),c=m.contract,loadedId=c?.id,lifecycle=useContractLifecycleMutation(),deletion=useContractDeletionMutation(),confirm=useConfirmation();
- const [childBusy,setChildBusy]=useState(false),[reportOpen,setReportOpen]=useState(false),[monthlyPeriod,setMonthlyPeriod]=useState<ContractMonthlyPeriod>(()=>defaultContractMonthlyPeriod()),[dailyPeriod,setDailyPeriod]=useState<ContractDailyLoadPeriod>(()=>defaultContractDailyLoadPeriod()),[deleting,setDeleting]=useState(false),[deleteError,setDeleteError]=useState('');const titleRef=useRef<HTMLHeadingElement>(null),closing=useRef(false),removing=useRef(false);
+ const [childBusy,setChildBusy]=useState(false),[reportOpen,setReportOpen]=useState(false),[dailyPeriod,setDailyPeriod]=useState<ContractDailyLoadPeriod>(()=>defaultContractDailyLoadPeriod()),[monthlyPeriod,setMonthlyPeriod]=useState<ContractMonthlyPeriod>(()=>contractMonthlyPeriodFromDateRange(dailyPeriod)),[deleting,setDeleting]=useState(false),[deleteError,setDeleteError]=useState('');const titleRef=useRef<HTMLHeadingElement>(null),closing=useRef(false),removing=useRef(false);
  const busy=childBusy||lifecycle.isPending||deleting||deletion.isPending;
  const {searchParams,navigate}=useModuleNavigation();
  const requestedTab=searchParams.get('aba')??'summary';
@@ -34,7 +34,9 @@ export function ContractDetail({id,editing,saved}:{id:string;editing:boolean;sav
  const loads=useContractLoads(id,loadFilters,!editing&&tab==='loads');
  const [tabReport,setTabReport]=useState<{contract:BillingContract;model:ContractTabReport}|null>(null);
  const exportCurrent=()=>{if(!c)return;if(tab==='loads'){if(loads.data&&!loads.loading&&!loads.error)setTabReport({contract:c,model:loadsReportModel(loads.data)});}else if(tab==='financial')setTabReport({contract:c,model:financialReportModel(c)});else setReportOpen(true);};
- const onBusy=useCallback((value:boolean)=>setChildBusy(value),[]);
+ const onBusy=useCallback((value:boolean)=>setChildBusy(value),[setChildBusy]);
+ const changeDailyPeriod=useCallback((period:ContractDailyLoadPeriod)=>{setDailyPeriod(period);setMonthlyPeriod(contractMonthlyPeriodFromDateRange(period));},[setDailyPeriod,setMonthlyPeriod]);
+ const changeMonthlyPeriod=useCallback((period:ContractMonthlyPeriod)=>{setMonthlyPeriod(period);setDailyPeriod(current=>({...current,...contractMonthlyDateFilters(period)}));},[setDailyPeriod,setMonthlyPeriod]);
  const close=async()=>{
   if(!c||closing.current)return;
   const totals=c.financialSummary?.totals,credit=totals?.creditAmount??'',remaining=c.remainingVolume;
@@ -64,7 +66,7 @@ export function ContractDetail({id,editing,saved}:{id:string;editing:boolean;sav
   <div className="companies-heading contract-detail-heading"><div><h2 ref={titleRef} tabIndex={-1}>{editing?'Editar contrato':c.clientName}</h2><p>{c.typeName} · {c.companyName}{c.contractNumber?` · Nº ${c.contractNumber}`:''}</p></div>{!editing&&<div className="contract-detail-actions">{c.status==='Ativo'&&<button type="button" className="btn contract-close-button" disabled={busy} onClick={()=>{void close();}}><CheckCircle2 size={15}/>Encerrar contrato</button>}<button type="button" className="btn" disabled={busy||tab==='loads'&&(loads.loading||!!loads.error||!loads.data)} title={tab==='loads'?'Exportar carregamentos com os filtros selecionados':tab==='financial'?'Exportar financeiro':'Exportar resumo do contrato'} onClick={exportCurrent}><FileDown size={15}/>Exportar</button><ModuleLink className="btn" href={contractHref(id)+'&editar=1'} aria-disabled={busy} onClick={event=>{if(busy)event.preventDefault();}}><Pencil size={15}/>Editar</ModuleLink><button type="button" className="btn contract-delete-button" disabled={busy} onClick={()=>{void remove();}}>{deleting?<Loader2 size={15} className="animate-spin"/>:<Trash2 size={15}/>} {deleting?'Excluindo…':'Excluir'}</button></div>}</div>
   {deleteError&&<p className="form-error contract-delete-error" role="alert">{deleteError}</p>}
   {saved&&<p className="company-saved" role="status"><Check size={16}/>Contrato salvo.</p>}
-  {editing?<ContractForm contract={c} onBusy={onBusy}/>:<Tabs value={tab} onValueChange={setTab} className="contract-detail-tabs"><TabsList variant="line" aria-label="Áreas do contrato"><TabsTrigger disabled={busy} value="summary">Resumo</TabsTrigger><TabsTrigger disabled={busy} value="financial">Financeiro</TabsTrigger><TabsTrigger disabled={busy} value="loads">Carregamentos</TabsTrigger></TabsList><TabsContent value="summary"><ContractSummaryTab key={c.id+':'+c.notes} contract={c} onBusy={onBusy} monthlyPeriod={monthlyPeriod} onMonthlyPeriod={setMonthlyPeriod} dailyPeriod={dailyPeriod} onDailyPeriod={setDailyPeriod}/></TabsContent><TabsContent value="financial"><ContractFinancialTab contract={c} onBusy={onBusy}/></TabsContent><TabsContent value="loads"><ContractLoadsTab contract={c} filters={loadFilters} onFilters={setLoadFilters} query={loads}/></TabsContent></Tabs>}
+  {editing?<ContractForm contract={c} onBusy={onBusy}/>:<Tabs value={tab} onValueChange={setTab} className="contract-detail-tabs"><TabsList variant="line" aria-label="Áreas do contrato"><TabsTrigger disabled={busy} value="summary">Resumo</TabsTrigger><TabsTrigger disabled={busy} value="financial">Financeiro</TabsTrigger><TabsTrigger disabled={busy} value="loads">Carregamentos</TabsTrigger></TabsList><TabsContent value="summary"><ContractSummaryTab key={c.id+':'+c.notes} contract={c} onBusy={onBusy} monthlyPeriod={monthlyPeriod} onMonthlyPeriod={changeMonthlyPeriod} dailyPeriod={dailyPeriod} onDailyPeriod={changeDailyPeriod}/></TabsContent><TabsContent value="financial"><ContractFinancialTab contract={c} onBusy={onBusy}/></TabsContent><TabsContent value="loads"><ContractLoadsTab contract={c} filters={loadFilters} onFilters={setLoadFilters} query={loads}/></TabsContent></Tabs>}
   {reportOpen&&<ContractMonthlyReportDialog open onOpenChange={setReportOpen} contract={c} period={monthlyPeriod} dailyPeriod={dailyPeriod}/>}
   {tabReport&&<ContractTabReportDialog contract={tabReport.contract} model={tabReport.model} onClose={()=>setTabReport(null)}/>}
  </section>;

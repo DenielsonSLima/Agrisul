@@ -2,7 +2,7 @@ import {drawReportPdfHeader,drawReportPdfWatermark,REPORT_MARGIN_MM,type ReportP
 import {formatCnpj} from '@/shared/utils/cnpj';
 import type {BillingContract,ContractLoadsData} from '../types';
 import {contractSummaryDetails,summaryReceivedNote,type SummaryTable} from '../utils/contractSummaryDetails';
-import {contractDailyLoadsChartPages,contractDailyLoadsChartRows} from '../utils/contractDailyLoadsPresentation';
+import {contractDailyLoadGranularityCopy,contractDailyLoadsChartPages,contractDailyLoadsChartRows,type ContractDailyLoadPeriod} from '../utils/contractDailyLoadsPresentation';
 import {formatAtr,formatAtrCriterion,formatContractDate,formatContractMonth,formatContractVolume} from '../utils/contractFormat';
 import {filterContractMonths,monthIsInContractPeriod,type ContractMonthlyPeriod} from '../utils/contractMonthlyPeriod';
 import type {ContractMonthlyReportBrand} from './contractMonthlySummaryPdf';
@@ -23,10 +23,12 @@ async function loadImage(url:string|null):Promise<ReportPdfImage|null>{
 }
 
 // Arithmetic measures page and chart geometry. Financial results come from the RPC.
-export async function createContractSummaryDocument(contract:BillingContract,brand:ContractMonthlyReportBrand,monthlyPeriod?:ContractMonthlyPeriod,dailyLoads?:ContractLoadsData){
+export async function createContractSummaryDocument(contract:BillingContract,brand:ContractMonthlyReportBrand,monthlyPeriod?:ContractMonthlyPeriod,dailyLoads?:ContractLoadsData,dailyPeriod?:ContractDailyLoadPeriod){
  const {jsPDF}=await import('@/shared/reporting/jsPdfRuntime');
  const doc=new jsPDF({orientation:brand.orientation,unit:'mm',format:'a4',compress:true});
- const summary=contractSummaryDetails(contract),filteredMonths=filterContractMonths(summary.months,monthlyPeriod),margin=REPORT_MARGIN_MM;
+ const summary=contractSummaryDetails(contract);
+ const effectiveMonthlyPeriod=dailyPeriod?.from&&dailyPeriod?.to?{from:dailyPeriod.from.slice(0,7),to:dailyPeriod.to.slice(0,7)}:monthlyPeriod;
+ const filteredMonths=filterContractMonths(summary.months,effectiveMonthlyPeriod),margin=REPORT_MARGIN_MM;
  const width=doc.internal.pageSize.getWidth(),height=doc.internal.pageSize.getHeight(),content=width-margin*2,bottom=height-margin-10;
  const [logo,watermark]=await Promise.all([loadImage(brand.company?.logoUrl??null),loadImage(brand.watermark.imageUrl)]);
  let y=0;
@@ -132,19 +134,21 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
  };
  const dailyChart=()=>{
   if(!dailyLoads)return;
-  const rows=contractDailyLoadsChartRows(dailyLoads),numberLabel=(value:number)=>new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(value);
+  const granularity=dailyPeriod?.granularity??'day';
+  const granularityCopy=contractDailyLoadGranularityCopy[granularity];
+  const rows=contractDailyLoadsChartRows(dailyLoads,granularity),numberLabel=(value:number)=>new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(value);
   const atrValues=rows.map(row=>row.averageAtr).filter((value):value is number=>value!==null&&Number.isFinite(value));
   const atrMinimum=atrValues.length?Math.min(...atrValues):0,atrMaximum=atrValues.length?Math.max(...atrValues):1,atrRange=atrMaximum-atrMinimum;
   const atrPadding=atrRange>0?atrRange*.08:Math.max(Math.abs(atrMaximum)*.03,.5),atrScaleMinimum=atrMinimum-atrPadding,atrScaleMaximum=atrMaximum+atrPadding;
   const period=`${formatContractDate(dailyLoads.filters.from)} a ${formatContractDate(dailyLoads.filters.to)}`;
   if(!rows.length){
-   ensure(34);panel(margin,y,content,30);heading(margin+4,y+4,'EVOLUÇÃO DOS CARREGAMENTOS','Quantidade carregada por dia','truck');
+   ensure(34);panel(margin,y,content,30);heading(margin+4,y+4,'EVOLUÇÃO DOS CARREGAMENTOS',granularityCopy.title,'truck');
    font(7,false,palette.muted);doc.text(`Período: ${period} · Nenhum carregamento no período selecionado.`,margin+4,y+23);y+=36;return;
   }
   for(const pageRows of contractDailyLoadsChartPages(rows)){
    const padding=5,panelHeight=79;
-   ensure(panelHeight);panel(margin,y,content,panelHeight);heading(margin+padding,y+4,'EVOLUÇÃO DOS CARREGAMENTOS','Quantidade carregada por dia','truck');
-   font(5.8,false,palette.muted);doc.text(`Barras em toneladas e linha pontilhada do ATR médio diário · Período: ${period}`,margin+padding,y+14);
+   ensure(panelHeight);panel(margin,y,content,panelHeight);heading(margin+padding,y+4,'EVOLUÇÃO DOS CARREGAMENTOS',granularityCopy.title,'truck');
+   font(5.8,false,palette.muted);doc.text(`Barras em toneladas e linha pontilhada do ${granularityCopy.atr.toLowerCase()} · Período: ${period}`,margin+padding,y+14);
    const top=y+19,left=margin+padding+15,right=width-margin-padding-12,plotWidth=right-left,base=top+35,plotHeight=29,slot=plotWidth/pageRows.length;
    panel(margin+padding,top,content-padding*2,54,palette.surface);
    const maxVolume=Math.max(1,...pageRows.map(row=>row.volume));
@@ -154,19 +158,21 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
    }
    const centers=pageRows.map((_,index)=>left+(index+.5)*slot);
    const atrY=(value:number)=>base-(value-atrScaleMinimum)/(atrScaleMaximum-atrScaleMinimum)*plotHeight;
-   const atrPoints=pageRows.map((row,index)=>{const value=row.averageAtr;return value===null||!Number.isFinite(value)?null:{x:centers[index],y:atrY(value),label:formatAtr(row.averageAtrText)};});
+   const atrPoints=pageRows.map((row,index)=>{const value=row.averageAtr;return value===null||!Number.isFinite(value)?null:{x:centers[index],y:atrY(value)};});
    pageRows.forEach((row,index)=>{
     const center=centers[index],barWidth=Math.min(8,slot*.45),barHeight=row.volume/maxVolume*plotHeight;
     doc.setFillColor(84,168,115);doc.roundedRect(center-barWidth/2,base-barHeight,barWidth,barHeight,Math.min(1,barHeight/2),Math.min(1,barHeight/2),'F');
     font(5.2,true,[82,107,90]);doc.text(numberLabel(row.volume),center,base-barHeight-1.2,{align:'center'});
-    font(5.6,false,palette.muted);doc.text(formatContractDate(row.date).slice(0,5),center,base+3.7,{align:'center'});font(4.8,false,palette.muted);doc.text(`${row.loadCount} ${row.loadCount===1?'carga':'cargas'}`,center,base+6.3,{align:'center'});
+    if(row.averageAtr!==null){font(4.8,true,[145,71,0]);doc.text(`ATR ${formatAtr(row.averageAtrText)}`,center,base+3.3,{align:'center'});}
+    font(5.4,false,palette.muted);doc.text(row.label,center,base+6.2,{align:'center'});
    });
    doc.setDrawColor(236,177,111);doc.setLineWidth(.7);doc.setLineDashPattern([1.2,1],0);let previousAtr:{x:number;y:number}|null=null;
    atrPoints.forEach(point=>{if(!point){previousAtr=null;return;}if(previousAtr)doc.line(previousAtr.x,previousAtr.y,point.x,point.y);previousAtr=point;});doc.setLineDashPattern([],0);
-   atrPoints.forEach(point=>{if(!point)return;doc.setFillColor(255,255,255);doc.setDrawColor(236,177,111);doc.circle(point.x,point.y,1,'FD');font(4.8,true,[145,71,0]);const labelWidth=Math.max(10,doc.getTextWidth(point.label)+3),labelTop=point.y<top+6?point.y+1.5:point.y-4.5;doc.setFillColor(255,248,237);doc.setDrawColor(236,177,111);doc.roundedRect(point.x-labelWidth/2,labelTop,labelWidth,3,1.5,1.5,'FD');font(4.8,true,[145,71,0]);doc.text(point.label,point.x,labelTop+2,{align:'center'});});
+   atrPoints.forEach(point=>{if(!point)return;doc.setFillColor(255,255,255);doc.setDrawColor(236,177,111);doc.circle(point.x,point.y,1,'FD');});
    if(atrValues.length){font(4.8,false,[145,71,0]);doc.text(formatAtr(String(atrScaleMaximum)),right+2,top+1);doc.text(formatAtr(String(atrScaleMinimum)),right+2,base+.8);}
-   font(5.3,false,[84,168,115]);doc.text('■ Quantidade diária',margin+padding+3,top+50);const atrLegendX=margin+padding+39,atrLegendY=top+48.8;doc.setDrawColor(236,177,111);doc.setLineWidth(.7);doc.setLineDashPattern([1.2,1],0);doc.line(atrLegendX,atrLegendY,atrLegendX+7,atrLegendY);doc.setLineDashPattern([],0);font(5.3,false,[145,71,0]);doc.text('ATR médio diário (kg/t)',atrLegendX+9,top+50);
-   const metrics=[`Média diária ${formatContractVolume(dailyLoads.summary.averageDailyVolume)}`,`Volume ${formatContractVolume(dailyLoads.summary.volume)}`,`ATR médio ${formatAtr(dailyLoads.summary.averageAtr)} kg/t`,`${dailyLoads.summary.monthCount} meses movimentados`];
+   font(5.3,false,[84,168,115]);doc.text(`■ ${granularityCopy.quantity}`,margin+padding+3,top+50);const atrLegendX=margin+padding+42,atrLegendY=top+48.8;doc.setDrawColor(236,177,111);doc.setLineWidth(.7);doc.setLineDashPattern([1.2,1],0);doc.line(atrLegendX,atrLegendY,atrLegendX+7,atrLegendY);doc.setLineDashPattern([],0);font(5.3,false,[145,71,0]);doc.text(`${granularityCopy.atr} (kg/t)`,atrLegendX+9,top+50);
+   const averageVolume=granularity==='day'?dailyLoads.summary.averageDailyVolume:String(rows.reduce((total,row)=>total+row.volume,0)/rows.length);
+   const metrics=[`Média ${granularityCopy.average} ${formatContractVolume(averageVolume)}`,`Volume ${formatContractVolume(dailyLoads.summary.volume)}`,`ATR médio ${formatAtr(dailyLoads.summary.averageAtr)} kg/t`,`${dailyLoads.summary.monthCount} meses movimentados`];
    font(5.5,false,palette.muted);doc.text(metrics.join('  ·  '),width-margin-padding-3,top+50,{align:'right'});
    y+=panelHeight+6;
   }
@@ -191,7 +197,7 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
  const charts=()=>{
   const numberLabel=(value:number)=>new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1}).format(value);
   const moneyLabel=(value:number)=>'R$ '+(value>=1000000?numberLabel(value/1000000)+' mi':value>=1000?numberLabel(value/1000)+' mil':numberLabel(value));
-  const periodLabel=monthlyPeriod?`${formatContractMonth(monthlyPeriod.from)} a ${formatContractMonth(monthlyPeriod.to)}`:'Todo o contrato';
+  const periodLabel=dailyPeriod?.from&&dailyPeriod?.to?`${formatContractDate(dailyPeriod.from)} a ${formatContractDate(dailyPeriod.to)}`:effectiveMonthlyPeriod?`${formatContractMonth(effectiveMonthlyPeriod.from)} a ${formatContractMonth(effectiveMonthlyPeriod.to)}`:'Todo o contrato';
   if(!filteredMonths.length){
    ensure(34);panel(margin,y,content,30);heading(margin+4,y+4,'RESUMO MENSAL','Entregas, faturamento e entradas','calendar');
    font(7,false,palette.muted);doc.text(`Período: ${periodLabel} · Nenhuma movimentação no período selecionado.`,margin+4,y+23);y+=36;return;
@@ -221,9 +227,10 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
      const barWidth=Math.min(5.2,slot*.3),center=left+(index+.5)*slot;
      [gross[index],net[index]].forEach((value,seriesIndex)=>{if(value===null||!Number.isFinite(value)||value<=0)return;const barHeight=value/scale*plotHeight,barX=center+(seriesIndex?0:-barWidth);doc.setFillColor(...(seriesIndex?palette.dark:[117,185,140] as Color));doc.roundedRect(barX,base-barHeight,barWidth*.9,barHeight,Math.min(.7,barHeight/2),Math.min(.7,barHeight/2),'F');font(4.8,false,seriesIndex?palette.dark:[89,128,104]);doc.text(numberLabel(value>=1000?value/1000:value)+(value>=1000?'k':''),barX+barWidth*.45,base-barHeight-1,{align:'center'});});
      if(atr[index]!==null)points.push([center,base-(atr[index] as number)/maxAtr*plotHeight]);
-     font(5.8,false,palette.muted);doc.text(formatContractMonth(row.month),center,base+3.5,{align:'center'});font(4.9,false,palette.muted);doc.text(`${numberLabel(Number(row.finance?.loadedVolume??row.production?.loadedVolume??0))} t`,center,base+6.2,{align:'center'});
+     if(atr[index]!==null){font(4.7,true,[145,71,0]);doc.text(`ATR ${formatAtr(String(atr[index]))}`,center,base+3.2,{align:'center'});}
+     font(5.8,false,palette.muted);doc.text(formatContractMonth(row.month),center,base+6,{align:'center'});font(4.9,false,palette.muted);doc.text(`${numberLabel(Number(row.finance?.loadedVolume??row.production?.loadedVolume??0))} t`,center,base+8.7,{align:'center'});
     });
-   if(points.length>1){doc.setDrawColor(...palette.amber);doc.setLineWidth(.7);for(let index=1;index<points.length;index++)doc.line(points[index-1][0],points[index-1][1],points[index][0],points[index][1]);}
+   if(points.length>1){doc.setDrawColor(...palette.amber);doc.setLineWidth(.7);doc.setLineDashPattern([1.2,1],0);for(let index=1;index<points.length;index++)doc.line(points[index-1][0],points[index-1][1],points[index][0],points[index][1]);doc.setLineDashPattern([],0);}
    points.forEach(point=>{doc.setFillColor(255,255,255);doc.setDrawColor(...palette.amber);doc.setLineWidth(.6);doc.circle(point[0],point[1],1,'FD');});
    const legends=[{label:'Faturado bruto',color:[117,185,140] as Color},{label:'Valor líquido',color:palette.dark},{label:'ATR médio',color:palette.amber},{label:'Quantidade entregue',color:palette.muted}];let legendX=margin+padding+3;
    legends.forEach(item=>{doc.setFillColor(...item.color);doc.circle(legendX+1,top+56,.8,'F');font(5.4,false,item.color);doc.text(item.label,legendX+3,top+56.7);legendX+=doc.getTextWidth(item.label)+8;});
@@ -266,7 +273,7 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
  dailyChart();
  financialOverview();
  charts();
- const periodTables=summary.tables.map((model,index)=>index<2&&monthlyPeriod?{...model,rows:model.rows.filter((_,rowIndex)=>monthIsInContractPeriod(summary.months[rowIndex]?.month??'',monthlyPeriod))}:model);
+ const periodTables=summary.tables.map((model,index)=>index<2&&effectiveMonthlyPeriod?{...model,rows:model.rows.filter((_,rowIndex)=>monthIsInContractPeriod(summary.months[rowIndex]?.month??'',effectiveMonthlyPeriod))}:model);
  for(const model of periodTables)table(model);
  if(contract.notes.trim()){section('Observações do contrato');paragraph(contract.notes,8);}
 
