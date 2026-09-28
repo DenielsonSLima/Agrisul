@@ -10,7 +10,9 @@ const inputDate=(date:Date)=>{
 
 export function defaultContractDailyLoadPeriod(today=new Date()):ContractDailyLoadPeriod{
  const end=new Date(today.getFullYear(),today.getMonth(),today.getDate());
- const start=new Date(end);start.setDate(start.getDate()-29);
+ const startMonth=new Date(end.getFullYear(),end.getMonth()-6,1);
+ const lastDayOfStartMonth=new Date(startMonth.getFullYear(),startMonth.getMonth()+1,0).getDate();
+ const start=new Date(startMonth.getFullYear(),startMonth.getMonth(),Math.min(end.getDate(),lastDayOfStartMonth));
  return {from:inputDate(start),to:inputDate(end)};
 }
 
@@ -21,10 +23,14 @@ export function contractDailyLoadPeriodError({from,to}:ContractDailyLoadPeriod){
 }
 
 export function contractDailyLoadsChartRows(data:ContractDailyLoadsData){
- return data.groups.map(group=>({
+ const rows=data.groups.map(group=>({
   date:group.key,
   volume:Number(group.volume),
   volumeText:group.volume,
   loadCount:group.loadCount,
  })).sort((a,b)=>a.date.localeCompare(b.date));
+ return rows.map((row,index)=>({
+  ...row,
+  variationPercent:index===0||rows[index-1].volume===0?null:(row.volume-rows[index-1].volume)/rows[index-1].volume*100,
+ }));
 }

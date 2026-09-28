@@ -39,6 +39,7 @@ export function contractSummaryDetails(contract:BillingContract){
  const remaining=contract.monthlySummary?.totals.remainingVolume??contract.remainingVolume;
  const averageAtr=finance?.averageAtr??contract.monthlySummary?.totals.averageLoadAtr??contract.averageAtr;
  const financialItems=[...summaryFinancialItems(finance)];
+ const perTonValue=(key:'grossPerTon'|'netPerTon')=>!finance?'—':finance.billingPending?'Pendente':finance[key]?`${formatContractBilling(finance[key])}/t`:'—';
  if(!finance)financialItems[0]={...financialItems[0],value:formatContractBilling(presentation.totals.billingAmount,presentation.totals.billingPending)};
  const monthlyMoney=(entry:typeof rows[number],key:keyof ContractFinancialMetrics,pending=false)=>entry.finance?formatContractBilling(String(entry.finance[key]),pending&&entry.finance.billingPending):'—';
  const deliveryTable:SummaryTable={
@@ -72,6 +73,7 @@ export function contractSummaryDetails(contract:BillingContract){
    {label:'Falta entregar',value:formatContractVolume(remaining),hint:'Saldo em toneladas'},
    {label:'ATR médio',value:formatAtr(averageAtr),hint:'Ponderado pelas entregas · kg/t'},
   ],
+  salePerTon:{label:'Valor de venda por tonelada',gross:perTonValue('grossPerTon'),net:perTonValue('netPerTon')},
   conditions:[{label:'Número do contrato',value:contract.contractNumber||'Não informado'},{label:'Empresa',value:contract.companyName},{label:'Cliente',value:contract.clientName},{label:'Tipo de contrato',value:contract.typeName},{label:'Situação',value:contract.status},{label:'Vigência',value:contractPeriod(contract.startDate,contract.endDate)},{label:'Critério do ATR',value:formatAtrCriterion(contract.atrPriceType,contract.atrPeriodType)}],
   notice:!finance?summaryUnavailableNote:finance.billingPending?summaryPendingNote:'',
   tables:[deliveryTable,balanceTable,payments,discounts],

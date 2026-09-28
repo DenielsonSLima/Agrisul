@@ -11,6 +11,7 @@ import './contract-daily-loads-chart.css';
 
 const compactVolume=(value:number)=>new Intl.NumberFormat('pt-BR',{notation:'compact',maximumFractionDigits:1}).format(value);
 const barValue=(value:unknown)=>new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(Number(value));
+const percentageLabel=(value:unknown)=>value===null||value===undefined?'':`${new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1,signDisplay:'always'}).format(Number(value))}%`;
 const shortDate=(date:string)=>{const [,month,day]=date.split('-');return `${day}/${month}`;};
 
 export function ContractDailyLoadsChart({contractId}:{contractId:string}){
@@ -18,9 +19,7 @@ export function ContractDailyLoadsChart({contractId}:{contractId:string}){
  const initialPeriod=useMemo(()=>defaultContractDailyLoadPeriod(),[]);
  const [from,setFrom]=useState(initialPeriod.from),[to,setTo]=useState(initialPeriod.to);
  const periodError=contractDailyLoadPeriodError({from,to});
- // The RPC contract accepts the dedicated daily grouping. The double assertion
- // keeps this component deployable while the shared union rolls out with it.
- const filters={search:'',from,to,groupBy:'day'} as unknown as ContractLoadFilters;
+ const filters:ContractLoadFilters={search:'',from,to,groupBy:'day'};
  const query=useContractLoads(contractId,filters,!periodError);
  const data=query.data as ContractDailyLoadsData|undefined;
  const rows=data?contractDailyLoadsChartRows(data):[];
@@ -28,13 +27,13 @@ export function ContractDailyLoadsChart({contractId}:{contractId:string}){
 
  return <section className="contract-daily-loads" aria-labelledby={titleId} aria-busy={query.loading}>
   <header className="contract-daily-loads-heading">
-   <div><span><BarChart3 size={14}/>EVOLUÇÃO DOS CARREGAMENTOS</span><h4 id={titleId}>Quantidade carregada por dia</h4><p>Barras em toneladas e linha de variação nos dias em que houve carregamento.</p></div>
-   <div className="contract-daily-loads-legend" aria-hidden="true"><i/><span>Quantidade diária</span><b/><span>Variação</span></div>
+   <div><span><BarChart3 size={14}/>EVOLUÇÃO DOS CARREGAMENTOS</span><h4 id={titleId}>Quantidade carregada por dia</h4><p>Barras em toneladas e variação percentual em relação ao dia anterior com carregamento.</p></div>
+   <div className="contract-daily-loads-legend" aria-hidden="true"><i/><span>Quantidade diária</span><b/><span>Variação percentual</span></div>
   </header>
   <div className="contract-daily-loads-filters" aria-label="Período do gráfico diário">
    <label><span>Data inicial</span><input type="date" min="1900-01-01" max="9999-12-31" value={from} aria-invalid={!!periodError} onChange={event=>setFrom(event.target.value)}/></label>
    <label><span>Data final</span><input type="date" min="1900-01-01" max="9999-12-31" value={to} aria-invalid={!!periodError} onChange={event=>setTo(event.target.value)}/></label>
-   <button className="btn" type="button" onClick={resetPeriod}><CalendarRange size={15}/>Últimos 30 dias</button>
+   <button className="btn" type="button" onClick={resetPeriod}><CalendarRange size={15}/>Últimos 6 meses</button>
   </div>
   {periodError?<div className="contract-daily-loads-state is-error" role="alert"><CalendarRange/><strong>Confira o período</strong><p>{periodError}</p></div>:
    query.loading?<div className="contract-daily-loads-state" role="status"><Loader2 className="animate-spin"/><strong>Carregando evolução diária…</strong></div>:
@@ -43,17 +42,18 @@ export function ContractDailyLoadsChart({contractId}:{contractId:string}){
    <>
     <div className="contract-daily-loads-chart-scroll" tabIndex={0} role="region" aria-label="Gráfico diário; deslize horizontalmente para consultar todos os dias">
      <div className="contract-daily-loads-chart" style={{minWidth:`${Math.max(640,rows.length*72)}px`}} role="img" aria-labelledby={`${titleId} ${descriptionId}`}>
-      <ResponsiveContainer width="100%" height="100%" minWidth={0}><ComposedChart data={rows} margin={{top:32,right:16,left:0,bottom:4}}>
+      <ResponsiveContainer width="100%" height="100%" minWidth={0}><ComposedChart data={rows} margin={{top:42,right:0,left:0,bottom:4}}>
        <CartesianGrid vertical={false} stroke="#e7eee9" strokeDasharray="4 5"/>
        <XAxis dataKey="date" tickFormatter={shortDate} axisLine={false} tickLine={false} tick={{fontSize:10,fill:'#788b7e'}} tickMargin={10}/>
-       <YAxis tickFormatter={compactVolume} axisLine={false} tickLine={false} tick={{fontSize:10,fill:'#8a9990'}} width={48}/>
+       <YAxis yAxisId="volume" tickFormatter={compactVolume} axisLine={false} tickLine={false} tick={{fontSize:10,fill:'#8a9990'}} width={48}/>
+       <YAxis yAxisId="variation" orientation="right" domain={['auto','auto']} tickFormatter={percentageLabel} axisLine={false} tickLine={false} tick={{fontSize:9,fill:'#b57438',fillOpacity:.72}} width={58}/>
        <Tooltip content={({active,payload})=><DailyLoadsTooltip active={active} row={payload?.[0]?.payload as DailyChartRow|undefined}/>}/>
-       <Bar dataKey="volume" name="Quantidade diária" fill="#54a873" radius={[6,6,0,0]} maxBarSize={38} isAnimationActive={false}><LabelList dataKey="volume" position="top" formatter={barValue} fill="#526b5a" fontSize={9}/></Bar>
-       <Line type="linear" dataKey="volume" name="Variação" stroke="#285f7b" strokeWidth={2.5} dot={{r:3,fill:'#285f7b',stroke:'#fff',strokeWidth:2}} activeDot={{r:5}} isAnimationActive={false}/>
+       <Bar yAxisId="volume" dataKey="volume" name="Quantidade diária" fill="#54a873" radius={[6,6,0,0]} maxBarSize={38} isAnimationActive={false}><LabelList dataKey="volume" position="top" formatter={barValue} fill="#526b5a" fontSize={9}/></Bar>
+       <Line yAxisId="variation" type="linear" dataKey="variationPercent" name="Variação percentual" connectNulls={false} stroke="#d97706" strokeOpacity={.52} strokeWidth={2.5} dot={{r:3,fill:'#d97706',fillOpacity:.52,stroke:'#fff',strokeWidth:2}} activeDot={{r:5,fill:'#d97706',fillOpacity:.7}} isAnimationActive={false}><LabelList dataKey="variationPercent" position="top" formatter={percentageLabel} fill="#b45f06" opacity={.7} fontSize={9}/></Line>
       </ComposedChart></ResponsiveContainer>
      </div>
     </div>
-    <p className="sr-only" id={descriptionId}>{rows.map(row=>`${formatContractDate(row.date)}: ${formatContractVolume(row.volumeText)}, ${row.loadCount} ${row.loadCount===1?'carregamento':'carregamentos'}`).join('. ')}</p>
+    <p className="sr-only" id={descriptionId}>{rows.map(row=>`${formatContractDate(row.date)}: ${formatContractVolume(row.volumeText)}, ${row.loadCount} ${row.loadCount===1?'carregamento':'carregamentos'}, ${row.variationPercent===null?'sem comparação anterior':`variação de ${percentageLabel(row.variationPercent)}`}`).join('. ')}</p>
     <DailyLoadsSummary data={data}/>
    </>}
  </section>;
@@ -62,7 +62,7 @@ export function ContractDailyLoadsChart({contractId}:{contractId:string}){
 type DailyChartRow=ReturnType<typeof contractDailyLoadsChartRows>[number];
 function DailyLoadsTooltip({active,row}:{active?:boolean;row?:DailyChartRow}){
  if(!active||!row)return null;
- return <div className="contract-daily-loads-tooltip"><strong>{formatContractDate(row.date)}</strong><span>Quantidade <b>{formatContractVolume(row.volumeText)}</b></span><span>Carregamentos <b>{row.loadCount}</b></span></div>;
+ return <div className="contract-daily-loads-tooltip"><strong>{formatContractDate(row.date)}</strong><span>Quantidade <b>{formatContractVolume(row.volumeText)}</b></span><span>Carregamentos <b>{row.loadCount}</b></span><span>Variação <b className="is-variation">{row.variationPercent===null?'Sem base anterior':percentageLabel(row.variationPercent)}</b></span></div>;
 }
 
 function DailyLoadsSummary({data}:{data:ContractDailyLoadsData}){

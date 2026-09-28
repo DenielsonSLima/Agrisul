@@ -32,5 +32,5 @@ export type ContractRefund=ContractRefundInput&{id:string;revision:number};
 export type ContractDiscountInput={requestId:string;title:string;ratePerTon:string;months:string[];notes:string};
 export type ContractDiscountMonthlyRow={month:string;loadedVolume:string;amount:string};
 export type ContractDiscount=ContractDiscountInput&{id:string;revision:number;loadedVolume:string;amount:string;monthlyBreakdown:ContractDiscountMonthlyRow[]};
-export type ContractFinancialMetrics={loadedVolume:string;averageAtr:string;grossAmount:string;billingPending:boolean;discountAmount:string;netAmount:string;advanceAmount:string;receiptAmount:string;refundedAmount:string;receivedAmount:string;pendingAmount:string;creditAmount:string;refundableAmount:string};
+export type ContractFinancialMetrics={loadedVolume:string;averageAtr:string;grossAmount:string;grossPerTon:string;billingPending:boolean;discountAmount:string;netAmount:string;netPerTon:string;advanceAmount:string;receiptAmount:string;refundedAmount:string;receivedAmount:string;pendingAmount:string;creditAmount:string;refundableAmount:string};
 export type ContractFinancialSummary={months:(ContractFinancialMetrics&{month:string})[];totals:ContractFinancialMetrics;emptyMonth:ContractFinancialMetrics;payments:ContractPayment[];refunds:ContractRefund[];discounts:ContractDiscount[]};

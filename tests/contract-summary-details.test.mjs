@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {mkdtemp,rm,mkdir,writeFile} from 'node:fs/promises';
+import {mkdtemp,readFile,rm,mkdir,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {createRequire} from 'node:module';
@@ -11,7 +11,7 @@ try{
  const output=join(directory,'summary.mjs');
  await build({stdin:{contents:`export {contractSummaryDetails} from './modules/contratos/utils/contractSummaryDetails'; export {createContractMonthlySummaryPdf} from './modules/contratos/reporting/contractMonthlySummaryPdf';`,resolveDir:process.cwd()},outfile:output,bundle:true,platform:'node',format:'esm'});
  const {contractSummaryDetails,createContractMonthlySummaryPdf}=await import(pathToFileURL(output));
- const metrics={loadedVolume:'250',averageAtr:'121.5',grossAmount:'150000.75',discountAmount:'2000.25',netAmount:'148000.50',advanceAmount:'25000.15',receiptAmount:'35000.35',refundedAmount:'0',receivedAmount:'60000.50',pendingAmount:'88000',creditAmount:'0',refundableAmount:'0',billingPending:false};
+ const metrics={loadedVolume:'250',averageAtr:'121.5',grossAmount:'150000.75',grossPerTon:'600.003',discountAmount:'2000.25',netAmount:'148000.50',netPerTon:'592.002',advanceAmount:'25000.15',receiptAmount:'35000.35',refundedAmount:'0',receivedAmount:'60000.50',pendingAmount:'88000',creditAmount:'0',refundableAmount:'0',billingPending:false};
  const empty={...metrics,loadedVolume:'0',averageAtr:'',grossAmount:'0',discountAmount:'0',netAmount:'0',advanceAmount:'0',receiptAmount:'0',refundedAmount:'0',receivedAmount:'0',pendingAmount:'0',creditAmount:'0',refundableAmount:'0'};
  const advanceMonth={...empty,month:'2026-08',advanceAmount:'987.65',receivedAmount:'987.65',creditAmount:'987.65'};
  const production={month:'2026-09',atrReferenceMonth:'2026-08',loadedVolume:'250',averageLoadAtr:'121.5',atrQuote:'1.253367',billingAmount:'150000.75',billingPending:false,expenseAmount:'',expensesPending:true,resultAmount:''};
@@ -25,6 +25,13 @@ try{
  assert.deepEqual(model.financialItems.map(item=>item.key),['gross','discount','net','advance','receipt','refund','received','pending','credit']);
  for(const [key,value] of [['advance','25.000,15'],['receipt','35.000,35'],['received','60.000,50'],['pending','88.000,00']])assert.ok(model.financialItems.find(item=>item.key===key).value.includes(value));
  assert.ok(model.operationalItems.find(item=>item.label==='Falta entregar').value.includes('750,00'));
+ assert.equal(model.salePerTon.gross,'R$ 600,00/t');
+ assert.equal(model.salePerTon.net,'R$ 592,00/t');
+ const heroSource=await readFile('modules/contratos/components/details/ContractSummaryHero.tsx','utf8');
+ const heroOrder=['Quantidade do contrato','Quantidade entregue','summary.operationalItems[3].label','Falta entregar'].map(value=>heroSource.indexOf(value));
+ assert.ok(heroOrder.every((position,index)=>position>=0&&(index===0||position>heroOrder[index-1])),'Hero KPI rows must keep contract/received, delivered/pending, ATR/sale-per-ton, remaining/credit order');
+ assert.match(heroSource,/balances=\[money\[0\],money\[1\],null,money\[2\]\]/);
+ assert.doesNotMatch(heroSource,/Quantidade entregue[^\n]+ATR médio/);
  assert.ok(model.tables[1].rows[0][1].includes('987,65'));
  assert.equal(model.tables[2].rows[0][0],'15/09/2026');assert.equal(model.tables[2].rows[0][1],'Ago/2026');
  const agreement=model.tables.find(table=>table.title==='Acordos de desconto');
@@ -39,12 +46,14 @@ try{
  assert.ok(pendingModel.financialItems.find(item=>item.key==='received').value.includes('60.000,50'));
  const noFinance=contractSummaryDetails({...contract,financialSummary:undefined});
  assert.equal(noFinance.financialItems.find(item=>item.key==='received').value,'—');
+ assert.deepEqual(noFinance.salePerTon,{label:'Valor de venda por tonelada',gross:'—',net:'—'});
  const brand={orientation:'portrait',header:{variant:'detailed',logoAlignment:'left',showCnpj:true,showContact:true},company:null,watermark:{imageUrl:null,opacity:15,size:60},issuer:{id:'user',name:'Responsável',email:'responsavel@example.test'},issuedAt:new Date('2026-09-15T12:00:00Z')};
+ const dailyLoads={filters:{search:'',from:'2026-09-01',to:'2026-09-30',groupBy:'day'},summary:{loadCount:2,volume:'250',farmCount:1,plotCount:1,activeDayCount:2,monthCount:1,averageDailyVolume:'125',averageAtr:'121.5',firstLoadedAt:'2026-09-15',lastLoadedAt:'2026-09-16',grossAmount:'150000.75',discountAmount:'2000.25',netAmount:'148000.50',billingPending:false},monthlyVolumes:[{month:'2026-09',volume:'250',loadCount:2}],groups:[{key:'2026-09-15',label:'2026-09-15',loadCount:1,volume:'100',averageAtr:'120',loads:[]},{key:'2026-09-16',label:'2026-09-16',loadCount:1,volume:'150',averageAtr:'122.5',loads:[]}]};
  const longContract={...contract,notes:('Orientação comercial detalhada. '.repeat(120)+'FIM-DAS-OBSERVACOES'),financialSummary:{...contract.financialSummary,payments:Array.from({length:45},(_,index)=>({...payment,id:'payment-'+index,document:'RECIBO-'+String(index).padStart(3,'0'),notes:index===4?'Detalhes do comprovante. '.repeat(40)+'FIM-DO-COMPROVANTE':'Entrada confirmada.'})),discounts:[{...discount,notes:'Condições do acordo. '.repeat(45)+'FIM-DO-ACORDO'}]}};
  for(const orientation of ['portrait','landscape']){
-  const {doc}=await createContractMonthlySummaryPdf(longContract,{...brand,orientation});
+  const {doc}=await createContractMonthlySummaryPdf(longContract,{...brand,orientation},undefined,dailyLoads);
   const commands=doc.internal.pages.flat().join('\n');
-  for(const text of ['Avanço do carregamento','Da entrega ao recebimento','Entregas, faturamento e entradas','Faturamento, líquido e ATR por mês','ATR médio','Quantidade entregue','Acordos de desconto','Valor por tonelada','Meses de aplicação','Base entregue','Desconto total','Adiantamentos','Recebimentos','Estornos','Total recebido','Crédito do contrato','Falta entregar','25.000,15','35.000,35','60.000,50','88.000,00','8,001/t','Ago/2026','Out/2026','RECIBO-044','FIM-DO-COMPROVANTE','FIM-DO-ACORDO','FIM-DAS-OBSERVACOES'])assert.ok(commands.includes(text),orientation+' lost '+text);
+  for(const text of ['Avanço do carregamento','Quantidade carregada por dia','Variação percentual','Média diária 125,00 t','15/09','16/09','Valor de venda por tonelada','Bruto','600,00/t','Líquido após descontos:','592,00/t','Da entrega ao recebimento','Entregas, faturamento e entradas','Faturamento, líquido e ATR por mês','ATR médio','Quantidade entregue','Acordos de desconto','Valor por tonelada','Meses de aplicação','Base entregue','Desconto total','Adiantamentos','Recebimentos','Estornos','Total recebido','Crédito do contrato','Falta entregar','25.000,15','35.000,35','60.000,50','88.000,00','8,001/t','Ago/2026','Out/2026','RECIBO-044','FIM-DO-COMPROVANTE','FIM-DO-ACORDO','FIM-DAS-OBSERVACOES'])assert.ok(commands.includes(text),orientation+' lost '+text);
   assert.doesNotMatch(commands,/A ajustar|Dados essenciais|Condições do contrato/);
   assert.ok(doc.getNumberOfPages()>2);
   for(const page of doc.internal.pages.slice(1))for(const command of page){

@@ -1,8 +1,9 @@
 import {drawReportPdfHeader,drawReportPdfWatermark,REPORT_MARGIN_MM,type ReportPdfImage} from '@/shared/reporting';
 import {formatCnpj} from '@/shared/utils/cnpj';
-import type {BillingContract} from '../types';
+import type {BillingContract,ContractLoadsData} from '../types';
 import {contractSummaryDetails,summaryReceivedNote,type SummaryTable} from '../utils/contractSummaryDetails';
-import {formatAtrCriterion,formatContractMonth} from '../utils/contractFormat';
+import {contractDailyLoadsChartRows} from '../utils/contractDailyLoadsPresentation';
+import {formatAtrCriterion,formatContractDate,formatContractMonth,formatContractVolume} from '../utils/contractFormat';
 import {filterContractMonths,monthIsInContractPeriod,type ContractMonthlyPeriod} from '../utils/contractMonthlyPeriod';
 import type {ContractMonthlyReportBrand} from './contractMonthlySummaryPdf';
 
@@ -22,7 +23,7 @@ async function loadImage(url:string|null):Promise<ReportPdfImage|null>{
 }
 
 // Arithmetic measures page and chart geometry. Financial results come from the RPC.
-export async function createContractSummaryDocument(contract:BillingContract,brand:ContractMonthlyReportBrand,monthlyPeriod?:ContractMonthlyPeriod){
+export async function createContractSummaryDocument(contract:BillingContract,brand:ContractMonthlyReportBrand,monthlyPeriod?:ContractMonthlyPeriod,dailyLoads?:ContractLoadsData){
  const {jsPDF}=await import('@/shared/reporting/jsPdfRuntime');
  const doc=new jsPDF({orientation:brand.orientation,unit:'mm',format:'a4',compress:true});
  const summary=contractSummaryDetails(contract),filteredMonths=filterContractMonths(summary.months,monthlyPeriod),margin=REPORT_MARGIN_MM;
@@ -89,12 +90,13 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
  };
  const hero=()=>{
   const gap=3,overviewWidth=content*.43,kpiWidth=(content-overviewWidth-gap*2)/2,copyX=margin+34,copyWidth=overviewWidth-38,valueWidth=(copyWidth-2)/2;
-  const quantities=summary.operationalItems.slice(0,3).map((item,index)=>({...item,hint:index===1?`ATR médio: ${summary.operationalItems[3].value} kg/t`:item.hint}));
-  const balances=summary.financialItems.filter(item=>item.key==='received'||item.key==='pending'||item.key==='credit');
+  const quantities=[summary.operationalItems[0],summary.operationalItems[1],summary.operationalItems[3],summary.operationalItems[2]],money=summary.financialItems.filter(item=>item.key==='received'||item.key==='pending'||item.key==='credit'),balances:SummaryCard[]=[
+   money[0],money[1],{label:summary.salePerTon.label,value:`Bruto ${summary.salePerTon.gross}`,hint:`Líquido após descontos: ${summary.salePerTon.net}`},money[2],
+  ];
   const copyValues=[quantities[1],quantities[0]].map(item=>{const size=fitValue(item.value,valueWidth,8.5);return {size,value:lines(item.value,size,valueWidth,true)};});
   const copyExtra=(Math.max(...copyValues.map(item=>item.value.length))-1)*3.5;
   const rowHeight=Math.max(...quantities.map(item=>metricLayout(item,kpiWidth,'scale').height),...balances.map(item=>metricLayout(item,kpiWidth).height));
-  const heroHeight=Math.max(60+copyExtra,rowHeight*3+gap*2),kpiHeight=(heroHeight-gap*2)/3;
+  const heroHeight=Math.max(60+copyExtra,rowHeight*4+gap*3),kpiHeight=(heroHeight-gap*3)/4;
   ensure(heroHeight+6);panel(margin,y,overviewWidth,heroHeight,[242,249,245]);
   icon('gauge',margin+4,y+4);font(5.7,true,palette.muted);doc.text('VISÃO OPERACIONAL',margin+14,y+6.5);
   font(8.7,true);doc.text('Avanço do carregamento',margin+14,y+11);
@@ -123,10 +125,47 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
   if(percent>0){doc.setFillColor(...palette.green);doc.roundedRect(copyX,y+51+copyExtra,Math.max(.5,copyWidth*percent/100),1.8,Math.min(.9,copyWidth*percent/200),.9,'F');}
   quantities.forEach((item,index)=>{
    const top=y+index*(kpiHeight+gap),x=margin+overviewWidth+gap;
-   metric(item,x,top,kpiWidth,kpiHeight,(['scale','package','truck'] as const)[index]);
+   metric(item,x,top,kpiWidth,kpiHeight,(['scale','package','gauge','truck'] as const)[index]);
    metric(balances[index],x+kpiWidth+gap,top,kpiWidth,kpiHeight);
   });
   y+=heroHeight+6;
+ };
+ const dailyChart=()=>{
+  if(!dailyLoads)return;
+  const rows=contractDailyLoadsChartRows(dailyLoads),numberLabel=(value:number)=>new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(value);
+  const period=`${formatContractDate(dailyLoads.filters.from)} a ${formatContractDate(dailyLoads.filters.to)}`;
+  if(!rows.length){
+   ensure(34);panel(margin,y,content,30);heading(margin+4,y+4,'EVOLUÇÃO DOS CARREGAMENTOS','Quantidade carregada por dia','truck');
+   font(7,false,palette.muted);doc.text(`Período: ${period} · Nenhum carregamento no período selecionado.`,margin+4,y+23);y+=36;return;
+  }
+  for(let offset=0;offset<rows.length;offset+=8){
+   const pageRows=rows.slice(offset,offset+8),padding=5,panelHeight=79;
+   ensure(panelHeight);panel(margin,y,content,panelHeight);heading(margin+padding,y+4,'EVOLUÇÃO DOS CARREGAMENTOS','Quantidade carregada por dia','truck');
+   font(5.8,false,palette.muted);doc.text(`Barras em toneladas e linha de variação percentual · Período: ${period}`,margin+padding,y+14);
+   const top=y+19,left=margin+padding+15,right=width-margin-padding-12,plotWidth=right-left,base=top+35,plotHeight=29,slot=plotWidth/pageRows.length;
+   panel(margin+padding,top,content-padding*2,54,palette.surface);
+   const maxVolume=Math.max(1,...pageRows.map(row=>row.volume));
+   const variations=pageRows.map(row=>row.variationPercent).filter((value):value is number=>value!==null&&Number.isFinite(value));
+   const maxVariation=Math.max(1,...variations.map(value=>Math.abs(value)));
+   for(let index=0;index<=3;index++){
+    const gridY=base-plotHeight*index/3;doc.setDrawColor(227,237,231);doc.setLineWidth(.2);doc.setLineDashPattern([1,1.4],0);doc.line(left,gridY,right,gridY);doc.setLineDashPattern([],0);
+    font(5.5,false,palette.muted);doc.text(numberLabel(maxVolume*index/3),left-2,gridY+.8,{align:'right'});
+   }
+   const points:[number,number][]=[];
+   pageRows.forEach((row,index)=>{
+    const center=left+(index+.5)*slot,barWidth=Math.min(8,slot*.45),barHeight=row.volume/maxVolume*plotHeight;
+    doc.setFillColor(84,168,115);doc.roundedRect(center-barWidth/2,base-barHeight,barWidth,barHeight,Math.min(1,barHeight/2),Math.min(1,barHeight/2),'F');
+    font(5.2,true,[82,107,90]);doc.text(numberLabel(row.volume),center,base-barHeight-1.2,{align:'center'});
+    if(row.variationPercent!==null){const pointY=top+plotHeight/2-row.variationPercent/maxVariation*(plotHeight/2);points.push([center,pointY]);font(4.8,false,[180,95,6]);doc.text(`${row.variationPercent>0?'+':''}${numberLabel(row.variationPercent)}%`,center,pointY-1.6,{align:'center'});}
+    font(5.6,false,palette.muted);doc.text(formatContractDate(row.date).slice(0,5),center,base+3.7,{align:'center'});font(4.8,false,palette.muted);doc.text(`${row.loadCount} ${row.loadCount===1?'carga':'cargas'}`,center,base+6.3,{align:'center'});
+   });
+   if(points.length>1){doc.setDrawColor(217,119,6);doc.setLineWidth(.7);for(let index=1;index<points.length;index++)doc.line(points[index-1][0],points[index-1][1],points[index][0],points[index][1]);}
+   points.forEach(point=>{doc.setFillColor(255,255,255);doc.setDrawColor(217,119,6);doc.circle(point[0],point[1],1,'FD');});
+   font(5.3,false,[84,168,115]);doc.text('■ Quantidade diária',margin+padding+3,top+50);font(5.3,false,[180,95,6]);doc.text('— Variação percentual',margin+padding+39,top+50);
+   const metrics=[`Média diária ${formatContractVolume(dailyLoads.summary.averageDailyVolume)}`,`Volume ${formatContractVolume(dailyLoads.summary.volume)}`,`${dailyLoads.summary.loadCount} carregamentos`,`${dailyLoads.summary.monthCount} meses movimentados`];
+   font(5.5,false,palette.muted);doc.text(metrics.join('  ·  '),width-margin-padding-3,top+50,{align:'right'});
+   y+=panelHeight+6;
+  }
  };
  const financialOverview=()=>{
   const items=summary.financialItems.filter(item=>item.key!=='received'&&item.key!=='pending'&&item.key!=='credit'),gap=2.2,padding=4,cardWidth=(content-padding*2-gap*(items.length-1))/items.length;
@@ -220,6 +259,7 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
 
  startPage();
  hero();
+ dailyChart();
  financialOverview();
  charts();
  const periodTables=summary.tables.map((model,index)=>index<2&&monthlyPeriod?{...model,rows:model.rows.filter((_,rowIndex)=>monthIsInContractPeriod(summary.months[rowIndex]?.month??'',monthlyPeriod))}:model);

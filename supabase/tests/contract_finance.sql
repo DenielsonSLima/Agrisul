@@ -39,9 +39,9 @@ BEGIN
  IF (public.billing_rpc('contracts','save-payment',input)->>'id')::uuid<>payment_id THEN RAISE EXCEPTION 'Payment retry duplicated'; END IF;
  PERFORM public.billing_rpc('contracts','save-payment',scope||jsonb_build_object('requestId',gen_random_uuid(),'kind','receipt','receivedAt','2026-08-10','referenceMonth','2026-07','amount','2000.50','document','REC','notes',''));
  s=public.billing_rpc('contracts','get',jsonb_build_object('id',contract,'companyId',company))->'contract'->'financialSummary';
- IF s->'totals'->>'loadedVolume'<>'70' OR s->'totals'->>'averageAtr'<>'164.285714' OR s->'totals'->>'grossAmount'<>'11500' OR s->'totals'->>'discountAmount'<>'3750' OR s->'totals'->>'netAmount'<>'7750' OR s->'totals'->>'receivedAmount'<>'3000.75' OR s->'totals'->>'pendingAmount'<>'4749.25' THEN RAISE EXCEPTION 'Finance totals wrong: %',s->'totals'; END IF;
+ IF s->'totals'->>'loadedVolume'<>'70' OR s->'totals'->>'averageAtr'<>'164.285714' OR s->'totals'->>'grossAmount'<>'11500' OR s->'totals'->>'grossPerTon'<>'164.285714' OR s->'totals'->>'discountAmount'<>'3750' OR s->'totals'->>'netAmount'<>'7750' OR s->'totals'->>'netPerTon'<>'110.714286' OR s->'totals'->>'receivedAmount'<>'3000.75' OR s->'totals'->>'pendingAmount'<>'4749.25' THEN RAISE EXCEPTION 'Finance totals wrong: %',s->'totals'; END IF;
  SELECT item INTO r FROM jsonb_array_elements(s->'months') item WHERE item->>'month'='2026-07';
- IF r->>'averageAtr'<>'175' OR r->>'discountAmount'<>'3000' OR r->>'pendingAmount'<>'999.25' THEN RAISE EXCEPTION 'Weighted ATR or monthly totals wrong: %',r; END IF;
+ IF r->>'averageAtr'<>'175' OR r->>'grossPerTon'<>'175' OR r->>'netPerTon'<>'100' OR r->>'discountAmount'<>'3000' OR r->>'pendingAmount'<>'999.25' THEN RAISE EXCEPTION 'Weighted ATR or monthly totals wrong: %',r; END IF;
  SELECT item INTO r FROM jsonb_array_elements(s->'months') item WHERE item->>'month'='2026-08';
  IF r->>'discountAmount'<>'0' OR r->>'receivedAmount'<>'0' OR r->>'pendingAmount'<>'3000' THEN RAISE EXCEPTION 'Unselected month discounted or receipt assigned by date: %',r; END IF;
  IF jsonb_array_length(s->'payments')<>2 THEN RAISE EXCEPTION 'Receipts duplicated'; END IF;
@@ -68,11 +68,11 @@ BEGIN
  PERFORM public.billing_rpc('contracts','save-payment',input||jsonb_build_object('requestId',gen_random_uuid(),'referenceMonth','2026-11','amount','100'));
  s=public.billing_rpc('contracts','get',jsonb_build_object('id',contract,'companyId',company))->'contract'->'financialSummary';
  SELECT item INTO r FROM jsonb_array_elements(s->'months') item WHERE item->>'month'='2026-11';
- IF r->>'pendingAmount'<>'0' OR r->>'creditAmount'<>'100' OR r->>'grossAmount'<>'0' THEN RAISE EXCEPTION 'Advance before delivery mishandled'; END IF;
+ IF r->>'pendingAmount'<>'0' OR r->>'creditAmount'<>'100' OR r->>'grossAmount'<>'0' OR r->>'grossPerTon'<>'' OR r->>'netPerTon'<>'' THEN RAISE EXCEPTION 'Advance before delivery mishandled'; END IF;
  -- Missing quote makes the financial balance unknown, but keeps discounts and receipts.
  PERFORM public.billing_rpc('contracts','save-load',scope||jsonb_build_object('farmId',farm,'plotId',plot,'loadedAt','2026-10-01','volume','1','atr','100','document','','notes',''));
  s=public.billing_rpc('contracts','get',jsonb_build_object('id',contract,'companyId',company))->'contract'->'financialSummary';
- IF s->'totals'->>'billingPending'<>'true' OR s->'totals'->>'pendingAmount'<>'' OR s->'totals'->>'creditAmount'<>'' OR s->'totals'->>'receivedAmount'<>'2100.5' THEN RAISE EXCEPTION 'Missing quote fabricated a balance: %',s->'totals'; END IF;
+ IF s->'totals'->>'billingPending'<>'true' OR s->'totals'->>'grossPerTon'<>'' OR s->'totals'->>'netPerTon'<>'' OR s->'totals'->>'pendingAmount'<>'' OR s->'totals'->>'creditAmount'<>'' OR s->'totals'->>'receivedAmount'<>'2100.5' THEN RAISE EXCEPTION 'Missing quote fabricated a balance: %',s->'totals'; END IF;
  -- Discounts follow changes in delivered quantity and can be removed independently.
  SELECT id INTO load_id FROM public.billing_contract_loads WHERE contract_id=contract AND loaded_at='2026-09-01';
  PERFORM public.billing_rpc('contracts','save-load',scope||jsonb_build_object('id',load_id,'farmId',farm,'plotId',plot,'loadedAt','2026-09-01','volume','20','atr','150','document','','notes',''));

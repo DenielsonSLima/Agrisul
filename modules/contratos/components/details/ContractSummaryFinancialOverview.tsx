@@ -5,6 +5,7 @@ import {contractSummaryDetails,summaryReceivedNote,type SummaryTable} from '../.
 import {formatAtrCriterion} from '../../utils/contractFormat';
 import {contractMonthlyDateFilters,contractMonthlyPeriodError,filterContractMonths,type ContractMonthlyPeriod} from '../../utils/contractMonthlyPeriod';
 import {ContractDailyLoadsChart} from './ContractDailyLoadsChart';
+import {ContractMonthlyBalancesTable} from './ContractMonthlyBalancesTable';
 import {ContractMonthlyDeliveriesTable} from './ContractMonthlyDeliveriesTable';
 import {ContractMonthlyCharts} from './ContractMonthlyCharts';
 import '../../summary-details.css';
@@ -13,8 +14,7 @@ export function ContractSummaryFinancialOverview({contract,monthlyPeriod,onMonth
  const summary=contractSummaryDetails(contract);
  const periodError=contractMonthlyPeriodError(monthlyPeriod),dateFilters=contractMonthlyDateFilters(monthlyPeriod);
  const monthlyLoads=useContractLoads(contract.id,{search:'',...dateFilters,groupBy:'month'},!periodError);
- const filteredChartMonths=filterContractMonths(summary.chartMonths,monthlyPeriod),allowedMonths=new Set(filteredChartMonths.map(item=>item.month));
- const balanceTable={...summary.tables[1],rows:summary.tables[1].rows.filter((_,index)=>allowedMonths.has(summary.months[index]?.month??''))};
+ const filteredChartMonths=filterContractMonths(summary.chartMonths,monthlyPeriod);
  const financialItems=summary.financialItems.filter(item=>item.key!=='received'&&item.key!=='pending'&&item.key!=='credit');
  return <>
   <section className="contract-summary-section contract-summary-financial-overview" aria-label="Resumo financeiro de todo o contrato">
@@ -29,7 +29,7 @@ export function ContractSummaryFinancialOverview({contract,monthlyPeriod,onMonth
    <ContractMonthlyCharts months={filteredChartMonths} period={monthlyPeriod} onPeriod={onMonthlyPeriod} error={periodError}/>
    {summary.months.length?<>
     <ContractMonthlyDeliveriesTable contract={contract} period={monthlyPeriod} data={monthlyLoads.data} loading={monthlyLoads.loading} error={periodError||monthlyLoads.error} onRetry={periodError?undefined:monthlyLoads.reload}/>
-    <SummaryDetailTable model={balanceTable}/>
+    <ContractMonthlyBalancesTable contract={contract} period={monthlyPeriod}/>
    </>:<div className="contract-monthly-empty"><Banknote size={26}/><h4>Nenhuma movimentação lançada</h4><p>Carregamentos, adiantamentos, recebimentos e acordos aparecerão neste resumo.</p></div>}
   </section>
   <div className="contract-summary-ledgers">
