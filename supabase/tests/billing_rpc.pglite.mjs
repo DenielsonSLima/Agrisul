@@ -446,4 +446,9 @@ try {
  await db.exec(readFileSync(new URL('./material_categories.sql',import.meta.url),'utf8'));
  console.log('Material categories: normalized names, optional links, deletion guard, permissions and isolation passed');
 } catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
+try {
+ await db.exec(readFileSync(new URL('../migrations/20260928135925_contract_atr_current_month_fallback.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./contract_atr_current_month_fallback.sql',import.meta.url),'utf8'));
+ console.log('Contract ATR: current-month preference, previous-month fallback, daily groups and server aggregates passed');
+} catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
 await db.close();

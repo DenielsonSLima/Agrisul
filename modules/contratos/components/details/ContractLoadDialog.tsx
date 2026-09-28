@@ -51,7 +51,7 @@ export function ContractLoadDialog({contract,load,onClose,returnFocus}:{contract
        <Field label="ATR do carregamento (kg/t) *"><input name="atr" required inputMode="decimal" maxLength={18} placeholder="Ex.: 121,500000" value={data.atr} onChange={e=>set('atr',e.target.value)}/><small>Informe o ATR medido neste carregamento.</small></Field>
        <Field label="Documento (opcional)"><input name="document" maxLength={100} placeholder="Ticket, romaneio ou nota" value={data.document} onChange={e=>set('document',e.target.value)}/></Field>
       </div>
-      <p className="field-help">Faturamento = quantidade (t) × ATR do carregamento (kg/t) × cotação (R$/kg). A cotação será {formatAtrCriterion(contract.atrPriceType,contract.atrPeriodType)}, do mês anterior à data do carregamento.</p>
+      <p className="field-help">Faturamento = quantidade (t) × ATR do carregamento (kg/t) × cotação (R$/kg). A cotação será {formatAtrCriterion(contract.atrPriceType,contract.atrPeriodType)}, do mesmo mês ou, enquanto ausente, do mês anterior.</p>
       {excessVolume>0&&<p className="contract-load-excess-warning" role="status"><TriangleAlert size={18}/><span><strong>O volume contratado será ultrapassado em {formatContractVolume(String(excessVolume))}.</strong> O carregamento poderá ser lançado e todo o excedente será incluído normalmente no faturamento.</span></p>}
       <Field label="Observações (opcional)"><Textarea name="notes" rows={3} maxLength={1000} placeholder="Informações adicionais sobre este carregamento" value={data.notes} onChange={e=>set('notes',e.target.value)}/></Field>
      </section>

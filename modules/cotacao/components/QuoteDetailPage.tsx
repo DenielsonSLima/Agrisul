@@ -1,7 +1,7 @@
 'use client';
 
 import {useState} from 'react';
-import {ClipboardList, DollarSign, Loader2, Pencil, RefreshCw, ShoppingCart, Trash2, Users} from 'lucide-react';
+import {ClipboardList, DollarSign, Loader2, Pencil, RefreshCw, Scale, ShoppingCart, Trash2, Users} from 'lucide-react';
 import {Tabs, TabsList, TabsTrigger, TabsContent} from '@/components/ui/tabs';
 import {useProviders} from '@/modules/cadastro/prestadores/hooks/useProviders';
 import {notifications, useConfirmation} from '@/shared/feedback';
@@ -20,8 +20,9 @@ import {
   type QuoteScopeProviderInput,
 } from './QuoteScopeDialogs';
 import {QuoteSummaryTab} from './QuoteSummaryTab';
+import {QuoteComparisonTab} from './QuoteComparisonTab';
 
-type QuoteDetailTab = 'summary' | 'negotiation' | 'providers';
+type QuoteDetailTab = 'summary' | 'negotiation' | 'providers' | 'comparison';
 
 export function QuoteDetailPage({id}: {id: string}) {
   const query = useQuoteDetail(id);
@@ -304,6 +305,9 @@ function QuoteDetailContent({quote}: {quote: Quote}) {
           <TabsTrigger value="providers" disabled={mutations.saving}>
             <Users size={16}/>Fornecedores
           </TabsTrigger>
+          <TabsTrigger value="comparison" disabled={mutations.saving}>
+            <Scale size={16}/>Comparativo final
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="summary" className="quote-detail-tab-content">
@@ -338,6 +342,16 @@ function QuoteDetailContent({quote}: {quote: Quote}) {
             onRemoveProvider={removeProvider}
             addingProviders={mutations.scopeSaving}
             removingProviderId={removingProviderId}
+          />
+        </TabsContent>
+        <TabsContent value="comparison" className="quote-detail-tab-content">
+          <QuoteComparisonTab
+            quote={quote}
+            busy={mutations.saving}
+            finalizing={mutations.finalizing}
+            finalizeError={finalizeError}
+            onFinalize={finalize}
+            onGoToNegotiation={() => setTab('negotiation')}
           />
         </TabsContent>
       </Tabs>

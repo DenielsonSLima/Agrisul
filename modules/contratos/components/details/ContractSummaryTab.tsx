@@ -7,6 +7,7 @@ import {contractSummaryDetails} from '../../utils/contractSummaryDetails';
 import {useContractsMutation} from '../../hooks/useContracts';
 import {ContractSummaryHero} from './ContractSummaryHero';
 import {ContractSummaryFinancialOverview} from './ContractSummaryFinancialOverview';
+import type {ContractMonthlyPeriod} from '../../utils/contractMonthlyPeriod';
 
 const inputWithNotes=(contract:BillingContract,notes:string):ContractInput=>({
  title:contract.title,contractNumber:contract.contractNumber,companyId:contract.companyId,clientId:contract.clientId,typeId:contract.typeId,status:contract.status,
@@ -14,7 +15,7 @@ const inputWithNotes=(contract:BillingContract,notes:string):ContractInput=>({
  atrPriceType:contract.atrPriceType,atrPeriodType:contract.atrPeriodType,value:contract.value,notes,
 });
 
-export function ContractSummaryTab({contract,onBusy}:{contract:BillingContract;onBusy?:(busy:boolean)=>void}){
+export function ContractSummaryTab({contract,onBusy,monthlyPeriod,onMonthlyPeriod}:{contract:BillingContract;onBusy?:(busy:boolean)=>void;monthlyPeriod:ContractMonthlyPeriod;onMonthlyPeriod:(period:ContractMonthlyPeriod)=>void}){
  const mutation=useContractsMutation(),summary=contractSummaryDetails(contract);
  const [notes,setNotes]=useState(contract.notes),[saving,setSaving]=useState(false),[error,setError]=useState('');
  const mounted=useRef(true),cleanNotes=notes.trim(),dirty=cleanNotes!==contract.notes;
@@ -31,7 +32,7 @@ export function ContractSummaryTab({contract,onBusy}:{contract:BillingContract;o
  return <div className="contract-detail-tab contract-summary-tab">
   <ContractSummaryHero contract={contract} summary={summary}/>
 
-  <ContractSummaryFinancialOverview contract={contract}/>
+  <ContractSummaryFinancialOverview contract={contract} monthlyPeriod={monthlyPeriod} onMonthlyPeriod={onMonthlyPeriod}/>
 
   <div className="contract-summary-content">
    <section className="contract-summary-section contract-conditions-panel"><div className="contract-summary-section-heading"><span className="contract-summary-icon"><CalendarDays size={18}/></span><div><small>Dados essenciais</small><h3>Condições do contrato</h3></div></div><dl className="contract-condition-grid">{summary.conditions.map(item=><div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl></section>

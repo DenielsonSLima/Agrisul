@@ -3,12 +3,13 @@ import {formatCnpj} from '@/shared/utils/cnpj';
 import type {BillingContract} from '../types';
 import {contractSummaryDetails,summaryReceivedNote,type SummaryTable} from '../utils/contractSummaryDetails';
 import {formatAtrCriterion,formatContractMonth} from '../utils/contractFormat';
+import {filterContractMonths,monthIsInContractPeriod,type ContractMonthlyPeriod} from '../utils/contractMonthlyPeriod';
 import type {ContractMonthlyReportBrand} from './contractMonthlySummaryPdf';
 
 type Color=[number,number,number];
 type SummaryCard={label:string;value:string;hint:string;key?:string};
 type SummaryIcon='gauge'|'scale'|'package'|'truck'|'money'|'calendar';
-const palette={ink:[49,91,64],muted:[120,139,126],border:[220,232,224],surface:[249,252,250],green:[53,165,109],dark:[30,79,54],blue:[76,129,165]} satisfies Record<string,Color>;
+const palette={ink:[49,91,64],muted:[120,139,126],border:[220,232,224],surface:[249,252,250],green:[53,165,109],dark:[30,79,54],blue:[76,129,165],amber:[209,138,53]} satisfies Record<string,Color>;
 
 async function loadImage(url:string|null):Promise<ReportPdfImage|null>{
  if(!url)return null;
@@ -21,10 +22,10 @@ async function loadImage(url:string|null):Promise<ReportPdfImage|null>{
 }
 
 // Arithmetic measures page and chart geometry. Financial results come from the RPC.
-export async function createContractSummaryDocument(contract:BillingContract,brand:ContractMonthlyReportBrand){
+export async function createContractSummaryDocument(contract:BillingContract,brand:ContractMonthlyReportBrand,monthlyPeriod?:ContractMonthlyPeriod){
  const {jsPDF}=await import('@/shared/reporting/jsPdfRuntime');
  const doc=new jsPDF({orientation:brand.orientation,unit:'mm',format:'a4',compress:true});
- const summary=contractSummaryDetails(contract),margin=REPORT_MARGIN_MM;
+ const summary=contractSummaryDetails(contract),filteredMonths=filterContractMonths(summary.months,monthlyPeriod),margin=REPORT_MARGIN_MM;
  const width=doc.internal.pageSize.getWidth(),height=doc.internal.pageSize.getHeight(),content=width-margin*2,bottom=height-margin-10;
  const [logo,watermark]=await Promise.all([loadImage(brand.company?.logoUrl??null),loadImage(brand.watermark.imageUrl)]);
  let y=0;
@@ -145,48 +146,44 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
   y+=panelHeight+6;
  };
  const charts=()=>{
-  if(!summary.months.length)return;
   const numberLabel=(value:number)=>new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1}).format(value);
-  const axisLabel=(value:number,money:boolean)=>(money?'R$ ':'')+(value>=1000000?numberLabel(value/1000000)+' mi':value>=1000?numberLabel(value/1000)+' mil':numberLabel(value));
-  // Every month remains visible; long calendars use additional chart panels.
-  for(let offset=0;offset<summary.months.length;offset+=12){
-   const rows=summary.months.slice(offset,offset+12),gap=3,padding=4,chartWidth=(content-padding*2-gap)/2,chartHeight=58,panelHeight=80;
+  const moneyLabel=(value:number)=>'R$ '+(value>=1000000?numberLabel(value/1000000)+' mi':value>=1000?numberLabel(value/1000)+' mil':numberLabel(value));
+  const periodLabel=monthlyPeriod?`${formatContractMonth(monthlyPeriod.from)} a ${formatContractMonth(monthlyPeriod.to)}`:'Todo o contrato';
+  if(!filteredMonths.length){
+   ensure(34);panel(margin,y,content,30);heading(margin+4,y+4,'RESUMO MENSAL','Entregas, faturamento e entradas','calendar');
+   font(7,false,palette.muted);doc.text(`Período: ${periodLabel} · Nenhuma movimentação no período selecionado.`,margin+4,y+23);y+=36;return;
+  }
+  // Keep every selected month readable by continuing the combined chart in new panels.
+  for(let offset=0;offset<filteredMonths.length;offset+=10){
+   const rows=filteredMonths.slice(offset,offset+10),padding=5,panelHeight=83;
    ensure(panelHeight);panel(margin,y,content,panelHeight);
    heading(margin+padding,y+4,'RESUMO MENSAL','Entregas, faturamento e entradas','calendar');
    const criterion='ATR '+formatAtrCriterion(contract.atrPriceType,contract.atrPeriodType);font(6.2,false,[47,133,84]);
    const criterionWidth=doc.getTextWidth(criterion)+5;
    doc.setFillColor(235,246,239);doc.roundedRect(width-margin-padding-criterionWidth,y+5,criterionWidth,5.5,1.3,1.3,'F');doc.text(criterion,width-margin-padding-2.5,y+8.6,{align:'right'});
-   const top=y+17;
-   const chart=(x:number,title:string,subtitle:string,money:boolean,series:{label:string;color:Color;values:(number|null)[]}[])=>{
-    panel(x,top,chartWidth,chartHeight,palette.surface);font(7.3,true);doc.text(title,x+3,top+5);font(5.5,false,palette.muted);doc.text(subtitle,x+3,top+8.6);
-    const left=x+(money?17:12),plotWidth=chartWidth-(money?21:16),base=top+chartHeight-14,plotHeight=30,slot=plotWidth/rows.length;
-    const maximum=Math.max(1,...series.flatMap(item=>item.values.filter((value):value is number=>value!==null&&Number.isFinite(value))));
+   const top=y+17,left=margin+padding+18,right=width-margin-padding-13,plotWidth=right-left,base=top+43,plotHeight=34,slot=plotWidth/rows.length;
+   panel(margin+padding,top,content-padding*2,59,palette.surface);font(7.3,true);doc.text('Faturamento, líquido e ATR por mês',margin+padding+3,top+5);font(5.5,false,palette.muted);doc.text(`Quantidade entregue abaixo de cada mês · Período: ${periodLabel}`,margin+padding+3,top+8.6);
+   const gross=rows.map(row=>row.finance?(row.finance.billingPending?null:Number(row.finance.grossAmount)):row.production?.billingPending?null:Number(row.production?.billingAmount??0));
+   const net=rows.map(row=>row.finance?.billingPending?null:Number(row.finance?.netAmount??0));
+   const atr=rows.map(row=>{const value=Number(row.finance?.averageAtr??row.production?.averageLoadAtr??'');return Number.isFinite(value)&&value>0?value:null;});
+   const maximum=Math.max(1,...[...gross,...net].filter((value):value is number=>value!==null&&Number.isFinite(value)));
+   const maxAtr=Math.max(1,...atr.filter((value):value is number=>value!==null&&Number.isFinite(value)));
     const magnitude=10**Math.floor(Math.log10(maximum)),scale=Math.ceil(maximum/magnitude*2)/2*magnitude;
     for(let index=0;index<=4;index++){
      const gridY=base-plotHeight*index/4;doc.setDrawColor(227,237,231);doc.setLineWidth(.2);doc.setLineDashPattern([1,1.4],0);doc.line(left,gridY,left+plotWidth,gridY);doc.setLineDashPattern([],0);
-     font(5.8,false,palette.muted);doc.text(axisLabel(scale*index/4,money),left-2,gridY+.8,{align:'right'});
+     font(5.8,false,palette.muted);doc.text(moneyLabel(scale*index/4),left-2,gridY+.8,{align:'right'});font(5.8,false,palette.amber);doc.text(numberLabel(maxAtr*index/4),right+2,gridY+.8);
     }
+   const points:[number,number][]=[];
     rows.forEach((row,index)=>{
-     const barWidth=Math.min(series.length===1?6:4.3,slot*.72/series.length),groupWidth=barWidth*series.length;
-     series.forEach((item,seriesIndex)=>{
-      const value=item.values[index];if(value===null||!Number.isFinite(value)||value<=0)return;
-      const barHeight=value/scale*plotHeight,barX=left+(index+.5)*slot-groupWidth/2+seriesIndex*barWidth;
-      doc.setFillColor(...item.color);doc.roundedRect(barX,base-barHeight,barWidth*.88,barHeight,Math.min(.8,barWidth*.2,barHeight/2),Math.min(.8,barWidth*.2,barHeight/2),'F');
-     });
-     font(5.8,false,palette.muted);doc.text(formatContractMonth(row.month).replace('/','\n'),left+(index+.5)*slot,base+3.3,{align:'center',lineHeightFactor:1.2});
+     const barWidth=Math.min(5.2,slot*.3),center=left+(index+.5)*slot;
+     [gross[index],net[index]].forEach((value,seriesIndex)=>{if(value===null||!Number.isFinite(value)||value<=0)return;const barHeight=value/scale*plotHeight,barX=center+(seriesIndex?0:-barWidth);doc.setFillColor(...(seriesIndex?palette.dark:[117,185,140] as Color));doc.roundedRect(barX,base-barHeight,barWidth*.9,barHeight,Math.min(.7,barHeight/2),Math.min(.7,barHeight/2),'F');font(4.8,false,seriesIndex?palette.dark:[89,128,104]);doc.text(numberLabel(value>=1000?value/1000:value)+(value>=1000?'k':''),barX+barWidth*.45,base-barHeight-1,{align:'center'});});
+     if(atr[index]!==null)points.push([center,base-(atr[index] as number)/maxAtr*plotHeight]);
+     font(5.8,false,palette.muted);doc.text(formatContractMonth(row.month),center,base+3.5,{align:'center'});font(4.9,false,palette.muted);doc.text(`${numberLabel(Number(row.finance?.loadedVolume??row.production?.loadedVolume??0))} t`,center,base+6.2,{align:'center'});
     });
-    if(series.length>1){
-     font(5.8);const widths=series.map(item=>doc.getTextWidth(item.label)+5),legendWidth=widths.reduce((total,value)=>total+value,0)+3;
-     let legendX=x+(chartWidth-legendWidth)/2;
-     series.forEach((item,index)=>{doc.setFillColor(...item.color);doc.circle(legendX+1,top+chartHeight-3.5,.9,'F');font(5.8,false,item.color);doc.text(item.label,legendX+3,top+chartHeight-2.8);legendX+=widths[index]+3;});
-    }
-   };
-   chart(margin+padding,'Quantidade carregada por mês','Toneladas entregues',false,[{label:'Quantidade entregue',color:[84,168,115],values:rows.map(row=>Number(row.finance?.loadedVolume??row.production?.loadedVolume??0))}]);
-   chart(margin+padding+chartWidth+gap,'Faturado e recebido por mês','Entregas e entradas financeiras',true,[
-    {label:'Faturado bruto',color:[47,128,82],values:rows.map(row=>row.finance?(row.finance.billingPending?null:Number(row.finance.grossAmount)):row.production?.billingPending?null:Number(row.production?.billingAmount??0))},
-    {label:'Total recebido',color:palette.blue,values:rows.map(row=>row.finance?Number(row.finance.receivedAmount):null)},
-   ]);
-   if(summary.months.length>12){font(5.5,false,palette.muted);doc.text(`Período: ${formatContractMonth(rows[0].month)} a ${formatContractMonth(rows[rows.length-1].month)}`,margin+padding,y+panelHeight-1.7);}
+   if(points.length>1){doc.setDrawColor(...palette.amber);doc.setLineWidth(.7);for(let index=1;index<points.length;index++)doc.line(points[index-1][0],points[index-1][1],points[index][0],points[index][1]);}
+   points.forEach(point=>{doc.setFillColor(255,255,255);doc.setDrawColor(...palette.amber);doc.setLineWidth(.6);doc.circle(point[0],point[1],1,'FD');});
+   const legends=[{label:'Faturado bruto',color:[117,185,140] as Color},{label:'Valor líquido',color:palette.dark},{label:'ATR médio',color:palette.amber},{label:'Quantidade entregue',color:palette.muted}];let legendX=margin+padding+3;
+   legends.forEach(item=>{doc.setFillColor(...item.color);doc.circle(legendX+1,top+56,.8,'F');font(5.4,false,item.color);doc.text(item.label,legendX+3,top+56.7);legendX+=doc.getTextWidth(item.label)+8;});
    y+=panelHeight+6;
   }
  };
@@ -225,7 +222,8 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
  hero();
  financialOverview();
  charts();
- for(const model of summary.tables)table(model);
+ const periodTables=summary.tables.map((model,index)=>index<2&&monthlyPeriod?{...model,rows:model.rows.filter((_,rowIndex)=>monthIsInContractPeriod(summary.months[rowIndex]?.month??'',monthlyPeriod))}:model);
+ for(const model of periodTables)table(model);
  if(contract.notes.trim()){section('Observações do contrato');paragraph(contract.notes,8);}
 
  const pages=doc.getNumberOfPages();

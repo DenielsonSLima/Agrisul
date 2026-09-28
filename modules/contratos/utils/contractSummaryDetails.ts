@@ -42,7 +42,7 @@ export function contractSummaryDetails(contract:BillingContract){
  if(!finance)financialItems[0]={...financialItems[0],value:formatContractBilling(presentation.totals.billingAmount,presentation.totals.billingPending)};
  const monthlyMoney=(entry:typeof rows[number],key:keyof ContractFinancialMetrics,pending=false)=>entry.finance?formatContractBilling(String(entry.finance[key]),pending&&entry.finance.billingPending):'—';
  const deliveryTable:SummaryTable={
-  title:'Entregas e faturamento por mês',description:'Cotação do mês anterior, conforme o critério do ATR do contrato.',
+  title:'Entregas e faturamento por mês',description:'Cotação do mês do carregamento; na ausência, referência do mês anterior, conforme o critério do ATR do contrato.',
   columns:['Mês','Entregue (t)','ATR médio (kg/t)','Cotação ATR','Faturado bruto','Descontos','Valor líquido'],widths:[.10,.14,.13,.13,.18,.15,.17],
   rows:rows.map(entry=>[formatContractMonth(entry.month),formatContractVolume(entry.finance?.loadedVolume??entry.production?.loadedVolume??'0'),formatAtr(entry.finance?.averageAtr??entry.production?.averageLoadAtr??''),entry.production?`${formatAtrQuote(entry.production.atrQuote)}\nRef. ${formatContractMonth(entry.production.atrReferenceMonth)}`:'—',entry.finance?monthlyMoney(entry,'grossAmount',true):formatContractBilling(entry.production?.billingAmount??'',entry.production?.billingPending),monthlyMoney(entry,'discountAmount'),monthlyMoney(entry,'netAmount',true)]),
   empty:'Nenhuma movimentação lançada.',

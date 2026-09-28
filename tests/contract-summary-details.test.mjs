@@ -44,7 +44,7 @@ try{
  for(const orientation of ['portrait','landscape']){
   const {doc}=await createContractMonthlySummaryPdf(longContract,{...brand,orientation});
   const commands=doc.internal.pages.flat().join('\n');
-  for(const text of ['Avanço do carregamento','Da entrega ao recebimento','Entregas, faturamento e entradas','Quantidade carregada por mês','Faturado e recebido por mês','Acordos de desconto','Valor por tonelada','Meses de aplicação','Base entregue','Desconto total','Adiantamentos','Recebimentos','Estornos','Total recebido','Crédito do contrato','Falta entregar','25.000,15','35.000,35','60.000,50','88.000,00','8,001/t','Ago/2026','Out/2026','RECIBO-044','FIM-DO-COMPROVANTE','FIM-DO-ACORDO','FIM-DAS-OBSERVACOES'])assert.ok(commands.includes(text),orientation+' lost '+text);
+  for(const text of ['Avanço do carregamento','Da entrega ao recebimento','Entregas, faturamento e entradas','Faturamento, líquido e ATR por mês','ATR médio','Quantidade entregue','Acordos de desconto','Valor por tonelada','Meses de aplicação','Base entregue','Desconto total','Adiantamentos','Recebimentos','Estornos','Total recebido','Crédito do contrato','Falta entregar','25.000,15','35.000,35','60.000,50','88.000,00','8,001/t','Ago/2026','Out/2026','RECIBO-044','FIM-DO-COMPROVANTE','FIM-DO-ACORDO','FIM-DAS-OBSERVACOES'])assert.ok(commands.includes(text),orientation+' lost '+text);
   assert.doesNotMatch(commands,/A ajustar|Dados essenciais|Condições do contrato/);
   assert.ok(doc.getNumberOfPages()>2);
   for(const page of doc.internal.pages.slice(1))for(const command of page){

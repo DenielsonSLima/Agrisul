@@ -36,13 +36,16 @@ try{
  assert.equal(new TextDecoder().decode(new Uint8Array(doc.output('arraybuffer')).slice(0,4)),'%PDF');
  assert.equal(fileName,'resumo-contrato-12345678-2026-09-15.pdf');
  assert.ok(doc.getNumberOfPages()>=2,'The complete summary paginates the monthly tables and financial history.');
- for(const text of ['Resumo do contrato','Cliente mensal','CNPJ: 11.222.333/0001-81','Nº CTR-123/2026','Quantidade do contrato','Quantidade entregue','Falta entregar','Faturado bruto','Avanço do carregamento','Entregas, faturamento e entradas','Quantidade carregada por mês','Faturado e recebido por mês','Acordos de desconto','Nenhum acordo de desconto cadastrado.','Descontos','Valor líquido','Adiantamentos','Recebimentos','Total recebido','Saldo a receber','Crédito do contrato','3.000,00','3.431,46','1.200,00','2.231,46','75,25','42.000,00'])assert.ok(commands.includes(text),'PDF lost '+text);
+ for(const text of ['Resumo do contrato','Cliente mensal','CNPJ: 11.222.333/0001-81','Nº CTR-123/2026','Quantidade do contrato','Quantidade entregue','Falta entregar','Faturado bruto','Avanço do carregamento','Entregas, faturamento e entradas','Faturamento, líquido e ATR por mês','ATR médio','Acordos de desconto','Nenhum acordo de desconto cadastrado.','Descontos','Valor líquido','Adiantamentos','Recebimentos','Total recebido','Saldo a receber','Crédito do contrato','3.000,00','3.431,46','1.200,00','2.231,46','75,25','42.000,00'])assert.ok(commands.includes(text),'PDF lost '+text);
  assert.ok(commands.indexOf('(Cliente mensal)')<commands.indexOf('(CNPJ: 11.222.333/0001-81)')&&commands.indexOf('(CNPJ: 11.222.333/0001-81)')<commands.indexOf('(Fornecimento'),'Client CNPJ must appear directly below the client name and before contract details');
  assert.doesNotMatch(commands,/A ajustar|Despesas|Dados essenciais|Condições do contrato/);
  const chartCommands=commands.slice(0,commands.indexOf('(Entregas e faturamento por mês)'));
  const chartText=[...chartCommands.matchAll(/\(((?:\\.|[^\\)])*)\) Tj/g)].map(match=>match[1]).join(' ');
  assert.ok(/Dez(?:\/|\s+)2024/.test(chartText),'The first month must remain visible in the charts for a contract longer than 12 months');
  assert.ok(/Fev(?:\/|\s+)2026/.test(chartText),'The last production month must remain visible in the charts');
+ const filtered=await createContractMonthlySummaryPdf(contract,brand,{from:'2025-03',to:'2025-04'}),filteredCommands=filtered.doc.internal.pages.flat().join('\n');
+ const filteredChart=filteredCommands.slice(filteredCommands.indexOf('(RESUMO MENSAL)'),filteredCommands.indexOf('(Entregas e faturamento por mês)'));
+ assert.match(filteredChart,/Mar\/2025/);assert.match(filteredChart,/Abr\/2025/);assert.doesNotMatch(filteredChart,/Fev\/2025|Mai\/2025/);
  const zeroContract={...contract,financialSummary:undefined,contractedVolume:'0',loadedVolume:'0',remainingVolume:'0',billingAmount:'0',monthlySummary:{...contract.monthlySummary,months:[],totals:{...contract.monthlySummary.totals,contractedVolume:'0',loadedVolume:'0',remainingVolume:'0',billingAmount:'0'}}};
  const zeroResult=await createContractMonthlySummaryPdf(zeroContract,brand),zeroCommands=zeroResult.doc.internal.pages.flat().join('\n');
  assert.match(zeroCommands,/Avanço do carregamento/);
@@ -68,6 +71,6 @@ try{
  const pendingCommands=pendingReport.doc.internal.pages.flat().join('\n');
  assert.match(pendingCommands,/Pendente/);assert.match(pendingCommands,/3\.000,00/);assert.match(pendingCommands,/1\.200,00/);
  const detail=await readFile('modules/contratos/components/ContractDetail.tsx','utf8'),summary=await readFile('modules/contratos/components/details/ContractSummaryTab.tsx','utf8'),form=await readFile('modules/contratos/forms/ContractForm.tsx','utf8');
- assert.match(detail,/>Exportar</);assert.doesNotMatch(summary,/ContractStages|Valor do contrato/);assert.doesNotMatch(form,/ContractStages|Valor total \(R\$\)/);
+ assert.match(detail,/>Exportar</);assert.match(detail,/period=\{monthlyPeriod\}/);assert.match(summary,/monthlyPeriod=\{monthlyPeriod\}/);assert.doesNotMatch(summary,/ContractStages|Valor do contrato/);assert.doesNotMatch(form,/ContractStages|Valor total \(R\$\)/);
  console.log('Passed: monthly finance from RPC, discounts/net/receipts/pending, payment reference months, pending ATR, PDF portrait/landscape, charts and export.');
 }finally{await rm(directory,{recursive:true,force:true});}

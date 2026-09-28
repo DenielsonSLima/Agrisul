@@ -55,13 +55,13 @@ export function ContractFinancialTab({contract:c,onBusy}:{contract:BillingContra
    <Metric icon={<Clock3/>} label="Pendente de receber" value={money(selected.pendingAmount,selected.billingPending)} overall={money(total.pendingAmount,total.billingPending)} month={month} tone="pending" note="Saldo após os valores recebidos"/>
   </section>
   {(total.creditAmount!==''&&total.creditAmount!=='0'||selected.creditAmount!==''&&selected.creditAmount!=='0')&&<div className="finance-credit"><span><ArrowUpRight size={16}/>Valor recebido além do total: <strong>{money(selected.creditAmount,selected.billingPending)}</strong> no mês · <strong>{money(total.creditAmount,total.billingPending)}</strong> no contrato.</span>{canRefund?<button type="button" className="btn" disabled={mutation.isPending} onClick={newRefund}><RotateCcw size={15}/>Estornar saldo</button>:c.status==='Ativo'&&<small>Encerre o contrato para liberar o estorno do saldo excedente.</small>}</div>}
-  {total.billingPending&&<p className="finance-notice" role="status">Há entregas sem o ATR medido ou sem a cotação do mês anterior, conforme o tipo selecionado no contrato. O valor entregue, o total e o pendente ficam em aberto até informar o ATR e cadastrar a cotação correspondente. Adiantamentos e recebimentos continuam disponíveis.</p>}
+  {total.billingPending&&<p className="finance-notice" role="status">Há entregas sem o ATR medido ou sem uma cotação disponível no mês do carregamento ou no mês anterior, conforme o tipo selecionado no contrato. O valor entregue, o total e o pendente ficam em aberto até informar o ATR e cadastrar a cotação correspondente. Adiantamentos e recebimentos continuam disponíveis.</p>}
   <ContractFinanceCharts summary={summary} month={month} onMonth={setMonth}/>
   <section className="finance-deliveries" aria-label="Entregas no mês e no contrato">
    <DeliveryMetric icon={<Truck/>} label="Quantidade entregue" value={formatContractVolume(selected.loadedVolume)} overall={formatContractVolume(total.loadedVolume)}/>
    <DeliveryMetric icon={<FlaskConical/>} label="ATR médio · kg/t" value={formatAtr(selected.averageAtr)} overall={formatAtr(total.averageAtr)}/>
    <DeliveryMetric icon={<CircleDollarSign/>} label="Valor entregue" value={money(selected.grossAmount,selected.billingPending)} overall={money(total.grossAmount,total.billingPending)}/>
-   <div className="finance-criterion"><span><Info size={12}/>Entregas de {formatContractMonth(month)} · ATR ponderado pelo volume.</span><span>Cotação do mês anterior · <b>{formatAtrCriterion(c.atrPriceType,c.atrPeriodType)}</b></span></div>
+   <div className="finance-criterion"><span><Info size={12}/>Entregas de {formatContractMonth(month)} · ATR ponderado pelo volume.</span><span>Cotação do mês; fallback anterior · <b>{formatAtrCriterion(c.atrPriceType,c.atrPeriodType)}</b></span></div>
   </section>
   <div className="finance-section-heading"><div><span className="finance-eyebrow">MOVIMENTAÇÕES</span><h3>Entradas e acordos</h3></div><span><CalendarDays size={13}/>{formatContractMonth(month)}</span></div>
   {error&&!draft&&<p className="form-error" role="alert">{error}</p>}

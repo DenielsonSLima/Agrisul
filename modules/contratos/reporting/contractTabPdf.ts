@@ -40,7 +40,7 @@ export function financialReportModel(contract:BillingContract):ContractTabReport
  return {kind:'financial',title:'Financeiro do contrato',criteria:`Todo o período · ATR ${formatAtrCriterion(contract.atrPriceType,contract.atrPeriodType)}`,
   metrics:[{label:'Faturamento calculado',value:formatContractBilling(contract.billingAmount,contract.billingPending)},{label:'Despesas',value:'A ajustar'},{label:'Situação',value:contract.status}],
   columns:['Mês','Quantidade','ATR médio','Cotação ATR','Faturamento'],widths:[.14,.22,.18,.20,.26],
-  groups:[{title:'Faturamento mensal',subtitle:contract.billingPending?'Há meses com ATR medido ou cotação pendente.':'Valores conforme os carregamentos e a cotação do mês anterior.',rows:(contract.monthlySummary?.months??[]).map(month=>[formatContractMonth(month.month),formatContractVolume(month.loadedVolume),formatAtr(month.averageLoadAtr),formatAtrQuote(month.atrQuote),formatContractBilling(month.billingAmount,month.billingPending)])}]};
+  groups:[{title:'Faturamento mensal',subtitle:contract.billingPending?'Há meses com ATR medido ou cotação pendente.':'Cotação do mês do carregamento, com fallback para o mês anterior quando necessário.',rows:(contract.monthlySummary?.months??[]).map(month=>[formatContractMonth(month.month),formatContractVolume(month.loadedVolume),formatAtr(month.averageLoadAtr),formatAtrQuote(month.atrQuote),formatContractBilling(month.billingAmount,month.billingPending)])}]};
 }
 async function loadImage(url:string|null):Promise<ReportPdfImage|null>{
  if(!url)return null;

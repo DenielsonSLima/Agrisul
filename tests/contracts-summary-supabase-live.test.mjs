@@ -53,18 +53,18 @@ try{
   await verifyContractsSummaryBrowser({cdpUrl:process.env.BILLING_BROWSER_CDP,baseUrl:process.env.BILLING_LOCAL_URL??'http://localhost:5173',session:a.session,projectRef:PROJECT_REF,
    onRemotePayment:()=>rpc(independent,'contracts','save-payment',{...scope,contractId:ca.id,requestId:randomUUID(),kind:'receipt',receivedAt:'2026-07-20',referenceMonth:'2026-07',amount:'25',document:'REALTIME-KPI',notes:''})});
  }
- // Different delivered months must use their own preceding quotation and the
- // contract criterion; a quotation for an unused month cannot affect the mean.
+ // Different delivered months prefer their own quotation and use the contract
+ // criterion; a quotation for an unused preceding month cannot affect the mean.
  await rpc(a.client,'contracts','save-load',{...scope,contractId:ca.id,farmId:farm.id,plotId:plot.id,loadedAt:'2026-08-10',volume:'30',atr:'200',document:'QUOTE-AVERAGE',notes:''});
  const records=(await rpc(a.client,'atr','list',{page:1,pageSize:12})).records;
- for(const [month,gross,net,accGross,accNet] of [[6,'1.1','0.9','1.5','1.2'],[7,'1.3','1.1','1.7','1.4'],[8,'999','999','999','999']]){
+ for(const [month,gross,net,accGross,accNet] of [[6,'999','999','999','999'],[7,'1.3','1.1','1.7','1.4'],[8,'2.3','2.1','2.7','2.4']]){
   const quote=records.find(record=>record.month===month);
   await rpc(a.client,'atr','save',{id:quote.id,year:2026,month,monthlyGrossValue:gross,monthlyNetValue:net,accumulatedGrossValue:accGross,accumulatedNetValue:accNet});
  }
- for(const [atrPriceType,atrPeriodType,average] of [['gross','monthly','1.25'],['net','monthly','1.05'],['gross','accumulated','1.65'],['net','accumulated','1.35']]){
+ for(const [atrPriceType,atrPeriodType,average] of [['gross','monthly','2.05'],['net','monthly','1.85'],['gross','accumulated','2.45'],['net','accumulated','2.15']]){
   await rpc(a.client,'contracts','save',{...input,id:ca.id,contractNumber:'CTR-001/2026',status:'Ativo',atrPriceType,atrPeriodType});
   const contract=(await rpc(a.client,'contracts','list',{...scope,search:'CTR-001',from:'2026-07-01',to:'2026-07-01'})).contracts[0];
-  assert.equal(contract.averageAtr,'175');assert.equal(contract.atrQuoteSummary.average,average);assert.deepEqual(contract.atrQuoteSummary.loadedMonths,['2026-07','2026-08']);assert.deepEqual(contract.atrQuoteSummary.referenceMonths,['2026-06','2026-07']);
+  assert.equal(contract.averageAtr,'175');assert.equal(contract.atrQuoteSummary.average,average);assert.deepEqual(contract.atrQuoteSummary.loadedMonths,['2026-07','2026-08']);assert.deepEqual(contract.atrQuoteSummary.referenceMonths,['2026-07','2026-08']);
  }
  console.log('PASS: live contract KPIs, exact financial totals, weighted measured ATR/quotations, all four criteria, delivery/reference months, filters and account isolation.');
 }finally{

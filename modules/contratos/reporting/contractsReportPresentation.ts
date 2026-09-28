@@ -30,7 +30,7 @@ export const contractsReportColors={
 } as const;
 export type ContractsReportTone=keyof typeof contractsReportColors;
 export type ContractsReportCell={key:string;label:string;value:string;detail?:string;tone:ContractsReportTone};
-export const contractsReportNote='¹ Cotação ponderada pelo volume, pelo critério do contrato e pelo mês anterior ao carregamento. ² Despesas: descontos e acordos do financeiro. ³ Recebidos já incluem adiantamentos; não somar novamente. Excedente recebido é o valor acima do líquido. Qtd. pendente é o volume a carregar.';
+export const contractsReportNote='¹ Cotação ponderada pelo volume e pelo critério do contrato: usa o mês do carregamento e, quando ausente, o mês anterior. ² Despesas: descontos e acordos do financeiro. ³ Recebidos já incluem adiantamentos; não somar novamente. Excedente recebido é o valor acima do líquido. Qtd. pendente é o volume a carregar.';
 
 // Presentation only: quantities, balances and pending flags all come from the RPC.
 export function contractsReportRow(contract:BillingContract){

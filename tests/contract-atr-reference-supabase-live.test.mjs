@@ -42,18 +42,19 @@ try{
  const farm=(await rpc(a.client,'farms','save',{name:'ATR reference farm',areaHa:'10',city:'Cidade',state:'SP'})).farm;
  const plot=(await rpc(a.client,'plots','save',{farmId:farm.id,name:'ATR reference plot',areaHa:'10'})).data.plots[0];
  const augustInput={year:2026,month:8,monthlyGrossValue:'1.5',monthlyNetValue:'1.4',accumulatedGrossValue:'1.3',accumulatedNetValue:'1.2'};
- const august=(await rpc(a.client,'atr','save',augustInput)).record;
- await rpc(a.client,'atr','save',{year:2026,month:9,monthlyGrossValue:'9',monthlyNetValue:'8',accumulatedGrossValue:'7',accumulatedNetValue:'6'});
+ await rpc(a.client,'atr','save',augustInput);
+ const septemberInput={year:2026,month:9,monthlyGrossValue:'9',monthlyNetValue:'8',accumulatedGrossValue:'7',accumulatedNetValue:'6'};
+ const septemberQuote=(await rpc(a.client,'atr','save',septemberInput)).record;
  await rpc(a.client,'atr','save',{year:2026,month:12,monthlyGrossValue:'2.5',monthlyNetValue:'2.4',accumulatedGrossValue:'2.3',accumulatedNetValue:'2.2'});
  for(const [loadedAt,volume,atr] of [['2026-09-01','10','100'],['2026-09-30','30','200'],['2027-01-31','1','200']]){
   const result=await rpc(a.client,'contracts','save-load',{...scope,farmId:farm.id,plotId:plot.id,loadedAt,volume,atr,document:'',notes:''});
   assert.equal(result.load.atr,atr,'Measured load ATR must remain independent of its quotation');
  }
- for(const [price,period,quote,total] of [['gross','monthly','1.5','11000'],['net','monthly','1.4','10280'],['gross','accumulated','1.3','9560'],['net','accumulated','1.2','8840']]){
+ for(const [price,period,quote,total] of [['gross','monthly','9','63500'],['net','monthly','8','56480'],['gross','accumulated','7','49460'],['net','accumulated','6','42440']]){
   await rpc(a.client,'contracts','save',{...input,id:contract.id,atrPriceType:price,atrPeriodType:period});
   const data=await detail(),september=data.monthlySummary.months.find(m=>m.month==='2026-09');
   assert.equal(data.atrPriceType,price);assert.equal(data.atrPeriodType,period);
-  assert.equal(september.atrQuote,quote);assert.equal(september.atrReferenceMonth,'2026-08');
+  assert.equal(september.atrQuote,quote);assert.equal(september.atrReferenceMonth,'2026-09');
   assert.equal(september.averageLoadAtr,'175');
   assert.equal(data.billingAmount,total);assert.equal(data.financialSummary.totals.grossAmount,total);
   const list=await rpc(a.client,'contracts','list',{companyId:company.id,bucket:'open'});
@@ -63,13 +64,13 @@ try{
  const second=createClient(url,publicKey,{...options,global:{headers:{Authorization:`Bearer ${a.session.access_token}`}}});clients.push(second);
  let resolveEvent;const eventPromise=new Promise(resolve=>{resolveEvent=resolve;});
  const channel=a.client.channel('atr-reference-'+randomUUID()).on('postgres_changes',{event:'UPDATE',schema:'public',table:'billing_atr_records'},event=>{
-  if(event.new.id===august.id)resolveEvent();
+  if(event.new.id===septemberQuote.id)resolveEvent();
  });
  await new Promise((resolve,reject)=>{
   const timer=setTimeout(()=>reject(new Error('ATR Realtime subscribe timeout')),25000);
   channel.subscribe(status=>{if(status==='SUBSCRIBED'){clearTimeout(timer);resolve();}else if(['CHANNEL_ERROR','TIMED_OUT'].includes(status)){clearTimeout(timer);reject(new Error('ATR Realtime failed'));}});
  });
- await rpc(second,'atr','save',{...augustInput,id:august.id,monthlyGrossValue:'3'});
+ await rpc(second,'atr','save',{...septemberInput,id:septemberQuote.id,monthlyGrossValue:'3'});
  let eventTimer;
  try{await Promise.race([eventPromise,new Promise((_,reject)=>{eventTimer=setTimeout(()=>reject(new Error('ATR Realtime update missing')),15000);})]);}finally{clearTimeout(eventTimer);}
  const revised=await detail();assert.equal(revised.billingAmount,'21500');
@@ -77,10 +78,10 @@ try{
  assert.equal(revised.loads.find(l=>l.loadedAt==='2026-09-01').atr,'100');
  assert.equal((await b.client.from('billing_atr_records').select('id')).data.length,0);
  await assert.rejects(rpc(b.client,'contracts','get',{companyId:company.id,id:contract.id}));
- assert.equal((await a.client.from('billing_atr_records').update({monthly_gross_value:99}).eq('id',august.id)).error?.code,'42501');
+ assert.equal((await a.client.from('billing_atr_records').update({monthly_gross_value:99}).eq('id',septemberQuote.id)).error?.code,'42501');
  const anon=createClient(url,publicKey,options);clients.push(anon);
  await assert.rejects(rpc(anon,'contracts','get',{companyId:company.id,id:contract.id}));
- console.log('PASS: authenticated RPC, measured ATR preserved, four quotation criteria, previous month/year, totals, account isolation, DML denial and independent Realtime.');
+ console.log('PASS: authenticated RPC, measured ATR preserved, current-month ATR with previous-month fallback, four criteria, totals, account isolation, DML denial and independent Realtime.');
 }finally{
  for(const client of clients)await client.removeAllChannels();
  const failures=[];

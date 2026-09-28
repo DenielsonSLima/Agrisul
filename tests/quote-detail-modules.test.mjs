@@ -27,12 +27,13 @@ function appearsInOrder(source, labels) {
   }
 }
 
-test('quotation detail is split into accessible Summary, Negotiation and Suppliers tabs', async () => {
-  const [detail, summary, negotiation, providers, priceDialog] = await Promise.all([
+test('quotation detail is split into accessible Summary, Negotiation, Suppliers and Final Comparison tabs', async () => {
+  const [detail, summary, negotiation, providers, comparison, priceDialog] = await Promise.all([
     readComponent('QuoteDetailPage'),
     readComponent('QuoteSummaryTab'),
     readComponent('QuoteNegotiationTab'),
     readComponent('QuoteProvidersTab'),
+    readComponent('QuoteComparisonTab'),
     readComponent('QuotePriceDialog'),
   ]);
 
@@ -44,6 +45,7 @@ test('quotation detail is split into accessible Summary, Negotiation and Supplie
     'QuoteSummaryTab',
     'QuoteNegotiationTab',
     'QuoteProvidersTab',
+    'QuoteComparisonTab',
   ]) {
     assert.match(
       detail,
@@ -57,20 +59,49 @@ test('quotation detail is split into accessible Summary, Negotiation and Supplie
   assert.match(list, /aria-label=/, 'the tab list needs an accessible name');
   assert.equal(
     list.match(/<TabsTrigger\b/g)?.length,
-    3,
-    'quotation detail must expose exactly three primary tabs',
+    4,
+    'quotation detail must expose exactly four primary tabs',
   );
-  appearsInOrder(list, ['Resumo', 'Negociação', 'Fornecedores']);
+  appearsInOrder(list, ['Resumo', 'Negociação', 'Fornecedores', 'Comparativo final']);
   assert.equal(
     detail.match(/<TabsContent\b/g)?.length,
-    3,
+    4,
     'each trigger needs a corresponding tab panel',
   );
 
   assert.match(summary, /export function QuoteSummaryTab\b/);
   assert.match(negotiation, /export function QuoteNegotiationTab\b/);
   assert.match(providers, /export function QuoteProvidersTab\b/);
+  assert.match(comparison, /export function QuoteComparisonTab\b/);
   assert.match(priceDialog, /export function QuotePriceDialog\b/);
+});
+
+test('final comparison groups approved items by store and uses server-calculated totals', async () => {
+  const [source, detail, css] = await Promise.all([
+    readComponent('QuoteComparisonTab'),
+    readComponent('QuoteDetailPage'),
+    readFile(new URL('../modules/cotacao/styles.css', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(source, /quote\.itemAwards/);
+  assert.match(source, /award\.providerId\s*!==\s*provider\.id/);
+  assert.match(source, /Compras separadas por loja/);
+  assert.match(source, /provider\.providerName/);
+  assert.match(source, /item\.materialName/);
+  assert.match(source, /item\.quantity/);
+  assert.match(source, /award\.unitPrice/);
+  assert.match(source, /award\.lineTotal/);
+  assert.match(source, /provider\.awardedGrossTotal/);
+  assert.match(source, /provider\.awardedTotal/);
+  assert.match(source, /quote\.awardedGrossTotal/);
+  assert.match(source, /quote\.awardedTotal/);
+  assert.doesNotMatch(source, /\.reduce\(/, 'the browser must not recalculate financial totals');
+  assert.match(source, /Finalizar e gerar pedidos/);
+  assert.match(source, /onGoToNegotiation/);
+  assert.match(detail, /<QuoteComparisonTab\b/);
+  assert.match(detail, /onGoToNegotiation=\{\(\) => setTab\('negotiation'\)\}/);
+  assert.match(css, /\.quote-comparison-grid\{/);
+  assert.match(css, /\.quote-final-comparison-table-wrap\{/);
 });
 
 test('summary tab presents quotation data, materials, suppliers and winner results', async () => {
