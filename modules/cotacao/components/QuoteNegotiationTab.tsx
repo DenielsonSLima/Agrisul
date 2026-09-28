@@ -1,7 +1,7 @@
 'use client';
 
 import {useMemo, useState} from 'react';
-import {Check, History, Loader2, PackageOpen, Plus, ReceiptText} from 'lucide-react';
+import {Check, FileDown, History, Loader2, PackageOpen, Plus, ReceiptText} from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -9,6 +9,13 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {moneyLabel} from '@/shared/utils/presentation';
+import {PdfExportDialog} from '@/shared/reporting/PdfExportDialog';
+import {useWorkspaceCompany} from '@/shared/state/WorkspaceCompanyProvider';
+import {
+  createQuotationNegotiationPdf,
+  createQuotationNegotiationSnapshot,
+  type QuotationNegotiationSnapshot,
+} from '../reporting/quotationNegotiationPdf';
 import type {
   Material,
   Quote,
@@ -120,7 +127,9 @@ export function QuoteNegotiationTab({
   onApproveItem,
   onAddMaterials,
 }: QuoteNegotiationTabProps) {
+  const {activeCompanyId} = useWorkspaceCompany();
   const [priceEditor, setPriceEditor] = useState<PriceEditor | null>(null);
+  const [pdf, setPdf] = useState<QuotationNegotiationSnapshot | null>(null);
   const [approvingKey, setApprovingKey] = useState('');
   const [approvalError, setApprovalError] = useState('');
   const history = useMemo(() => [...quote.negotiations].sort(newestFirst), [quote.negotiations]);
@@ -164,6 +173,20 @@ export function QuoteNegotiationTab({
           <span className="quote-negotiation-count">
             <History size={15}/>{quote.negotiations.length} registros
           </span>
+          <button
+            className="btn"
+            type="button"
+            disabled={!quote.items.length || !quote.providers.length}
+            onClick={() => setPdf(createQuotationNegotiationSnapshot(
+              quote,
+              new Map(quote.items.map(item => [
+                item.materialId,
+                materialById.get(item.materialId)?.imageUrl ?? item.materialImageUrl ?? null,
+              ])),
+            ))}
+          >
+            <FileDown size={16}/><span>Exportar PDF</span>
+          </button>
           {quote.status === 'open' && (
             <button
               className="btn company-primary"
@@ -398,6 +421,20 @@ export function QuoteNegotiationTab({
           saving={saving}
           onClose={() => setPriceEditor(null)}
           onSave={onRecord}
+        />
+      )}
+      {pdf && (
+        <PdfExportDialog
+          snapshot={pdf}
+          companyId={activeCompanyId}
+          createPdf={createQuotationNegotiationPdf}
+          orientation="landscape"
+          fitPreviewToWidth
+          showPreviewToolbar
+          title="Exportar mapa de negociação"
+          description={`${quote.number || quote.title} · ${quote.items.length} material(is) · ${quote.providers.length} fornecedor(es). Confira preços, descontos e aprovações antes de baixar.`}
+          previewClassName="quote-negotiation-pdf-preview"
+          onClose={() => setPdf(null)}
         />
       )}
     </section>
