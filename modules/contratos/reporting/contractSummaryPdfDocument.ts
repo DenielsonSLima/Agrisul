@@ -133,6 +133,9 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
  const dailyChart=()=>{
   if(!dailyLoads)return;
   const rows=contractDailyLoadsChartRows(dailyLoads),numberLabel=(value:number)=>new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(value);
+  const atrValues=rows.map(row=>row.averageAtr).filter((value):value is number=>value!==null&&Number.isFinite(value));
+  const atrMinimum=atrValues.length?Math.min(...atrValues):0,atrMaximum=atrValues.length?Math.max(...atrValues):1,atrRange=atrMaximum-atrMinimum;
+  const atrPadding=atrRange>0?atrRange*.08:Math.max(Math.abs(atrMaximum)*.03,.5),atrScaleMinimum=atrMinimum-atrPadding,atrScaleMaximum=atrMaximum+atrPadding;
   const period=`${formatContractDate(dailyLoads.filters.from)} a ${formatContractDate(dailyLoads.filters.to)}`;
   if(!rows.length){
    ensure(34);panel(margin,y,content,30);heading(margin+4,y+4,'EVOLUÇÃO DOS CARREGAMENTOS','Quantidade carregada por dia','truck');
@@ -141,31 +144,28 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
   for(const pageRows of contractDailyLoadsChartPages(rows)){
    const padding=5,panelHeight=79;
    ensure(panelHeight);panel(margin,y,content,panelHeight);heading(margin+padding,y+4,'EVOLUÇÃO DOS CARREGAMENTOS','Quantidade carregada por dia','truck');
-   font(5.8,false,palette.muted);doc.text(`Barras em toneladas e linha de variação percentual · Período: ${period}`,margin+padding,y+14);
+   font(5.8,false,palette.muted);doc.text(`Barras em toneladas e linha pontilhada do ATR médio diário · Período: ${period}`,margin+padding,y+14);
    const top=y+19,left=margin+padding+15,right=width-margin-padding-12,plotWidth=right-left,base=top+35,plotHeight=29,slot=plotWidth/pageRows.length;
    panel(margin+padding,top,content-padding*2,54,palette.surface);
    const maxVolume=Math.max(1,...pageRows.map(row=>row.volume));
-   const variations=pageRows.slice(1).map(row=>row.variationPercent).filter((value):value is number=>value!==null&&Number.isFinite(value));
-   const maxVariation=Math.max(1,...variations.map(value=>Math.abs(value)));
    for(let index=0;index<=3;index++){
     const gridY=base-plotHeight*index/3;doc.setDrawColor(227,237,231);doc.setLineWidth(.2);doc.setLineDashPattern([1,1.4],0);doc.line(left,gridY,right,gridY);doc.setLineDashPattern([],0);
     font(5.5,false,palette.muted);doc.text(numberLabel(maxVolume*index/3),left-2,gridY+.8,{align:'right'});
    }
    const centers=pageRows.map((_,index)=>left+(index+.5)*slot);
-   const variationY=(value:number)=>top+plotHeight/2-value/maxVariation*(plotHeight/2);
-   const points:[number,number][]=[[centers[0],variationY(0)]];
-   const variationLabels:{x:number;y:number;value:number}[]=[];
+   const atrY=(value:number)=>base-(value-atrScaleMinimum)/(atrScaleMaximum-atrScaleMinimum)*plotHeight;
+   const atrPoints=pageRows.map((row,index)=>{const value=row.averageAtr;return value===null||!Number.isFinite(value)?null:{x:centers[index],y:atrY(value),label:formatAtr(row.averageAtrText)};});
    pageRows.forEach((row,index)=>{
     const center=centers[index],barWidth=Math.min(8,slot*.45),barHeight=row.volume/maxVolume*plotHeight;
     doc.setFillColor(84,168,115);doc.roundedRect(center-barWidth/2,base-barHeight,barWidth,barHeight,Math.min(1,barHeight/2),Math.min(1,barHeight/2),'F');
     font(5.2,true,[82,107,90]);doc.text(numberLabel(row.volume),center,base-barHeight-1.2,{align:'center'});
     font(5.6,false,palette.muted);doc.text(formatContractDate(row.date).slice(0,5),center,base+3.7,{align:'center'});font(4.8,false,palette.muted);doc.text(`${row.loadCount} ${row.loadCount===1?'carga':'cargas'}`,center,base+6.3,{align:'center'});
    });
-   pageRows.slice(1).forEach((row,index)=>{if(row.variationPercent!==null){const x=(centers[index]+centers[index+1])/2,pointY=variationY(row.variationPercent);points.push([x,pointY]);variationLabels.push({x,y:pointY,value:row.variationPercent});}});
-   if(points.length>1){doc.setDrawColor(236,177,111);doc.setLineWidth(.7);for(let index=1;index<points.length;index++)doc.line(points[index-1][0],points[index-1][1],points[index][0],points[index][1]);}
-   points.forEach((point,index)=>{if(index===0)return;doc.setFillColor(255,255,255);doc.setDrawColor(236,177,111);doc.circle(point[0],point[1],1,'FD');});
-   variationLabels.forEach(label=>{const text=`${label.value>0?'+':''}${numberLabel(label.value)}%`,labelWidth=Math.max(10,doc.getTextWidth(text)+3);doc.setFillColor(255,248,237);doc.setDrawColor(236,177,111);doc.roundedRect(label.x-labelWidth/2,label.y-4,labelWidth,3,1.5,1.5,'FD');font(4.8,true,[180,95,6]);doc.text(text,label.x,label.y-2,{align:'center'});});
-   font(5.3,false,[84,168,115]);doc.text('■ Quantidade diária',margin+padding+3,top+50);font(5.3,false,[180,95,6]);doc.text('— Variação percentual',margin+padding+39,top+50);
+   doc.setDrawColor(236,177,111);doc.setLineWidth(.7);doc.setLineDashPattern([1.2,1],0);let previousAtr:{x:number;y:number}|null=null;
+   atrPoints.forEach(point=>{if(!point){previousAtr=null;return;}if(previousAtr)doc.line(previousAtr.x,previousAtr.y,point.x,point.y);previousAtr=point;});doc.setLineDashPattern([],0);
+   atrPoints.forEach(point=>{if(!point)return;doc.setFillColor(255,255,255);doc.setDrawColor(236,177,111);doc.circle(point.x,point.y,1,'FD');font(4.8,true,[145,71,0]);const labelWidth=Math.max(10,doc.getTextWidth(point.label)+3),labelTop=point.y<top+6?point.y+1.5:point.y-4.5;doc.setFillColor(255,248,237);doc.setDrawColor(236,177,111);doc.roundedRect(point.x-labelWidth/2,labelTop,labelWidth,3,1.5,1.5,'FD');font(4.8,true,[145,71,0]);doc.text(point.label,point.x,labelTop+2,{align:'center'});});
+   if(atrValues.length){font(4.8,false,[145,71,0]);doc.text(formatAtr(String(atrScaleMaximum)),right+2,top+1);doc.text(formatAtr(String(atrScaleMinimum)),right+2,base+.8);}
+   font(5.3,false,[84,168,115]);doc.text('■ Quantidade diária',margin+padding+3,top+50);const atrLegendX=margin+padding+39,atrLegendY=top+48.8;doc.setDrawColor(236,177,111);doc.setLineWidth(.7);doc.setLineDashPattern([1.2,1],0);doc.line(atrLegendX,atrLegendY,atrLegendX+7,atrLegendY);doc.setLineDashPattern([],0);font(5.3,false,[145,71,0]);doc.text('ATR médio diário (kg/t)',atrLegendX+9,top+50);
    const metrics=[`Média diária ${formatContractVolume(dailyLoads.summary.averageDailyVolume)}`,`Volume ${formatContractVolume(dailyLoads.summary.volume)}`,`ATR médio ${formatAtr(dailyLoads.summary.averageAtr)} kg/t`,`${dailyLoads.summary.monthCount} meses movimentados`];
    font(5.5,false,palette.muted);doc.text(metrics.join('  ·  '),width-margin-padding-3,top+50,{align:'right'});
    y+=panelHeight+6;

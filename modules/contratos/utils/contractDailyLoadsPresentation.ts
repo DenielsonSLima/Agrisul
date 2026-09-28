@@ -8,16 +8,14 @@ export type ContractDailyLoadsChartRow={
  volumeText:string;
  loadCount:number;
  averageAtrText:string;
- variationPercent:number|null;
+ averageAtr:number|null;
 };
-export type ContractDailyLoadsChartSlot=
- |({kind:'day';slotKey:string;linePercent:number|null;variationLabel:null;isVariationBase:boolean}&Omit<ContractDailyLoadsChartRow,'variationPercent'>)
- |{kind:'variation';slotKey:string;date:'';volume:null;volumeText:'';loadCount:0;averageAtrText:'';linePercent:number;variationLabel:number;variationPercent:number;fromDate:string;toDate:string;baseVolume:number;baseVolumeText:string;currentVolume:number;currentVolumeText:string};
 
 const inputDate=(date:Date)=>{
  const year=date.getFullYear(),month=String(date.getMonth()+1).padStart(2,'0'),day=String(date.getDate()).padStart(2,'0');
  return `${year}-${month}-${day}`;
 };
+const nullableNumber=(value:string)=>{const parsed=Number(value);return value!==''&&Number.isFinite(parsed)?parsed:null;};
 
 export function defaultContractDailyLoadPeriod(today=new Date()):ContractDailyLoadPeriod{
  const end=new Date(today.getFullYear(),today.getMonth(),today.getDate());
@@ -40,11 +38,9 @@ export function contractDailyLoadsChartRows(data:ContractDailyLoadsData):Contrac
   volumeText:group.volume,
   loadCount:group.loadCount,
   averageAtrText:group.averageAtr,
+  averageAtr:nullableNumber(group.averageAtr),
  })).sort((a,b)=>a.date.localeCompare(b.date));
- return rows.map((row,index)=>({
-  ...row,
-  variationPercent:index===0||rows[index-1].volume===0?null:(row.volume-rows[index-1].volume)/rows[index-1].volume*100,
- }));
+ return rows;
 }
 
 export function contractDailyLoadsChartPages<T>(rows:readonly T[],pageSize=8):T[][]{
@@ -57,23 +53,4 @@ export function contractDailyLoadsChartPages<T>(rows:readonly T[],pageSize=8):T[
   offset+=pageSize-1;
  }
  return pages;
-}
-
-export function contractDailyLoadsChartSlots(data:ContractDailyLoadsData):ContractDailyLoadsChartSlot[]{
- const rows=contractDailyLoadsChartRows(data);
- return rows.flatMap((row,index)=>{
-  const day:ContractDailyLoadsChartSlot={
-   kind:'day',slotKey:`day:${row.date}`,date:row.date,volume:row.volume,volumeText:row.volumeText,loadCount:row.loadCount,averageAtrText:row.averageAtrText,
-   linePercent:index===0?0:null,variationLabel:null,isVariationBase:index===0,
-  };
-  if(index===0)return [day];
-  const previous=rows[index-1],variationPercent=row.variationPercent;
-  if(variationPercent===null||!Number.isFinite(variationPercent))return [day];
-  const transition:ContractDailyLoadsChartSlot={
-   kind:'variation',slotKey:`variation:${previous.date}:${row.date}`,date:'',volume:null,volumeText:'',loadCount:0,averageAtrText:'',
-   linePercent:variationPercent,variationLabel:variationPercent,variationPercent,
-   fromDate:previous.date,toDate:row.date,baseVolume:previous.volume,baseVolumeText:previous.volumeText,currentVolume:row.volume,currentVolumeText:row.volumeText,
-  };
-  return [transition,day];
- });
 }

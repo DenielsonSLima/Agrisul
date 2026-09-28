@@ -31,14 +31,15 @@ try{
  const pdfSource=await readFile('modules/contratos/reporting/contractSummaryPdfDocument.ts','utf8');
  const detailSource=await readFile('modules/contratos/components/ContractDetail.tsx','utf8');
  const reportDialogSource=await readFile('modules/contratos/components/ContractMonthlyReportDialog.tsx','utf8');
- const heroOrder=['Quantidade do contrato','Quantidade entregue','summary.operationalItems[3].label'].map(value=>heroSource.indexOf(value));
+ const heroOrder=['Quantidade do contrato','Quantidade entregue','summary.operationalItems[3].label','Falta entregar'].map(value=>heroSource.indexOf(value));
  assert.ok(heroOrder.every((position,index)=>position>=0&&(index===0||position>heroOrder[index-1])),'Hero KPI rows must keep contract/received, delivered/pending, ATR/sale-per-ton, remaining/credit order');
- assert.match(heroSource,/balances=\[money\[0\],money\[1\],null\],credit=money\[2\]/);
+ assert.match(heroSource,/balances=\[money\[0\],money\[1\],null,money\[2\]\]/);
  assert.doesNotMatch(heroSource,/Quantidade entregue[^\n]+ATR médio/);
- assert.match(heroSource,/remaining:formatContractVolume/);assert.match(heroSource,/<small>Restante<\/small>/);
- assert.doesNotMatch(heroSource,/label:'Falta entregar'/,'Remaining volume must sit beside delivered volume instead of being repeated in a separate KPI');
- assert.match(pdfSource,/\[\[centers\[0\],variationY\(0\)\]\]/,'The PDF variation line must start at zero on the first loading');
- assert.match(pdfSource,/\(centers\[index\]\+centers\[index\+1\]\)\/2/,'PDF percentages must be positioned between consecutive loading bars');
+ assert.match(heroSource,/label:'Falta entregar'/,'The eighth hero KPI must keep the remaining contract volume');
+ assert.match(pdfSource,/row\.averageAtr/,'The PDF daily line must use the server-calculated ATR for each day');
+ assert.match(pdfSource,/setLineDashPattern\(\[1\.2,1\],0\)/,'The PDF daily ATR line must be dotted');
+ assert.match(pdfSource,/ATR médio diário \(kg\/t\)/,'The PDF legend must identify the ATR scale');
+ assert.doesNotMatch(pdfSource,/variationPercent|Variação percentual/,'The PDF must not reuse the obsolete percentage series');
  assert.match(detailSource,/dailyPeriod=\{dailyPeriod\}/,'The summary PDF must receive the daily period currently selected on screen');
  assert.match(reportDialogSource,/\{search:'',\.\.\.dailyPeriod,groupBy:'day'\}/,'The PDF daily query must use the visible daily filter instead of deriving dates from the monthly filter');
  assert.ok(model.tables[1].rows[0][1].includes('987,65'));
@@ -62,7 +63,8 @@ try{
  for(const orientation of ['portrait','landscape']){
   const {doc}=await createContractMonthlySummaryPdf(longContract,{...brand,orientation},undefined,dailyLoads);
   const commands=doc.internal.pages.flat().join('\n');
-  for(const text of ['Avanço do carregamento','Quantidade carregada por dia','Variação percentual','Média diária 125,00 t','15/09','16/09','Valor de venda por tonelada','Bruto','600,00/t','Líquido após descontos:','592,00/t','Da entrega ao recebimento','Entregas, faturamento e entradas','Faturamento, líquido e ATR por mês','ATR médio','Quantidade entregue','Acordos de desconto','Valor por tonelada','Meses de aplicação','Base entregue','Desconto total','Adiantamentos','Recebimentos','Estornos','Total recebido','Crédito do contrato','Falta entregar','25.000,15','35.000,35','60.000,50','88.000,00','8,001/t','Ago/2026','Out/2026','RECIBO-044','FIM-DO-COMPROVANTE','FIM-DO-ACORDO','FIM-DAS-OBSERVACOES'])assert.ok(commands.includes(text),orientation+' lost '+text);
+  for(const text of ['Avanço do carregamento','Quantidade carregada por dia','ATR médio diário','120,00','122,50','Média diária 125,00 t','15/09','16/09','Valor de venda por tonelada','Bruto','600,00/t','Líquido após descontos:','592,00/t','Da entrega ao recebimento','Entregas, faturamento e entradas','Faturamento, líquido e ATR por mês','ATR médio','Quantidade entregue','Acordos de desconto','Valor por tonelada','Meses de aplicação','Base entregue','Desconto total','Adiantamentos','Recebimentos','Estornos','Total recebido','Crédito do contrato','Falta entregar','25.000,15','35.000,35','60.000,50','88.000,00','8,001/t','Ago/2026','Out/2026','RECIBO-044','FIM-DO-COMPROVANTE','FIM-DO-ACORDO','FIM-DAS-OBSERVACOES'])assert.ok(commands.includes(text),orientation+' lost '+text);
+  assert.ok(!commands.includes('Variação percentual'),orientation+' kept the obsolete percentage legend');
   assert.doesNotMatch(commands,/A ajustar|Dados essenciais|Condições do contrato/);
   assert.ok(doc.getNumberOfPages()>2);
   for(const page of doc.internal.pages.slice(1))for(const command of page){
@@ -72,5 +74,10 @@ try{
   }
   if(process.env.BILLING_SUMMARY_ARTIFACTS){const folder=resolve(process.env.BILLING_SUMMARY_ARTIFACTS);await mkdir(folder,{recursive:true});await writeFile(join(folder,'resumo-'+orientation+'.pdf'),new Uint8Array(doc.output('arraybuffer')));await writeFile(join(folder,'contract.json'),JSON.stringify(contract));}
  }
+ const nineDayLoads={...dailyLoads,summary:{...dailyLoads.summary,loadCount:9,volume:'450',activeDayCount:9,averageDailyVolume:'50',averageAtr:'114'},groups:Array.from({length:9},(_,index)=>({key:`2026-09-${String(index+1).padStart(2,'0')}`,label:`2026-09-${String(index+1).padStart(2,'0')}`,loadCount:1,volume:'50',averageAtr:String(110+index),loads:[]}))};
+ const {doc:pagedDoc}=await createContractMonthlySummaryPdf(contract,brand,undefined,nineDayLoads),pagedCommands=pagedDoc.internal.pages.flat().join('\n');
+ assert.equal(pagedCommands.match(/Quantidade carregada por dia/g)?.length,2,'Nine daily bars must produce two finite PDF chart panels');
+ assert.equal(pagedCommands.match(/08\/09/g)?.length,2,'The safe pagination overlap must repeat only the boundary bar');
+ assert.equal(pagedCommands.match(/09\/09/g)?.length,1,'The final daily bar must render once');
  console.log('Passed: nine financial indicators, delivery balance, payment-only months, credits, unavailable/pending states, RPC totals, full histories, long notes and PDF footer safety in both orientations.');
 }finally{await rm(directory,{recursive:true,force:true});}
