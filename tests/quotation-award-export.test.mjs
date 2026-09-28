@@ -66,7 +66,10 @@ test('approved export snapshot contains only items awarded to its supplier and t
       issuer: {id: 'tester', name: 'Teste', email: ''},
       issuedAt: new Date('2026-09-23T12:00:00-03:00'),
     });
-    assert.equal(result.fileName, 'cotacao-aprovada-cot-010-fornecedor-a.pdf');
+    assert.equal(
+      result.fileName,
+      'cotacao-aprovada-fornecedor-a-cotacao-de-filtros-cot-010.pdf',
+    );
     assert.equal(
       new TextDecoder().decode(new Uint8Array(result.doc.output('arraybuffer')).slice(0, 4)),
       '%PDF',

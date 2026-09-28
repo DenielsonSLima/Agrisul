@@ -221,7 +221,10 @@ test('quotation request PDF is a roomy supplier form with photo, prices, discoun
     const searchableText = allText.replace(/\s+/g, ' ');
 
     assert.equal(JSON.stringify(snapshot), before, 'PDF generation must not mutate its snapshot');
-    assert.equal(fileName, 'cotacao-cot-001-ana-cristina-alves-de-oliveira.pdf');
+    assert.equal(
+      fileName,
+      'cotacao-ana-cristina-alves-de-oliveira-cotacao-de-23-09-2026-cot-001.pdf',
+    );
     assert.equal(
       new TextDecoder().decode(new Uint8Array(doc.output('arraybuffer')).slice(0, 4)),
       '%PDF',

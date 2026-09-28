@@ -476,6 +476,6 @@ export async function createQuotationRequestPdf(
 
   return {
     doc,
-    fileName: `cotacao-${safeFilePart(snapshot.number || snapshot.title)}-${safeFilePart(snapshot.provider.providerName)}.pdf`,
+    fileName: `cotacao-${safeFilePart(snapshot.provider.providerName)}-${safeFilePart(snapshot.title)}-${safeFilePart(snapshot.number)}.pdf`,
   };
 }

@@ -390,6 +390,6 @@ export async function createQuotationAwardPdf(
 
   return {
     doc,
-    fileName: `cotacao-aprovada-${safeFilePart(snapshot.number || snapshot.title)}-${safeFilePart(snapshot.provider.providerName)}.pdf`,
+    fileName: `cotacao-aprovada-${safeFilePart(snapshot.provider.providerName)}-${safeFilePart(snapshot.title)}-${safeFilePart(snapshot.number)}.pdf`,
   };
 }
