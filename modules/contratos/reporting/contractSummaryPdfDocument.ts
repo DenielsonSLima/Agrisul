@@ -158,17 +158,16 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
    }
    const centers=pageRows.map((_,index)=>left+(index+.5)*slot);
    const atrY=(value:number)=>base-(value-atrScaleMinimum)/(atrScaleMaximum-atrScaleMinimum)*plotHeight;
-   const atrPoints=pageRows.map((row,index)=>{const value=row.averageAtr;return value===null||!Number.isFinite(value)?null:{x:centers[index],y:atrY(value)};});
+   const atrPoints=pageRows.map((row,index)=>{const value=row.averageAtr;return value===null||!Number.isFinite(value)?null:{x:centers[index],y:atrY(value),label:`ATR ${formatAtr(row.averageAtrText)}`};});
    pageRows.forEach((row,index)=>{
     const center=centers[index],barWidth=Math.min(8,slot*.45),barHeight=row.volume/maxVolume*plotHeight;
     doc.setFillColor(84,168,115);doc.roundedRect(center-barWidth/2,base-barHeight,barWidth,barHeight,Math.min(1,barHeight/2),Math.min(1,barHeight/2),'F');
     font(5.2,true,[82,107,90]);doc.text(numberLabel(row.volume),center,base-barHeight-1.2,{align:'center'});
-    if(row.averageAtr!==null){font(4.8,true,[145,71,0]);doc.text(`ATR ${formatAtr(row.averageAtrText)}`,center,base+3.3,{align:'center'});}
-    font(5.4,false,palette.muted);doc.text(row.label,center,base+6.2,{align:'center'});
+    font(5.4,false,palette.muted);doc.text(row.label,center,base+4.2,{align:'center'});
    });
    doc.setDrawColor(236,177,111);doc.setLineWidth(.7);doc.setLineDashPattern([1.2,1],0);let previousAtr:{x:number;y:number}|null=null;
    atrPoints.forEach(point=>{if(!point){previousAtr=null;return;}if(previousAtr)doc.line(previousAtr.x,previousAtr.y,point.x,point.y);previousAtr=point;});doc.setLineDashPattern([],0);
-   atrPoints.forEach(point=>{if(!point)return;doc.setFillColor(255,255,255);doc.setDrawColor(236,177,111);doc.circle(point.x,point.y,1,'FD');});
+   atrPoints.forEach(point=>{if(!point)return;doc.setFillColor(255,255,255);doc.setDrawColor(236,177,111);doc.circle(point.x,point.y,1,'FD');font(4.7,true,[145,71,0]);doc.text(point.label,point.x+1.7,point.y-1.5);});
    if(atrValues.length){font(4.8,false,[145,71,0]);doc.text(formatAtr(String(atrScaleMaximum)),right+2,top+1);doc.text(formatAtr(String(atrScaleMinimum)),right+2,base+.8);}
    font(5.3,false,[84,168,115]);doc.text(`■ ${granularityCopy.quantity}`,margin+padding+3,top+50);const atrLegendX=margin+padding+42,atrLegendY=top+48.8;doc.setDrawColor(236,177,111);doc.setLineWidth(.7);doc.setLineDashPattern([1.2,1],0);doc.line(atrLegendX,atrLegendY,atrLegendX+7,atrLegendY);doc.setLineDashPattern([],0);font(5.3,false,[145,71,0]);doc.text(`${granularityCopy.atr} (kg/t)`,atrLegendX+9,top+50);
    const averageVolume=granularity==='day'?dailyLoads.summary.averageDailyVolume:String(rows.reduce((total,row)=>total+row.volume,0)/rows.length);
@@ -209,49 +208,45 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
    font(7,false,palette.muted);doc.text(`Período: ${periodLabel} · Nenhuma movimentação no período selecionado.`,margin+4,y+23);y+=36;return;
   }
   // The PDF mirrors the single screen filter and keeps every selected bucket readable.
-  for(const pageRows of contractDailyLoadsChartPages(rows,6)){
+  for(let offset=0;offset<rows.length;offset+=6){
+   const pageRows=rows.slice(offset,offset+6);
    const padding=5,panelHeight=87;
    ensure(panelHeight);panel(margin,y,content,panelHeight);
    heading(margin+padding,y+4,'RESUMO MENSAL','Entregas, faturamento e entradas','calendar');
    const criterion='ATR '+formatAtrCriterion(contract.atrPriceType,contract.atrPeriodType);font(6.2,false,[47,133,84]);
    const criterionWidth=doc.getTextWidth(criterion)+5;
    doc.setFillColor(235,246,239);doc.roundedRect(width-margin-padding-criterionWidth,y+5,criterionWidth,5.5,1.3,1.3,'F');doc.text(criterion,width-margin-padding-2.5,y+8.6,{align:'right'});
-   const top=y+17,left=margin+padding+24,right=width-margin-padding-14,plotWidth=right-left,base=top+45,plotHeight=33,slot=plotWidth/pageRows.length;
-   panel(margin+padding,top,content-padding*2,63,palette.surface);font(7.3,true);doc.text(`Faturamento bruto, líquido e ATR por ${granularityCopy.noun}`,margin+padding+3,top+5);font(5.5,false,palette.muted);doc.text(`Barra total: bruto · Preenchimento interno: líquido · Período: ${periodLabel}`,margin+padding+3,top+8.6);
-   const maximum=Math.max(1,...pageRows.map(row=>row.gross??0));
-   const magnitude=10**Math.floor(Math.log10(maximum)),scale=Math.ceil(maximum/magnitude*2)/2*magnitude;
-   const atrValues=pageRows.map(row=>row.averageAtr).filter((value):value is number=>value!==null&&Number.isFinite(value));
-   const atrMinimum=atrValues.length?Math.min(...atrValues):0,atrMaximum=atrValues.length?Math.max(...atrValues):1,atrRange=atrMaximum-atrMinimum;
-   const atrPadding=atrRange>0?atrRange*.08:Math.max(Math.abs(atrMaximum)*.03,.5),atrScaleMinimum=atrMinimum-atrPadding,atrScaleMaximum=atrMaximum+atrPadding;
+   const top=y+17,left=margin+padding+24,right=width-margin-padding-5,plotWidth=right-left,base=top+47,plotHeight=36,slot=plotWidth/pageRows.length;
+   panel(margin+padding,top,content-padding*2,63,palette.surface);font(7.3,true);doc.text(`Faturamento bruto e líquido por ${granularityCopy.noun}`,margin+padding+3,top+5);font(5.5,false,palette.muted);doc.text(`Barra total: faturado bruto · Preenchimento interno: líquido · Período: ${periodLabel}`,margin+padding+3,top+8.6);
+   const hasPositiveGross=pageRows.some(row=>row.gross!==null&&Number.isFinite(row.gross)&&row.gross>0);
+   const maximum=hasPositiveGross?Math.max(...pageRows.map(row=>row.gross??0)):0;
+   const magnitude=hasPositiveGross?10**Math.floor(Math.log10(maximum)):1,scale=hasPositiveGross?Math.ceil(maximum/magnitude*2)/2*magnitude:1;
    for(let index=0;index<=4;index++){
     const gridY=base-plotHeight*index/4;doc.setDrawColor(227,237,231);doc.setLineWidth(.2);doc.setLineDashPattern([1,1.4],0);doc.line(left,gridY,right,gridY);doc.setLineDashPattern([],0);
-    font(5.1,false,palette.muted);doc.text(moneyLabel(scale*index/4),left-2,gridY+.8,{align:'right'});
-    if(atrValues.length){font(5.1,false,palette.amber);doc.text(formatAtr(String(atrScaleMinimum+(atrScaleMaximum-atrScaleMinimum)*index/4)),right+2,gridY+.8);}
+    if(hasPositiveGross||index===0){font(5.1,false,palette.muted);doc.text(moneyLabel(hasPositiveGross?scale*index/4:0),left-2,gridY+.8,{align:'right'});}
    }
-   const centers=pageRows.map((_,index)=>left+(index+.5)*slot),atrY=(value:number)=>base-(value-atrScaleMinimum)/(atrScaleMaximum-atrScaleMinimum)*plotHeight;
-   const points=pageRows.map((row,index)=>row.averageAtr===null?null:{x:centers[index],y:atrY(row.averageAtr)});
+   const centers=pageRows.map((_,index)=>left+(index+.5)*slot);
    pageRows.forEach((row,index)=>{
-    const center=centers[index],barWidth=Math.min(16,slot*.62);
+    const center=centers[index],barWidth=Math.min(19,slot*.68);
     if(row.gross!==null&&Number.isFinite(row.gross)&&row.gross>0){
      const grossHeight=row.gross/scale*plotHeight;
      doc.setFillColor(180,218,194);doc.setDrawColor(117,185,140);doc.setLineWidth(.25);doc.roundedRect(center-barWidth/2,base-grossHeight,barWidth,grossHeight,Math.min(1,barWidth/8),Math.min(1,grossHeight/2),'FD');
      font(4.6,true,[63,103,78]);doc.text(moneyLabel(row.gross),center,base-grossHeight-1.1,{align:'center'});
      if(row.net!==null&&Number.isFinite(row.net)&&row.net>=0){
       const netHeight=row.net/scale*plotHeight,netWidth=barWidth*.72;
-      doc.setFillColor(...palette.dark);doc.roundedRect(center-netWidth/2,base-netHeight,netWidth,netHeight,Math.min(.8,netWidth/8),Math.min(.8,netHeight/2),'F');
+      if(netHeight>0){doc.setFillColor(...palette.dark);doc.roundedRect(center-netWidth/2,base-netHeight,netWidth,netHeight,Math.min(.8,netWidth/8),Math.min(.8,netHeight/2),'F');}
       const netY=netHeight>=4?base-netHeight+3:base-netHeight-1;
       font(4.2,true,netHeight>=4?[255,255,255]:palette.dark);doc.text(moneyLabel(row.net),center,netY,{align:'center'});
      }
-    }else{font(4.8,true,palette.muted);doc.text('Pendente',center,base-2,{align:'center'});}
-    if(row.averageAtr!==null){font(4.6,true,[145,71,0]);doc.text(`ATR ${formatAtr(row.averageAtrText)}`,center,base+3.2,{align:'center'});}
-    font(5.3,true,palette.ink);doc.text(row.label,center,base+6,{align:'center'});font(4.7,false,palette.muted);doc.text(`${numberLabel(row.volume)} t`,center,base+8.6,{align:'center'});
+    }else if(row.gross===null){font(4.8,true,[145,93,35]);doc.text('Faturamento pendente',center,base-2,{align:'center'});}
+    else{
+     font(4.6,true,[63,103,78]);doc.text(moneyLabel(0),center,base-3.2,{align:'center'});
+     font(4.2,true,palette.dark);doc.text(`Líquido ${moneyLabel(row.net??0)}`,center,base-.8,{align:'center'});
+    }
+    font(5.3,true,palette.ink);doc.text(row.label,center,base+4,{align:'center'});font(4.7,false,palette.muted);doc.text(`${numberLabel(row.volume)} t`,center,base+6.6,{align:'center'});
    });
-   doc.setDrawColor(236,177,111);doc.setLineWidth(.7);doc.setLineDashPattern([1.2,1],0);let previousPoint:{x:number;y:number}|null=null;
-   points.forEach(point=>{if(!point){previousPoint=null;return;}if(previousPoint)doc.line(previousPoint.x,previousPoint.y,point.x,point.y);previousPoint=point;});doc.setLineDashPattern([],0);
-   points.forEach(point=>{if(!point)return;doc.setFillColor(255,255,255);doc.setDrawColor(236,177,111);doc.setLineWidth(.6);doc.circle(point.x,point.y,1,'FD');});
    const legendY=top+60;doc.setFillColor(180,218,194);doc.setDrawColor(117,185,140);doc.rect(margin+padding+3,legendY-1.6,3,2,'FD');font(5.2,false,[63,103,78]);doc.text('Faturado bruto (barra total)',margin+padding+7,legendY);
-   let legendX=margin+padding+49;doc.setFillColor(...palette.dark);doc.rect(legendX,legendY-1.6,3,2,'F');font(5.2,false,palette.dark);doc.text('Líquido (dentro)',legendX+4,legendY);
-   legendX+=38;doc.setDrawColor(236,177,111);doc.setLineWidth(.7);doc.setLineDashPattern([1.2,1],0);doc.line(legendX,legendY-1,legendX+7,legendY-1);doc.setLineDashPattern([],0);font(5.2,false,[145,71,0]);doc.text(granularityCopy.atr,legendX+9,legendY);
+   const legendX=margin+padding+49;doc.setFillColor(...palette.dark);doc.rect(legendX,legendY-1.6,3,2,'F');font(5.2,false,palette.dark);doc.text('Líquido (preenchimento interno)',legendX+4,legendY);
    y+=panelHeight+6;
   }
  };
@@ -288,8 +283,8 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
 
  startPage();
  hero();
- dailyChart();
  financialOverview();
+ dailyChart();
  charts();
  const periodTables=summary.tables.map((model,index)=>index<2&&effectiveMonthlyPeriod?{...model,rows:model.rows.filter((_,rowIndex)=>monthIsInContractPeriod(summary.months[rowIndex]?.month??'',effectiveMonthlyPeriod))}:model);
  for(const model of periodTables)table(model);

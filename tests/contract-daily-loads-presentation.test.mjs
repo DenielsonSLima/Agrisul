@@ -51,10 +51,15 @@ try{
  assert.throws(()=>contractDailyLoadsChartPages(sixteenDays,1),RangeError,'Reject an overlap step of zero instead of risking an infinite loop');
  assert.equal(data.groups[0].volume,'6.25','Presentation must not mutate values returned by the RPC');
  const component=await readFile('modules/contratos/components/details/ContractDailyLoadsChart.tsx','utf8');
+ const chartCss=await readFile('modules/contratos/components/details/contract-daily-loads-chart.css','utf8');
  assert.match(component,/data=\{rows\}/);assert.match(component,/dataKey="averageAtr"/);assert.match(component,/yAxisId="atr"/);assert.match(component,/strokeDasharray="6 5"/);assert.match(component,/strokeOpacity=\{\.52\}/);
- assert.match(component,/contractDailyLoadGranularities\.map/);assert.match(component,/aria-pressed=\{granularity===value\}/);assert.match(component,/<PeriodAxisTick rows=\{rows\}\/>/);assert.match(component,/ATR \{formatAtr\(row\.averageAtrText\)\} kg\/t/,'Each x-axis bucket must show its formatted ATR directly above the period label');
+ assert.match(component,/contractDailyLoadGranularities\.map/);assert.match(component,/aria-pressed=\{granularity===value\}/);assert.match(component,/<PeriodAxisTick rows=\{rows\}\/>/);
+ assert.doesNotMatch(component,/contract-daily-loads-axis-atr/,'The x-axis must contain only the period label');
+ assert.match(component,/<LabelList dataKey="averageAtr" position="top" offset=\{10\} dx=\{8\} textAnchor="start" formatter=\{atrPointLabel\} className="contract-daily-loads-line-atr" aria-hidden="true"\/>/,'Each ATR must be placed above and to the right of its line marker');
+ assert.match(component,/padding=\{\{left:8,right:72\}\}/,'The final ATR label needs reserved horizontal space');
+ assert.match(chartCss,/\.contract-daily-loads-line-atr\{[^}]*paint-order:stroke[^}]*pointer-events:none/,'Line labels must remain legible without intercepting pointer interaction');
  assert.doesNotMatch(component,/linePercent|variationLabel|VariationDot|Variação percentual/,'The screen chart must not retain percentage-transition semantics');
  assert.match(component,/copy\.atr/);assert.match(component,/ATR médio do período/);
  assert.doesNotMatch(component,/Volume total por mês/,'The redundant monthly volume cards must stay removed');
- console.log('Passed: six-month window, daily/weekly/fortnightly/monthly aggregation, weighted ATR line, x-axis ATR labels and period KPI.');
+ console.log('Passed: six-month window, daily/weekly/fortnightly/monthly aggregation, weighted ATR line, point-adjacent ATR labels and period KPI.');
 }finally{await rm(directory,{recursive:true,force:true});}
