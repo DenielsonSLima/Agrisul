@@ -29,19 +29,23 @@ function provider(id, name, itemId, offer) {
   };
 }
 
+async function compileReport(directory) {
+  const outfile = join(directory, 'quotation-negotiation-pdf.mjs');
+  await build({
+    entryPoints: [resolve('modules/cotacao/reporting/quotationNegotiationPdf.ts')],
+    outfile,
+    bundle: true,
+    platform: 'node',
+    format: 'esm',
+    logLevel: 'silent',
+  });
+  return import(pathToFileURL(outfile).href);
+}
+
 test('negotiation PDF preserves every supplier, discount, award and server total in landscape', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'quotation-negotiation-pdf-'));
   try {
-    const outfile = join(directory, 'quotation-negotiation-pdf.mjs');
-    await build({
-      entryPoints: [resolve('modules/cotacao/reporting/quotationNegotiationPdf.ts')],
-      outfile,
-      bundle: true,
-      platform: 'node',
-      format: 'esm',
-      logLevel: 'silent',
-    });
-    const {createQuotationNegotiationSnapshot, createQuotationNegotiationPdf} = await import(pathToFileURL(outfile).href);
+    const {createQuotationNegotiationSnapshot, createQuotationNegotiationPdf} = await compileReport(directory);
     const quoteItem = item('item-a', 'material-a', 'Luva de segurança');
     const discounted = {
       unitPrice: '10.00', discountType: 'percentage', discountValue: '7.00',
@@ -97,6 +101,60 @@ test('negotiation PDF preserves every supplier, discount, award and server total
       new TextDecoder().decode(new Uint8Array(result.doc.output('arraybuffer')).slice(0, 4)),
       '%PDF',
     );
+  } finally {
+    await rm(directory, {recursive: true, force: true});
+  }
+});
+
+test('landscape negotiation PDF fits eight material rows on full pages', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'quotation-negotiation-density-'));
+  try {
+    const {createQuotationNegotiationPdf} = await compileReport(directory);
+    const items = Array.from({length: 26}, (_, index) => ({
+      ...item(`item-${index + 1}`, `material-${index + 1}`, `Equipamento de proteção individual ${index + 1}`),
+      materialImageUrl: null,
+    }));
+    const offer = {
+      unitPrice: '69.70', discountType: 'percentage', discountValue: '7.00',
+      lineSubtotal: '139.40', discountAmount: '9.76', lineTotal: '129.64', netUnitPrice: '64.82',
+    };
+    const providers = Array.from({length: 3}, (_, index) => ({
+      id: `supplier-${index + 1}`,
+      providerId: `catalog-supplier-${index + 1}`,
+      providerName: `Fornecedor de equipamentos industriais ${index + 1}`,
+      values: Object.fromEntries(items.map(entry => [entry.id, offer.unitPrice])),
+      offers: Object.fromEntries(items.map(entry => [entry.id, {...offer}])),
+      notes: '', sentAt: null,
+      grossTotal: '3624.40', total: '3370.64', quotedItemCount: items.length,
+      awardedItemCount: index === 0 ? items.length : 0,
+      awardedGrossTotal: index === 0 ? '3624.40' : '0',
+      awardedTotal: index === 0 ? '3370.64' : '0',
+    }));
+    const result = await createQuotationNegotiationPdf({
+      title: 'Cotação de EPIs - 23/09/2026',
+      number: 'COT-003',
+      requestDate: '2026-09-23',
+      requester: 'Edmilson',
+      items,
+      providers,
+      approvedProviderByItem: Object.fromEntries(items.map(entry => [entry.id, providers[0].id])),
+      awardedItemCount: items.length,
+      awardedGrossTotal: '3624.40',
+      awardedTotal: '3370.64',
+    }, {
+      company: {
+        id: 'company', name: 'AGRISUL AGRÍCOLA LTDA EM RECUPERAÇÃO JUDICIAL', legalName: '',
+        cnpj: '04.773.159/0005-23', phone: '(11) 3262-1428', email: 'gerenciacontabil@best.com.br',
+        street: 'Fazenda Santana', number: 'S/N', complement: '', district: 'Zona Rural',
+        city: 'Itaporanga', state: 'SE', zipCode: '49950-000', logoUrl: null,
+      },
+      header: {variant: 'detailed', logoAlignment: 'left', showCnpj: true, showContact: true},
+      watermark: {imageUrl: null, opacity: 15, size: 60},
+      issuer: {id: 'tester', name: 'Teste', email: ''},
+      issuedAt: new Date('2026-09-23T12:00:00-03:00'),
+    });
+
+    assert.equal(result.doc.getNumberOfPages(), 4, '26 materials should use three full eight-row pages plus the final page');
   } finally {
     await rm(directory, {recursive: true, force: true});
   }

@@ -29,8 +29,8 @@ export type QuotationNegotiationSnapshot = {
 
 const MATERIAL_COLUMN_WIDTH = 62;
 const MIN_PROVIDER_COLUMN_WIDTH = 42;
-const TABLE_HEADER_HEIGHT = 16;
-const ITEM_ROW_HEIGHT = 21;
+const TABLE_HEADER_HEIGHT = 14;
+const ITEM_ROW_HEIGHT = 15.5;
 const TOTALS_ROW_HEIGHT = 28;
 const GENERAL_TOTALS_HEIGHT = 17;
 
@@ -208,17 +208,17 @@ export async function createQuotationNegotiationPdf(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(6.7);
     doc.setTextColor(48, 78, 57);
-    doc.text('MATERIAL', margin + 3, top + 9.2);
+    doc.text('MATERIAL', margin + 3, top + 8);
     let x = margin + MATERIAL_COLUMN_WIDTH;
     providers.forEach((provider, index) => {
       doc.line(x, top, x, top + TABLE_HEADER_HEIGHT);
       doc.setFontSize(5.3);
       doc.setTextColor(102, 121, 108);
-      doc.text(`FORNECEDOR ${index + 1}`, x + providerWidth / 2, top + 4, {align: 'center'});
+      doc.text(`FORNECEDOR ${index + 1}`, x + providerWidth / 2, top + 3.4, {align: 'center'});
       doc.setFontSize(7.1);
       doc.setTextColor(43, 76, 53);
       const lines = limitedLines(doc, provider.providerName, providerWidth - 5, 2);
-      doc.text(lines, x + providerWidth / 2, top + 8.3, {align: 'center', lineHeightFactor: 1.08});
+      doc.text(lines, x + providerWidth / 2, top + 7.4, {align: 'center', lineHeightFactor: 1.05});
       x += providerWidth;
     });
     y += TABLE_HEADER_HEIGHT;
@@ -249,7 +249,7 @@ export async function createQuotationNegotiationPdf(
       doc.rect(margin, rowTop, MATERIAL_COLUMN_WIDTH, ITEM_ROW_HEIGHT, 'F');
     }
     const image = images.get(item.id) ?? null;
-    const imageBox = 13;
+    const imageBox = 10.5;
     const imageX = margin + 2;
     const imageY = rowTop + (ITEM_ROW_HEIGHT - imageBox) / 2;
     doc.setFillColor(255, 255, 255);
@@ -259,30 +259,30 @@ export async function createQuotationNegotiationPdf(
       drawContainedImage(image, imageX + .7, imageY + .7, imageBox - 1.4, imageBox - 1.4);
     } else {
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(4.7);
+      doc.setFontSize(4.2);
       doc.setTextColor(155, 167, 159);
       doc.text('SEM FOTO', imageX + imageBox / 2, imageY + imageBox / 2 + .8, {align: 'center'});
     }
-    const copyX = imageX + imageBox + 2.3;
+    const copyX = imageX + imageBox + 2;
     const copyWidth = MATERIAL_COLUMN_WIDTH - imageBox - 8;
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6.8);
+    doc.setFontSize(6.2);
     doc.setTextColor(43, 70, 51);
-    doc.text(limitedLines(doc, item.materialName, copyWidth, 2), copyX, rowTop + 5, {lineHeightFactor: 1.08});
+    doc.text(limitedLines(doc, item.materialName, copyWidth, 2), copyX, rowTop + 3.8, {lineHeightFactor: 1.03});
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(5.3);
+    doc.setFontSize(4.8);
     doc.setTextColor(100, 118, 106);
     const references = item.materialReferences
       .map(reference => [reference.brand, reference.code].filter(Boolean).join(' '))
       .filter(Boolean)
       .join(' · ');
     if (references) {
-      doc.text(limitedLines(doc, references, copyWidth, 1)[0] ?? '', copyX, rowTop + 13.3);
+      doc.text(limitedLines(doc, references, copyWidth, 1)[0] ?? '', copyX, rowTop + 10.4);
     }
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(5.8);
+    doc.setFontSize(5.3);
     doc.setTextColor(55, 100, 68);
-    doc.text(`${item.quantity} ${item.unit}`.trim(), copyX, rowTop + 18);
+    doc.text(`${item.quantity} ${item.unit}`.trim(), copyX, rowTop + 14.1);
   };
 
   const drawOffer = (
@@ -299,44 +299,44 @@ export async function createQuotationNegotiationPdf(
       doc.setFillColor(232, 247, 237);
       doc.rect(x, rowTop, providerWidth, ITEM_ROW_HEIGHT, 'F');
       doc.setFillColor(39, 126, 75);
-      doc.roundedRect(x + providerWidth - 16.5, rowTop + 1.5, 14.5, 4, 1.2, 1.2, 'F');
+      doc.roundedRect(x + providerWidth - 15.5, rowTop + 1, 13.5, 3.4, 1.1, 1.1, 'F');
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(4.5);
+      doc.setFontSize(4.1);
       doc.setTextColor(255, 255, 255);
-      doc.text('APROVADO', x + providerWidth - 9.25, rowTop + 4.25, {align: 'center'});
+      doc.text('APROVADO', x + providerWidth - 8.75, rowTop + 3.35, {align: 'center'});
     }
     if (!offer && !currentPrice) {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6.2);
       doc.setTextColor(139, 153, 144);
-      doc.text('Sem preço informado', x + providerWidth / 2, rowTop + 11.5, {align: 'center'});
+      doc.text('Sem preço informado', x + providerWidth / 2, rowTop + 8.8, {align: 'center'});
       return;
     }
 
     const inset = 3;
     const discounted = Boolean(offer && offer.discountType !== 'none');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.4);
+    doc.setFontSize(6.8);
     doc.setTextColor(32, 111, 65);
     doc.text(
       moneyLabel(discounted ? offer?.netUnitPrice : offer?.unitPrice ?? currentPrice),
       x + inset,
-      rowTop + 6.4,
+      rowTop + 4.9,
     );
     if (discounted && offer) {
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(5.3);
+      doc.setFontSize(4.8);
       doc.setTextColor(117, 132, 122);
       const grossLabel = `Bruto ${moneyLabel(offer.unitPrice)}`;
-      doc.text(grossLabel, x + inset, rowTop + 10.2);
+      doc.text(grossLabel, x + inset, rowTop + 7.9);
       doc.setDrawColor(117, 132, 122);
       doc.line(
         x + inset,
-        rowTop + 8.7,
+        rowTop + 6.6,
         Math.min(x + providerWidth - inset, x + inset + doc.getTextWidth(grossLabel)),
-        rowTop + 8.7,
+        rowTop + 6.6,
       );
-      doc.setFontSize(5.1);
+      doc.setFontSize(4.7);
       doc.text(
         limitedLines(
           doc,
@@ -345,19 +345,19 @@ export async function createQuotationNegotiationPdf(
           1,
         )[0] ?? '',
         x + inset,
-        rowTop + 14,
+        rowTop + 10.9,
       );
     } else {
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(5.2);
+      doc.setFontSize(4.8);
       doc.setTextColor(117, 132, 122);
-      doc.text('Sem desconto', x + inset, rowTop + 12.2);
+      doc.text('Sem desconto', x + inset, rowTop + 9.3);
     }
     if (offer) {
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(5.8);
+      doc.setFontSize(5.3);
       doc.setTextColor(54, 87, 63);
-      doc.text(`Total ${moneyLabel(offer.lineTotal)}`, x + inset, rowTop + 18.2);
+      doc.text(`Total ${moneyLabel(offer.lineTotal)}`, x + inset, rowTop + 14.1);
     }
   };
 
