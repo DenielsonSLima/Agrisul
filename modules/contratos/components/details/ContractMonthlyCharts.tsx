@@ -14,7 +14,7 @@ const compactValue=(value:number)=>value>=1_000_000?`${new Intl.NumberFormat('pt
 
 function MonthTick({x=0,y=0,payload}:MonthTickProps){
  const [month,volume='']=String(payload?.value??'').split('|');
- return <g transform={`translate(${x},${y})`}><text textAnchor="middle" fill="#718579" fontSize="10"><tspan x="0" dy="12">{month}</tspan><tspan x="0" dy="13" fill="#91a097" fontSize="8">{volume}</tspan></text></g>;
+ return <g transform={`translate(${x},${y})`}><text textAnchor="middle" fill="#26372d" fontSize="11" fontWeight="600"><tspan x="0" dy="12">{month}</tspan><tspan x="0" dy="14" fill="#4e5e54" fontSize="11" fontWeight="500">{volume}</tspan></text></g>;
 }
 
 export function ContractMonthlyCharts({months,period,onPeriod,error=''}:Props){
@@ -30,19 +30,19 @@ export function ContractMonthlyCharts({months,period,onPeriod,error=''}:Props){
    <button type="button" className="btn" onClick={()=>onPeriod(defaultContractMonthlyPeriod())}><CalendarRange size={15}/>Últimos 6 meses</button>
   </div>
   {error&&<p className="contract-monthly-filter-error" role="alert">{error}</p>}
-  <section className="contract-monthly-combined">
+  <section className="contract-monthly-combined" tabIndex={0} role="region" aria-label="Gráfico mensal; deslize horizontalmente para consultar todos os meses">
    <header><h4>Entregas e faturamento por mês</h4><span>Barras: faturamento bruto e valor líquido · Linha: ATR médio</span></header>
    {!data.length||error?<div className="contract-monthly-combined-empty">Nenhuma movimentação no período selecionado.</div>:<div className="contract-monthly-combined-chart" role="img" aria-label={'Resumo mensal: '+data.map(item=>`${item.label}, ${formatContractVolume(String(item.volume??0))}, faturado ${item.gross===null?'pendente':formatContractBilling(String(item.gross))}, líquido ${item.net===null?'pendente':formatContractBilling(String(item.net))}, ATR ${item.atr===null?'indisponível':formatAtr(String(item.atr))}`).join('; ')}>
     <ResponsiveContainer width="100%" height="100%"><ComposedChart data={data} margin={{top:28,right:18,left:8,bottom:22}}>
      <CartesianGrid vertical={false} stroke="#e7eee9" strokeDasharray="4 5"/>
      <XAxis dataKey="axis" axisLine={false} tickLine={false} height={42} interval={0} tick={<MonthTick/>}/>
-     <YAxis yAxisId="money" tickFormatter={compactMoney} axisLine={false} tickLine={false} width={68} tick={{fontSize:9,fill:'#84938a'}}/>
-     <YAxis yAxisId="atr" orientation="right" tickFormatter={value=>formatAtr(String(value))} axisLine={false} tickLine={false} width={56} tick={{fontSize:9,fill:'#a87635'}}/>
+     <YAxis yAxisId="money" tickFormatter={compactMoney} axisLine={false} tickLine={false} width={68} tick={{fontSize:11,fill:'#3f5046',fontWeight:550}}/>
+     <YAxis yAxisId="atr" orientation="right" tickFormatter={value=>formatAtr(String(value))} axisLine={false} tickLine={false} width={56} tick={{fontSize:11,fill:'#98570f',fontWeight:600}}/>
      <YAxis yAxisId="volume" hide/>
-     <Tooltip labelFormatter={(_,payload)=>payload?.[0]?.payload?.label??''} formatter={(value,name)=>name==='ATR médio'?[formatAtr(String(value)),'ATR médio (kg/t)']:name==='Quantidade entregue'?[formatContractVolume(String(value)),'Quantidade entregue']:[formatContractBilling(String(value)),String(name)]} contentStyle={{borderRadius:9,borderColor:'#dfe8e2',fontSize:11}}/>
-     <Legend iconType="circle" wrapperStyle={{fontSize:10,paddingTop:8}}/>
-     <Bar yAxisId="money" dataKey="gross" name="Faturado bruto" fill="#75b98c" radius={[5,5,0,0]} maxBarSize={30}><LabelList dataKey="gross" position="top" formatter={(value:unknown)=>compactValue(Number(value))} fill="#598068" fontSize={8}/></Bar>
-     <Bar yAxisId="money" dataKey="net" name="Valor líquido" fill="#26784c" radius={[5,5,0,0]} maxBarSize={30}><LabelList dataKey="net" position="top" formatter={(value:unknown)=>compactValue(Number(value))} fill="#315b40" fontSize={8}/></Bar>
+     <Tooltip labelFormatter={(_,payload)=>payload?.[0]?.payload?.label??''} formatter={(value,name)=>name==='ATR médio'?[formatAtr(String(value)),'ATR médio (kg/t)']:name==='Quantidade entregue'?[formatContractVolume(String(value)),'Quantidade entregue']:[formatContractBilling(String(value)),String(name)]} contentStyle={{borderRadius:9,borderColor:'#d2ded6',fontSize:11,color:'#17251d'}} itemStyle={{color:'#26372d',fontWeight:550}} labelStyle={{color:'#17251d',fontWeight:700}}/>
+     <Legend iconType="circle" formatter={value=><span style={{color:'#26372d',fontWeight:600}}>{value}</span>} wrapperStyle={{fontSize:11,paddingTop:8}}/>
+     <Bar yAxisId="money" dataKey="gross" name="Faturado bruto" fill="#75b98c" radius={[5,5,0,0]} maxBarSize={30}><LabelList dataKey="gross" position="top" formatter={(value:unknown)=>compactValue(Number(value))} fill="#26372d" fontSize={11} fontWeight={600}/></Bar>
+     <Bar yAxisId="money" dataKey="net" name="Valor líquido" fill="#26784c" radius={[5,5,0,0]} maxBarSize={30}><LabelList dataKey="net" position="top" formatter={(value:unknown)=>compactValue(Number(value))} fill="#17291f" fontSize={11} fontWeight={650}/></Bar>
      <Line yAxisId="atr" type="monotone" dataKey="atr" name="ATR médio" stroke="#d18a35" strokeWidth={2.5} dot={{r:3,fill:'#fff',strokeWidth:2}} activeDot={{r:5}} connectNulls={false}/>
      <Line yAxisId="volume" dataKey="volume" name="Quantidade entregue" stroke="transparent" dot={false} activeDot={false} legendType="none"/>
     </ComposedChart></ResponsiveContainer>

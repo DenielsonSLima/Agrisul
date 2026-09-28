@@ -16,6 +16,9 @@ export async function persistContract(input:ContractInput,id?:string){
 export async function closeContract(contractId:string,companyId:string){
  return (await rpcRequest<{contract:BillingContract}>('contracts','close',{contractId,companyId})).contract;
 }
+export async function deleteContract(contractId:string,companyId:string){
+ return rpcRequest<{id:string;deleted:true}>('contracts','delete',{contractId,companyId});
+}
 export async function persistContractLoad(contractId:string,companyId:string,input:ContractLoadInput,id?:string){
  return (await rpcRequest<{load:ContractLoad}>('contracts','save-load',{...input,contractId,companyId,...(id?{id}:{})})).load;
 }

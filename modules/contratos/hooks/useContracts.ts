@@ -1,5 +1,5 @@
 import {useCadastroQuery,useCadastroMutation} from '@/modules/cadastro/hooks/useCadastroQuery';
-import {closeContract,deleteContractLoad,fetchContract,fetchContracts,persistContract,persistContractLoad} from '../services/contractApi';
+import {closeContract,deleteContract,deleteContractLoad,fetchContract,fetchContracts,persistContract,persistContractLoad} from '../services/contractApi';
 import type {ContractFilters,ContractInput,ContractLoadInput} from '../types';
 import {useWorkspaceCompany} from '@/shared/state/WorkspaceCompanyProvider';
 const defaultFilters:Omit<ContractFilters,'companyId'>={bucket:'open',search:'',from:'',to:''};
@@ -23,4 +23,8 @@ export function useContractsMutation(){
 export function useContractLifecycleMutation(){
  const {activeCompanyId}=useWorkspaceCompany();
  return useCadastroMutation('contracts',(contractId:string)=>closeContract(contractId,activeCompanyId));
+}
+export function useContractDeletionMutation(){
+ const {activeCompanyId}=useWorkspaceCompany();
+ return useCadastroMutation('contracts',(contractId:string)=>deleteContract(contractId,activeCompanyId));
 }

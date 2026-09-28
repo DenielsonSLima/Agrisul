@@ -1,5 +1,5 @@
 import {Fragment} from 'react';
-import {BadgeDollarSign,Gauge,PackageCheck,Scale,Truck} from 'lucide-react';
+import {BadgeDollarSign,Gauge,PackageCheck,Scale} from 'lucide-react';
 import type {BillingContract} from '../../types';
 import type {ContractSummaryDetails} from '../../utils/contractSummaryDetails';
 import {formatContractVolume,statusClass} from '../../utils/contractFormat';
@@ -10,11 +10,10 @@ export function ContractSummaryHero({contract,summary}:{contract:BillingContract
  const percent=total>0?Math.min(100,loaded/total*100):0,percentLabel=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1}).format(percent)+'%';
  const quantities=[
   {icon:Scale,label:'Quantidade do contrato',value:formatContractVolume(summary.totals.contractedVolume),hint:'Total acordado'},
-  {icon:PackageCheck,label:'Quantidade entregue',value:formatContractVolume(summary.totals.loadedVolume),hint:'Carregamentos realizados'},
+  {icon:PackageCheck,label:'Quantidade entregue',value:formatContractVolume(summary.totals.loadedVolume),remaining:formatContractVolume(contract.monthlySummary?.totals.remainingVolume??contract.remainingVolume),hint:'Carregamentos realizados'},
   {icon:Gauge,label:summary.operationalItems[3].label,value:summary.operationalItems[3].value==='—'?'—':`${summary.operationalItems[3].value} kg/t`,hint:summary.operationalItems[3].hint.replace(' · kg/t','')},
-  {icon:Truck,label:'Falta entregar',value:formatContractVolume(contract.monthlySummary?.totals.remainingVolume??contract.remainingVolume),hint:'Saldo em toneladas'},
  ];
- const money=summary.financialItems.filter(item=>item.key==='received'||item.key==='pending'||item.key==='credit'),balances=[money[0],money[1],null,money[2]];
+ const money=summary.financialItems.filter(item=>item.key==='received'||item.key==='pending'||item.key==='credit'),balances=[money[0],money[1],null],credit=money[2];
  return <div className="contract-summary-hero contract-summary-hero-compact">
   <section className="contract-volume-overview">
    <div className="contract-summary-section-heading"><span className="contract-summary-icon"><Gauge size={17}/></span><div><small>Visão operacional</small><h3>Avanço do carregamento</h3></div><span className={'billing-status '+statusClass(contract.status)}>{contract.status}</span></div>
@@ -25,9 +24,10 @@ export function ContractSummaryHero({contract,summary}:{contract:BillingContract
   </section>
   <div className="contract-summary-kpis" role="group" aria-label="Quantidades e saldos do contrato">
    {quantities.map((item,index)=>{const Icon=item.icon,balance=balances[index];return <Fragment key={item.label}>
-    <article><span className="contract-kpi-icon"><Icon size={17}/></span><div><small>{item.label}</small><strong>{item.value}</strong><p>{item.hint}</p></div></article>
+    <article className={'remaining' in item?'contract-delivery-kpi':undefined}><span className="contract-kpi-icon"><Icon size={17}/></span><div><small>{item.label}</small>{'remaining' in item?<div className="contract-delivery-values"><strong>{item.value}</strong><span><small>Restante</small><b>{item.remaining}</b></span></div>:<strong>{item.value}</strong>}<p>{item.hint}</p></div></article>
     {balance?<article className={'summary-money-'+balance.key}><div><small>{balance.label}</small><strong>{balance.value}</strong><p>{balance.hint}</p></div></article>:<article className="contract-sale-per-ton"><span className="contract-kpi-icon"><BadgeDollarSign size={17}/></span><div><small>{summary.salePerTon.label}</small><dl><div><dt>Bruto</dt><dd>{summary.salePerTon.gross}</dd></div><div><dt>Líquido após descontos</dt><dd>{summary.salePerTon.net}</dd></div></dl></div></article>}
    </Fragment>;})}
+   {credit&&<article className="summary-money-credit contract-summary-credit"><div><small>{credit.label}</small><strong>{credit.value}</strong><p>{credit.hint}</p></div></article>}
   </div>
  </div>;
 }

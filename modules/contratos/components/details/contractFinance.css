@@ -151,3 +151,77 @@
 @media(max-width:720px){.finance-heading{align-items:flex-start;gap:18px;flex-direction:column}.finance-period-control{width:100%;align-items:flex-start}.finance-period-control>span{display:none}.finance-period-control>div{width:100%;justify-content:space-between}.finance-month{flex:1;justify-content:center}.finance-month input{width:145px}.finance-balances{gap:9px}.finance-metric{padding:14px 12px}.finance-metric header{flex-wrap:wrap;gap:6px;margin-bottom:15px}.finance-metric header>small{display:none}.finance-metric h4{font-size:11px}.finance-metric-icon{width:24px;height:24px;border-radius:7px}.finance-metric-icon svg{width:13px;height:13px}.finance-metric>strong{font-size:23px;letter-spacing:-.8px}.finance-metric-note{font-size:10px;line-height:1.6;min-height:24px}.finance-metric footer{gap:5px;font-size:10px;margin-top:14px;padding-top:10px}.finance-delivery-metric{padding:0 13px;gap:8px;margin:18px 0}.finance-delivery-metric>span{display:none}.finance-delivery-metric strong{font-size:18px}.finance-delivery-metric p{font-size:10px;flex-wrap:wrap;gap:3px}.finance-criterion{padding:10px 13px;font-size:10px}.finance-payment-grid{grid-template-columns:1fr}.finance-card>header{flex-wrap:nowrap}.finance-chart-toolbar{gap:12px}.finance-chart-panel{padding-inline:15px}}
 @media(max-width:480px){.contract-finance{gap:17px}.finance-heading h3{font-size:23px}.finance-heading p{font-size:11px}.finance-balances{grid-template-columns:1fr}.finance-metric{padding:17px 19px}.finance-metric header{margin-bottom:11px;gap:8px}.finance-metric-icon{width:29px;height:29px}.finance-metric h4{font-size:11px}.finance-metric header>small{display:block;font-size:10px}.finance-metric>strong{font-size:30px}.finance-metric-note{font-size:11px;min-height:0}.finance-metric footer{font-size:11px;margin-top:17px;padding-top:12px}.finance-deliveries{grid-template-columns:1fr}.finance-delivery-metric{margin:0;padding:14px 17px;border-right:0;border-bottom:1px solid #eef3ef;align-items:center;gap:12px}.finance-delivery-metric>span{display:grid}.finance-delivery-metric>div{display:grid;grid-template-columns:1fr auto;gap:4px 12px;flex:1}.finance-delivery-metric h4{align-self:center;font-size:11px;margin:0}.finance-delivery-metric strong{font-size:18px;text-align:right}.finance-delivery-metric p{grid-column:1/-1;font-size:10px;justify-content:space-between;margin-top:1px}.finance-criterion{padding:10px 16px}.finance-panel-heading{align-items:flex-start;gap:10px}.finance-panel-heading h3{font-size:14px;line-height:1.4}.finance-panel-heading .finance-eyebrow{font-size:10px;letter-spacing:1px}.finance-chart-window select{max-width:111px;font-size:10px;padding:7px 22px 7px 7px}.finance-chart-window>svg{right:5px}.finance-chart-legend{gap:11px}.finance-evolution-chart{height:245px;margin-left:-10px;margin-right:-5px}.finance-chart-footer{flex-direction:column;align-items:flex-start;gap:6px}.finance-chart-footer>div{width:100%}.finance-chart-footer>span{font-size:10px}.finance-composition{display:flex;gap:0;padding-bottom:0}.finance-composition>.finance-panel-heading{width:100%}.finance-composition-filter{width:100%;margin-top:18px}.finance-donut{width:225px;height:215px;margin:10px 0}.finance-composition-legend{width:100%;margin:0 0 18px}.finance-composition-pending{width:100%;padding:14px 0}.finance-section-heading h3{font-size:17px}.finance-card{padding:17px}.finance-card h3{font-size:12px}.finance-card-title{gap:8px}.finance-card-title>svg{padding:7px;width:15px;height:15px}.finance-card>header>.btn{font-size:10px;padding:7px 8px;gap:4px}.finance-card-amount>strong{font-size:24px}.finance-discounts>header{align-items:flex-start;flex-wrap:wrap}.finance-form .form-grid{grid-template-columns:1fr}.finance-dialog{padding:20px!important}.finance-add-month{flex-wrap:wrap}}
 @media(prefers-reduced-motion:reduce){.contract-finance *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+.contract-detail-page .contract-finance{--fin-ink:#17251d;--fin-muted:#45564c;color:#17251d}
+.contract-detail-page .finance-eyebrow,
+.contract-detail-page .finance-period-control>span,
+.contract-detail-page .finance-heading p{color:#34443a;font-size:11px;font-weight:650}
+.contract-detail-page .finance-heading h3{color:#17251d;font-weight:720}
+.contract-detail-page .finance-period-control>div>button,
+.contract-detail-page .finance-month{color:#33443a}
+.contract-detail-page .finance-month input{color:#17251d;font-size:12px;font-weight:600}
+.contract-detail-page .finance-metric h4{color:#26372d;font-size:12px;font-weight:650}
+.contract-detail-page .finance-metric header>small{color:#3f5046;font-size:11px;font-weight:600}
+.contract-detail-page .finance-metric>strong{color:#17291f;font-weight:720}
+.contract-detail-page .finance-metric-note,
+.contract-detail-page .finance-metric footer>span,
+.contract-detail-page .finance-metric footer>b{color:#43534a;font-size:11px}
+.contract-detail-page .finance-metric footer>b{font-weight:650}
+.contract-detail-page .finance-metric-pending h4,
+.contract-detail-page .finance-metric-pending>strong,
+.contract-detail-page .finance-metric-pending footer>b{color:#fff}
+.contract-detail-page .finance-metric-pending header>small,
+.contract-detail-page .finance-metric-pending .finance-metric-note,
+.contract-detail-page .finance-metric-pending footer>span{color:#c4ddcc}
+.contract-detail-page .finance-delivery-metric h4{color:#34443a;font-size:12px;font-weight:650}
+.contract-detail-page .finance-delivery-metric strong{color:#17291f;font-weight:720}
+.contract-detail-page .finance-delivery-metric p,
+.contract-detail-page .finance-delivery-metric p>b{color:#45564c;font-size:11px}
+.contract-detail-page .finance-delivery-metric p>b{font-weight:650}
+.contract-detail-page .finance-criterion,
+.contract-detail-page .finance-criterion b,
+.contract-detail-page .finance-credit,
+.contract-detail-page .finance-credit>small{color:#3d4e44;font-size:11px}
+.contract-detail-page .finance-panel-heading .finance-eyebrow{color:#34443a;font-size:11px}
+.contract-detail-page .finance-panel-heading h3{color:#17251d;font-size:16px;font-weight:720}
+.contract-detail-page .finance-chart-window select,
+.contract-detail-page .finance-segmented button,
+.contract-detail-page .finance-chart-legend>span,
+.contract-detail-page .finance-chart-footer>span,
+.contract-detail-page .finance-chart-footer button{color:#3c4c43;font-size:11px}
+.contract-detail-page .finance-segmented button[aria-pressed=true]{color:#173c26;font-weight:700}
+.contract-detail-page .finance-chart-tooltip>strong{color:#17251d;font-size:12px;font-weight:700}
+.contract-detail-page .finance-chart-tooltip>p,
+.contract-detail-page .finance-chart-tooltip>p>span{color:#34443a;font-size:11px}
+.contract-detail-page .finance-chart-tooltip b{color:#17291f;font-weight:700}
+.contract-detail-page .finance-chart-caveat{font-size:11px;font-weight:550}
+.contract-detail-page .finance-chart-empty h4{color:#26372d;font-size:14px;font-weight:700}
+.contract-detail-page .finance-chart-empty p{color:#43534a;font-size:11px}
+.contract-detail-page .finance-donut-center>span,
+.contract-detail-page .finance-donut-center>small,
+.contract-detail-page .finance-composition-legend dt,
+.contract-detail-page .finance-composition-pending>span{color:#3f5046;font-size:11px}
+.contract-detail-page .finance-donut-center>strong,
+.contract-detail-page .finance-composition-legend dd{color:#17291f;font-weight:700}
+.contract-detail-page .finance-section-heading h3{color:#17251d;font-weight:720}
+.contract-detail-page .finance-section-heading>span{color:#34443a;font-size:11px;font-weight:600}
+.contract-detail-page .finance-card h3{color:#17251d;font-size:15px;font-weight:700}
+.contract-detail-page .finance-card-title>div>span,
+.contract-detail-page .finance-card-amount>span,
+.contract-detail-page .finance-card-hint{color:#43534a;font-size:11px}
+.contract-detail-page .finance-card>header>.btn{color:#34443a;font-size:11px;font-weight:600}
+.contract-detail-page .finance-card-amount>strong{color:#17291f;font-weight:720}
+.contract-detail-page .finance-empty,
+.contract-detail-page .finance-empty>strong,
+.contract-detail-page .finance-empty>p{color:#43534a;font-size:11px}
+.contract-detail-page .finance-empty>strong{font-weight:700}
+.contract-detail-page .finance-entry-list strong{color:#17291f;font-size:12px;font-weight:700}
+.contract-detail-page .finance-entry-list>li>div>span,
+.contract-detail-page .finance-entry-list>li>div>p{color:#43534a;font-size:11px}
+.contract-detail-page .finance-discount-table th,
+.contract-detail-page .finance-discount-table td{color:#26372d;font-size:12px}
+.contract-detail-page .finance-discount-table thead th{color:#1e3026;font-size:11px;font-weight:700}
+.contract-detail-page .finance-discount-rate,
+.contract-detail-page .finance-discount-notes,
+.contract-detail-page .finance-discount-legend{color:#43534a;font-size:11px}
+.contract-detail-page .finance-monthly .contract-table th{color:#22342a;font-size:11px;font-weight:700}
+.contract-detail-page .finance-monthly .contract-table td{color:#304137;font-size:12px}

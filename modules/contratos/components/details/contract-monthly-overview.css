@@ -4,3 +4,15 @@
 .contract-monthly-combined{min-width:0;padding:15px;border:1px solid #e4ebe6;border-radius:10px;background:#fbfdfb}.contract-monthly-combined>header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.contract-monthly-combined h4{margin:0;color:#3e5d49;font-size:12px}.contract-monthly-combined header span{color:#91a097;font-size:9px;text-align:right}.contract-monthly-combined-chart{width:100%;height:330px;margin-top:8px}.contract-monthly-combined-empty{display:grid;place-items:center;height:220px;color:#83968a;font-size:11px;text-align:center}
 .contract-monthly-tooltip{display:grid;gap:5px;min-width:190px;padding:10px 12px;border:1px solid #dce7df;border-radius:10px;background:#fff;box-shadow:0 8px 24px #173b2520;color:#74877a;font-size:10px}.contract-monthly-tooltip>strong{margin-bottom:2px;color:#3e604a;font-size:11px}.contract-monthly-tooltip span{display:flex;justify-content:space-between;gap:18px}.contract-monthly-tooltip b{color:#315b40;font-weight:650;font-variant-numeric:tabular-nums}
 @media(max-width:650px){.contract-monthly-filter{flex-wrap:wrap}.contract-monthly-filter label{flex:1;min-width:calc(50% - 5px)}.contract-monthly-filter input{width:100%}.contract-monthly-filter .btn{width:100%;justify-content:center}.contract-monthly-combined{padding:10px}.contract-monthly-combined>header{display:block}.contract-monthly-combined header span{display:block;margin-top:4px;text-align:left}.contract-monthly-combined-chart{height:300px}}
+
+.contract-detail-page .contract-monthly-filter label>span{color:#314138;font-size:11px;font-weight:750}
+.contract-detail-page .contract-monthly-filter input{color:#17251d;font-size:12px;font-weight:550}
+.contract-detail-page .contract-monthly-filter .btn{color:#26362d;font-size:11px;font-weight:600}
+.contract-detail-page .contract-monthly-combined h4{color:#17251d;font-size:14px;font-weight:720}
+.contract-detail-page .contract-monthly-combined:focus-visible{outline:2px solid #26875b;outline-offset:3px}
+.contract-detail-page .contract-monthly-combined header span{color:#45564c;font-size:11px;font-weight:500}
+.contract-detail-page .contract-monthly-combined-empty{color:#405148;font-size:12px;font-weight:500}
+.contract-detail-page .contract-monthly-tooltip{color:#34443a;font-size:11px}
+.contract-detail-page .contract-monthly-tooltip>strong{color:#17251d;font-size:12px;font-weight:700}
+.contract-detail-page .contract-monthly-tooltip b{color:#17291f;font-weight:700}
+@media(max-width:650px){.contract-detail-page .contract-monthly-combined{overflow-x:auto;scrollbar-width:thin}.contract-detail-page .contract-monthly-combined-chart{min-width:620px}}

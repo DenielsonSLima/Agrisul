@@ -451,4 +451,10 @@ try {
  await db.exec(readFileSync(new URL('./contract_atr_current_month_fallback.sql',import.meta.url),'utf8'));
  console.log('Contract ATR: current-month preference, previous-month fallback, daily groups and server aggregates passed');
 } catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
+try {
+ await db.exec(readFileSync(new URL('../migrations/20260928154024_contract_financial_per_ton_kpis.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260928161728_contract_deletion.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./contract_deletion.sql',import.meta.url),'utf8'));
+ console.log('Contract deletion: strict scope, permissions, complete cascade and sibling preservation passed');
+} catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
 await db.close();

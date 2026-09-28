@@ -367,3 +367,38 @@ body{margin:0;background:var(--background);color:#252a30;font-family:Arial,Helve
 .contract-monthly-report-progress>div>small{display:block;margin-top:1.5mm;color:#6f8777;font-size:5.5pt}
 .contract-monthly-report-progress b{display:block;height:1.5mm;margin-top:2mm;overflow:hidden;border-radius:1mm;background:#dceae0}
 .contract-monthly-report-progress b i{display:block;height:100%;border-radius:inherit;background:#35a56d}
+.contract-detail-actions{flex-wrap:wrap}.contract-detail-actions .btn[aria-disabled="true"]{pointer-events:none;opacity:.55}.contract-delete-button{border-color:#edc9c3;color:#a94d40}.contract-delete-button:hover{border-color:#e3b4ac;background:#fff0ed;color:#8f3e33}.contract-delete-button:disabled{opacity:.55}.contract-delete-error{margin-bottom:14px}
+
+/* Detalhe do contrato: contraste reforçado para leitura em telas claras. */
+.contract-detail-page{--contract-detail-ink:#17251d;--contract-detail-copy:#34443a;--contract-detail-muted:#56665c;color:var(--contract-detail-ink)}
+.contract-detail-page .contract-detail-heading h2{color:var(--contract-detail-ink);font-weight:720;letter-spacing:-.02em}
+.contract-detail-page .contract-detail-heading p{color:var(--contract-detail-copy);font-size:13px;font-weight:500}
+.contract-detail-page .client-breadcrumb{color:#405047;font-size:13px;font-weight:550}
+.contract-detail-page .client-breadcrumb a{color:#24352b;font-weight:650}
+.contract-detail-page .client-breadcrumb>span{color:#17251d;font-weight:650}
+.contract-detail-page .client-back{color:#284a37;font-size:13px;font-weight:650}
+.contract-detail-page .contract-detail-tabs>[data-slot=tabs-list]{border-bottom-color:#cfd9d2}
+.contract-detail-page .contract-detail-tabs>[data-slot=tabs-list]>button{color:#344239;font-size:14px;font-weight:600}
+.contract-detail-page .contract-detail-tabs>[data-slot=tabs-list]>button[data-state=active]{color:#101a14;font-weight:720}
+.contract-detail-page .contract-summary-section-heading small{color:#405047;font-size:11px;font-weight:700}
+.contract-detail-page .contract-summary-section-heading h3{color:var(--contract-detail-ink);font-size:17px;font-weight:720}
+.contract-detail-page .contract-atr-criterion{color:#1f5f3a;font-size:11px;font-weight:700}
+.contract-detail-page .contract-progress-ring small{color:#4f6056;font-size:11px;font-weight:600}
+.contract-detail-page .contract-volume-copy>p{color:var(--contract-detail-copy);font-size:13px}
+.contract-detail-page .contract-volume-values small{color:#4b5c52;font-size:11px;font-weight:600}
+.contract-detail-page .contract-volume-values strong{color:#172c20;font-size:18px;font-weight:720}
+.contract-detail-page .contract-summary-kpis small{color:#43534a;font-size:11px;font-weight:600}
+.contract-detail-page .contract-summary-kpis strong{color:#17291f;font-size:18px;font-weight:720}
+.contract-detail-page .contract-summary-kpis p{color:#4f5f56;font-size:11px;line-height:1.45}
+.contract-detail-page .contract-condition-grid dt{color:#4d5d53;font-size:11px;font-weight:600}
+.contract-detail-page .contract-condition-grid dd{color:#192820;font-size:14px;font-weight:650}
+.contract-detail-page .contract-notes-panel>label{color:#33443a;font-size:12px;font-weight:500}
+.contract-detail-page .contract-notes-panel textarea{color:#17251d;font-size:14px}
+.contract-detail-page .contract-notes-panel textarea::placeholder{color:#607067;opacity:1}
+.contract-detail-page .contract-notes-footer>span{color:#4f5f56;font-size:11px;font-weight:500}
+.contract-detail-page .contract-monthly-table th{color:#26372d;font-size:11px;font-weight:700}
+.contract-detail-page .contract-monthly-table td{color:#2f4036;font-size:12px}
+.contract-detail-page .contract-monthly-table td>small{color:#526158;font-size:11px}
+.contract-detail-page .contract-monthly-empty{color:#4f6056}
+.contract-detail-page .contract-monthly-empty h4{color:#1b2b22;font-size:15px;font-weight:700}
+.contract-detail-page .contract-monthly-empty p{font-size:12px}

@@ -8,15 +8,16 @@ import {useReportHeader} from '@/modules/configuracoes/cabecalho-relatorios/hook
 import type {BillingContract} from '../types';
 import {useContractLoads} from '../hooks/useContractLoads';
 import {contractSummaryDetails} from '../utils/contractSummaryDetails';
-import {contractMonthlyDateFilters,filterContractMonths,type ContractMonthlyPeriod} from '../utils/contractMonthlyPeriod';
+import {filterContractMonths,type ContractMonthlyPeriod} from '../utils/contractMonthlyPeriod';
+import type {ContractDailyLoadPeriod} from '../utils/contractDailyLoadsPresentation';
 import {downloadContractMonthlySummaryPdf,printContractMonthlySummaryPdf,type ContractMonthlyReportBrand} from '../reporting/contractMonthlySummaryPdf';
 import {ContractSummaryPdfPreview} from './ContractSummaryPdfPreview';
 import '../summary-details.css';
 
-export function ContractMonthlyReportDialog({open,onOpenChange,contract,period}:{open:boolean;onOpenChange:(open:boolean)=>void;contract:BillingContract;period:ContractMonthlyPeriod}){
+export function ContractMonthlyReportDialog({open,onOpenChange,contract,period,dailyPeriod}:{open:boolean;onOpenChange:(open:boolean)=>void;contract:BillingContract;period:ContractMonthlyPeriod;dailyPeriod:ContractDailyLoadPeriod}){
  const report=useReportHeader(contract.companyId),summary=contractSummaryDetails(contract);
  const visibleMonths=filterContractMonths(summary.months,period);
- const dates=contractMonthlyDateFilters(period),dailyLoads=useContractLoads(contract.id,{search:'',...dates,groupBy:'day'},open);
+ const dailyLoads=useContractLoads(contract.id,{search:'',...dailyPeriod,groupBy:'day'},open);
  const [action,setAction]=useState<'download'|'print'|null>(null);
  const brand:ContractMonthlyReportBrand={orientation:report.settings.orientation,header:activeReportHeader(report.settings),company:report.company,watermark:report.watermark,issuer:report.issuer,issuedAt:report.issuedAt};
  const freshBrand=async():Promise<ContractMonthlyReportBrand>=>({...brand,watermark:await report.refreshWatermark(),issuedAt:new Date()});

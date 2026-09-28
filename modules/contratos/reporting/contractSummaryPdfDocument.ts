@@ -2,8 +2,8 @@ import {drawReportPdfHeader,drawReportPdfWatermark,REPORT_MARGIN_MM,type ReportP
 import {formatCnpj} from '@/shared/utils/cnpj';
 import type {BillingContract,ContractLoadsData} from '../types';
 import {contractSummaryDetails,summaryReceivedNote,type SummaryTable} from '../utils/contractSummaryDetails';
-import {contractDailyLoadsChartRows} from '../utils/contractDailyLoadsPresentation';
-import {formatAtrCriterion,formatContractDate,formatContractMonth,formatContractVolume} from '../utils/contractFormat';
+import {contractDailyLoadsChartPages,contractDailyLoadsChartRows} from '../utils/contractDailyLoadsPresentation';
+import {formatAtr,formatAtrCriterion,formatContractDate,formatContractMonth,formatContractVolume} from '../utils/contractFormat';
 import {filterContractMonths,monthIsInContractPeriod,type ContractMonthlyPeriod} from '../utils/contractMonthlyPeriod';
 import type {ContractMonthlyReportBrand} from './contractMonthlySummaryPdf';
 
@@ -138,31 +138,35 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
    ensure(34);panel(margin,y,content,30);heading(margin+4,y+4,'EVOLUÇÃO DOS CARREGAMENTOS','Quantidade carregada por dia','truck');
    font(7,false,palette.muted);doc.text(`Período: ${period} · Nenhum carregamento no período selecionado.`,margin+4,y+23);y+=36;return;
   }
-  for(let offset=0;offset<rows.length;offset+=8){
-   const pageRows=rows.slice(offset,offset+8),padding=5,panelHeight=79;
+  for(const pageRows of contractDailyLoadsChartPages(rows)){
+   const padding=5,panelHeight=79;
    ensure(panelHeight);panel(margin,y,content,panelHeight);heading(margin+padding,y+4,'EVOLUÇÃO DOS CARREGAMENTOS','Quantidade carregada por dia','truck');
    font(5.8,false,palette.muted);doc.text(`Barras em toneladas e linha de variação percentual · Período: ${period}`,margin+padding,y+14);
    const top=y+19,left=margin+padding+15,right=width-margin-padding-12,plotWidth=right-left,base=top+35,plotHeight=29,slot=plotWidth/pageRows.length;
    panel(margin+padding,top,content-padding*2,54,palette.surface);
    const maxVolume=Math.max(1,...pageRows.map(row=>row.volume));
-   const variations=pageRows.map(row=>row.variationPercent).filter((value):value is number=>value!==null&&Number.isFinite(value));
+   const variations=pageRows.slice(1).map(row=>row.variationPercent).filter((value):value is number=>value!==null&&Number.isFinite(value));
    const maxVariation=Math.max(1,...variations.map(value=>Math.abs(value)));
    for(let index=0;index<=3;index++){
     const gridY=base-plotHeight*index/3;doc.setDrawColor(227,237,231);doc.setLineWidth(.2);doc.setLineDashPattern([1,1.4],0);doc.line(left,gridY,right,gridY);doc.setLineDashPattern([],0);
     font(5.5,false,palette.muted);doc.text(numberLabel(maxVolume*index/3),left-2,gridY+.8,{align:'right'});
    }
-   const points:[number,number][]=[];
+   const centers=pageRows.map((_,index)=>left+(index+.5)*slot);
+   const variationY=(value:number)=>top+plotHeight/2-value/maxVariation*(plotHeight/2);
+   const points:[number,number][]=[[centers[0],variationY(0)]];
+   const variationLabels:{x:number;y:number;value:number}[]=[];
    pageRows.forEach((row,index)=>{
-    const center=left+(index+.5)*slot,barWidth=Math.min(8,slot*.45),barHeight=row.volume/maxVolume*plotHeight;
+    const center=centers[index],barWidth=Math.min(8,slot*.45),barHeight=row.volume/maxVolume*plotHeight;
     doc.setFillColor(84,168,115);doc.roundedRect(center-barWidth/2,base-barHeight,barWidth,barHeight,Math.min(1,barHeight/2),Math.min(1,barHeight/2),'F');
     font(5.2,true,[82,107,90]);doc.text(numberLabel(row.volume),center,base-barHeight-1.2,{align:'center'});
-    if(row.variationPercent!==null){const pointY=top+plotHeight/2-row.variationPercent/maxVariation*(plotHeight/2);points.push([center,pointY]);font(4.8,false,[180,95,6]);doc.text(`${row.variationPercent>0?'+':''}${numberLabel(row.variationPercent)}%`,center,pointY-1.6,{align:'center'});}
     font(5.6,false,palette.muted);doc.text(formatContractDate(row.date).slice(0,5),center,base+3.7,{align:'center'});font(4.8,false,palette.muted);doc.text(`${row.loadCount} ${row.loadCount===1?'carga':'cargas'}`,center,base+6.3,{align:'center'});
    });
-   if(points.length>1){doc.setDrawColor(217,119,6);doc.setLineWidth(.7);for(let index=1;index<points.length;index++)doc.line(points[index-1][0],points[index-1][1],points[index][0],points[index][1]);}
-   points.forEach(point=>{doc.setFillColor(255,255,255);doc.setDrawColor(217,119,6);doc.circle(point[0],point[1],1,'FD');});
+   pageRows.slice(1).forEach((row,index)=>{if(row.variationPercent!==null){const x=(centers[index]+centers[index+1])/2,pointY=variationY(row.variationPercent);points.push([x,pointY]);variationLabels.push({x,y:pointY,value:row.variationPercent});}});
+   if(points.length>1){doc.setDrawColor(236,177,111);doc.setLineWidth(.7);for(let index=1;index<points.length;index++)doc.line(points[index-1][0],points[index-1][1],points[index][0],points[index][1]);}
+   points.forEach((point,index)=>{if(index===0)return;doc.setFillColor(255,255,255);doc.setDrawColor(236,177,111);doc.circle(point[0],point[1],1,'FD');});
+   variationLabels.forEach(label=>{const text=`${label.value>0?'+':''}${numberLabel(label.value)}%`,labelWidth=Math.max(10,doc.getTextWidth(text)+3);doc.setFillColor(255,248,237);doc.setDrawColor(236,177,111);doc.roundedRect(label.x-labelWidth/2,label.y-4,labelWidth,3,1.5,1.5,'FD');font(4.8,true,[180,95,6]);doc.text(text,label.x,label.y-2,{align:'center'});});
    font(5.3,false,[84,168,115]);doc.text('■ Quantidade diária',margin+padding+3,top+50);font(5.3,false,[180,95,6]);doc.text('— Variação percentual',margin+padding+39,top+50);
-   const metrics=[`Média diária ${formatContractVolume(dailyLoads.summary.averageDailyVolume)}`,`Volume ${formatContractVolume(dailyLoads.summary.volume)}`,`${dailyLoads.summary.loadCount} carregamentos`,`${dailyLoads.summary.monthCount} meses movimentados`];
+   const metrics=[`Média diária ${formatContractVolume(dailyLoads.summary.averageDailyVolume)}`,`Volume ${formatContractVolume(dailyLoads.summary.volume)}`,`ATR médio ${formatAtr(dailyLoads.summary.averageAtr)} kg/t`,`${dailyLoads.summary.monthCount} meses movimentados`];
    font(5.5,false,palette.muted);doc.text(metrics.join('  ·  '),width-margin-padding-3,top+50,{align:'right'});
    y+=panelHeight+6;
   }

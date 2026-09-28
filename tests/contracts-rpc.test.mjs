@@ -15,6 +15,7 @@ globalThis.contractsRpcFixture=async(resource,action,payload,signal)=>{
   if(failure)throw failure;
   if(action==='list')return {contracts:[snapshot],counts:{open:1,finished:0},total:1};
   if(action==='save-load')return {load:{...payload,id:'load-id'}};
+  if(action==='delete')return {id:payload.contractId,deleted:true};
   if(action==='delete-load')return {id:payload.id,deleted:true};
   return {contract:snapshot};
 };
@@ -50,6 +51,9 @@ try{
   assert.deepEqual(await api.closeContract('contract-id','company-id'),snapshot);
   assert.equal(calls.at(-1).action,'close');
   assert.deepEqual(calls.at(-1).payload,{contractId:'contract-id',companyId:'company-id'});
+  assert.deepEqual(await api.deleteContract('contract-id','company-id'),{id:'contract-id',deleted:true});
+  assert.equal(calls.at(-1).action,'delete');
+  assert.deepEqual(calls.at(-1).payload,{contractId:'contract-id',companyId:'company-id'});
   const input={title:'Safra',contractNumber:'CTR-123/2026',companyId:'company-id',clientId:'client-id',typeId:'type-id',status:'Ativo',startDate:'2026-09-01',endDate:'2026-10-01',contractedVolume:'25000,125',atrPriceType:'net',atrPeriodType:'accumulated',value:'1200,30',notes:''};
   assert.deepEqual(await api.persistContract(input,'contract-id'),snapshot);
   assert.deepEqual(calls.at(-1).payload,{...input,id:'contract-id'});
@@ -59,9 +63,15 @@ try{
   assert.deepEqual(calls.at(-1).payload,{...load,contractId:'contract-id',companyId:'company-id'});
   assert.deepEqual(await api.deleteContractLoad('contract-id','company-id','load-id'),{id:'load-id',deleted:true});
   assert.deepEqual(calls.at(-1).payload,{contractId:'contract-id',companyId:'company-id',id:'load-id'});
+  const detail=await readFile('modules/contratos/components/ContractDetail.tsx','utf8');
+  assert.match(detail,/title:`Excluir contrato/);
+  assert.match(detail,/tone:'destructive'/);
+  assert.match(detail,/notifications\.deleted/);
+  assert.match(detail,/navigate\('\/contratos',\{replace:true\}\)/);
+  assert.match(detail,/todos os carregamentos, descontos, adiantamentos, recebimentos e estornos/);
   failure=new api.ContractApiError('Cliente não encontrado.',404);
   await assert.rejects(api.persistContract(input),error=>error===failure);
-  console.log('Passed: contracts RPC filters/get/save/close/load/delete, cancellation, exact decimal input, server snapshot and errors.');
+  console.log('Passed: contracts RPC filters/get/save/close/contract deletion/load deletion, cancellation, destructive feedback, exact decimal input, server snapshot and errors.');
 }finally{
   delete globalThis.contractsRpcFixture;
   await rm(directory,{recursive:true,force:true});

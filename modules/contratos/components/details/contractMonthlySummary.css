@@ -20,3 +20,4 @@
 .contract-monthly-report-body .contract-monthly-report-values td{white-space:normal;overflow-wrap:anywhere}
 @media(max-width:900px){.contract-summary-finance{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:450px){.contract-summary-finance{gap:8px}.contract-summary-finance>div{padding:12px}.contract-summary-finance dd{font-size:17px}}
+.contract-detail-page .contract-summary-finance dt{color:#34443a;font-size:12px;font-weight:650}.contract-detail-page .contract-summary-finance dd{color:#17291f;font-weight:720}.contract-detail-page .contract-summary-finance small{color:#4e5e54;font-size:11px}.contract-detail-page .contract-summary-finance-note{color:#3f5046;font-size:11px}

@@ -9,3 +9,26 @@
 .contract-daily-loads-months{margin-top:14px;padding-top:13px;border-top:1px solid #e7ede9}.contract-daily-loads-months h5{color:#486553;font-size:11px;font-weight:600}.contract-daily-loads-months p{margin-top:3px;color:#8a998f;font-size:9px}.contract-daily-loads-months>div{margin-top:10px;overflow-x:auto;scrollbar-width:thin}.contract-daily-loads-months dl{display:flex;gap:7px;margin:0}.contract-daily-loads-months dl>div{flex:1;min-width:145px;padding:9px 10px;border-radius:8px;background:#f1f7f3}.contract-daily-loads-months dt{color:#6d8375;font-size:9px}.contract-daily-loads-months dd{margin:4px 0 2px;color:#34704a;font-size:13px;font-weight:650;font-variant-numeric:tabular-nums}.contract-daily-loads-months small{color:#87978d;font-size:8px}
 @media(max-width:800px){.contract-daily-loads-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:650px){.contract-daily-loads{margin-inline:-4px;padding:13px}.contract-daily-loads-heading{flex-direction:column;gap:8px}.contract-daily-loads-legend{padding:0}.contract-daily-loads-filters{flex-wrap:wrap;padding:10px}.contract-daily-loads-filters label{flex:1;min-width:calc(50% - 5px)}.contract-daily-loads-filters input{width:100%}.contract-daily-loads-filters .btn{width:100%;justify-content:center}.contract-daily-loads-chart{height:270px}.contract-daily-loads-kpis dd{font-size:14px}}
+
+/* Contraste do gráfico e de seus indicadores sem alterar a codificação visual das séries. */
+.contract-detail-page .contract-daily-loads-heading>div:first-child>span{color:#315f45;font-size:11px;font-weight:750}
+.contract-detail-page .contract-daily-loads-heading h4{color:#17251d;font-size:16px;font-weight:720}
+.contract-detail-page .contract-daily-loads-heading p{color:#3d4d44;font-size:12px}
+.contract-detail-page .contract-daily-loads-legend{color:#34443a;font-size:11px;font-weight:600}
+.contract-detail-page .contract-daily-loads-filters label>span{color:#314138;font-size:11px;font-weight:700}
+.contract-detail-page .contract-daily-loads-filters input{color:#17251d;font-size:12px;font-weight:550}
+.contract-detail-page .contract-daily-loads-filters .btn{color:#26362d;font-size:11px;font-weight:600}
+.contract-detail-page .contract-daily-loads-tooltip{color:#34443a;font-size:11px}
+.contract-detail-page .contract-daily-loads-tooltip strong{color:#17251d;font-size:12px;font-weight:700}
+.contract-detail-page .contract-daily-loads-tooltip b{color:#17291f;font-weight:700}
+.contract-detail-page .contract-daily-loads-state{color:#44554b}
+.contract-detail-page .contract-daily-loads-state strong{color:#17251d;font-size:14px;font-weight:700}
+.contract-detail-page .contract-daily-loads-state p{color:#3f5046;font-size:12px}
+.contract-detail-page .contract-daily-loads-kpis dt{color:#34443a;font-size:11px;font-weight:650}
+.contract-detail-page .contract-daily-loads-kpis dd{color:#17291f;font-size:17px;font-weight:720}
+.contract-detail-page .contract-daily-loads-kpis small{color:#4e5e54;font-size:11px;font-weight:500}
+.contract-detail-page .contract-daily-loads-months h5{color:#17251d;font-size:13px;font-weight:700}
+.contract-detail-page .contract-daily-loads-months p{color:#45564c;font-size:11px}
+.contract-detail-page .contract-daily-loads-months dt{color:#34443a;font-size:11px;font-weight:650}
+.contract-detail-page .contract-daily-loads-months dd{color:#184e2d;font-size:14px;font-weight:720}
+.contract-detail-page .contract-daily-loads-months small{color:#4e5e54;font-size:11px}
