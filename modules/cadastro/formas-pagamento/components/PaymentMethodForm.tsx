@@ -6,6 +6,7 @@ import {Dialog,DialogContent,DialogDescription,DialogHeader,DialogTitle} from '@
 import {Field} from '@/shared/components/Common';
 import {notifications} from '@/shared/feedback';
 import type {PaymentMethod,PaymentMethodInput} from '../types';
+import '../styles.css';
 
 export function PaymentMethodForm({method,onClose,onSave}:{method?:PaymentMethod;onClose:()=>void;onSave:(input:PaymentMethodInput)=>Promise<PaymentMethod>}){
   const [name,setName]=useState(method?.name??'');

@@ -24,6 +24,7 @@ DECLARE
  provider_a uuid;
  provider_b uuid;
  provider_contact_id uuid;
+ provider_b_contact_id uuid;
  payment_method_id uuid;
  quote_id uuid;
  order_id uuid;
@@ -160,10 +161,23 @@ BEGIN
   RAISE EXCEPTION 'Quotation with a purchase order was deleted';
  EXCEPTION WHEN check_violation THEN NULL; END;
 
+ r=public.billing_rpc('purchase-orders','save',jsonb_build_object(
+  'id',order_id,'purchaseOrderNumber','OC-2026-0042','paymentMethodId',payment_method_id,
+  'providerContactId',NULL));
+ IF r->'order'->>'purchaseOrderNumber'<>'OC-2026-0042'
+  OR r->'order'->>'paymentMethodId'<>payment_method_id::text
+  OR r->'order'->>'providerContactId' IS NOT NULL
+  OR r->'order'->>'providerContactName'<>''
+  OR r->'order'->>'providerContactPhone'<>'' THEN
+  RAISE EXCEPTION 'Purchase-order contact did not remain optional: %',r;
+ END IF;
+ r=public.billing_rpc('service-providers','save-contact',jsonb_build_object(
+  'providerId',provider_b,'name','Contato de outro fornecedor','phone','(11) 90000-0000'));
+ provider_b_contact_id=(r->'contact'->>'id')::uuid;
  BEGIN
   PERFORM public.billing_rpc('purchase-orders','save',jsonb_build_object(
-   'id',order_id,'purchaseOrderNumber','OC-2026-0042','paymentMethodId',payment_method_id));
-  RAISE EXCEPTION 'Purchase-order number without a responsible contact was accepted';
+   'id',order_id,'providerContactId',provider_b_contact_id));
+  RAISE EXCEPTION 'Contact from another provider was accepted in the purchase order';
  EXCEPTION WHEN check_violation THEN NULL; END;
  r=public.billing_rpc('purchase-orders','save',jsonb_build_object(
   'id',order_id,'purchaseOrderNumber','OC-2026-0042','paymentMethodId',payment_method_id,
@@ -214,6 +228,15 @@ BEGIN
   OR r->'order'->'items'->0->>'materialInternalCode'<>'INT-FH-01'
   OR jsonb_array_length(r->'order'->'items'->0->'materialReferences')<>2 THEN
   RAISE EXCEPTION 'Catalog edits changed the purchase-order snapshot: %',r;
+ END IF;
+
+ r=public.billing_rpc('purchase-orders','save',jsonb_build_object(
+  'id',order_id,'providerContactId',NULL));
+ IF r->'order'->>'purchaseOrderNumber'<>'OC-2026-0042'
+  OR r->'order'->>'providerContactId' IS NOT NULL
+  OR r->'order'->>'providerContactName'<>''
+  OR r->'order'->>'providerContactPhone'<>'' THEN
+  RAISE EXCEPTION 'Clearing the optional contact changed the OC or kept its snapshot: %',r;
  END IF;
 
  r=public.billing_rpc('purchase-orders','finish',jsonb_build_object('id',order_id));
