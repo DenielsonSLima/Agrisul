@@ -265,6 +265,7 @@ test('negotiation is a supplier matrix with per-item approval and accessible abb
   assert.match(source, />Adicionar materiais</);
   assert.match(source, /onClick=\{onAddMaterials\}/);
   assert.match(source, /quote-matrix-price-values[\s\S]*?currentOffer\.netUnitPrice[\s\S]*?<del[\s\S]*?currentOffer\.unitPrice/);
+  assert.match(source, /subtotal[\s\S]*?currentOffer\.lineSubtotal/i);
   assert.match(source, /total líquido[\s\S]*?currentOffer\.lineTotal/);
   assert.match(source, /<tfoot>[\s\S]*?Valor total[\s\S]*?provider\.grossTotal/);
   assert.match(source, /Valor total com desconto[\s\S]*?provider\.total/);
@@ -280,11 +281,37 @@ test('negotiation is a supplier matrix with per-item approval and accessible abb
   assert.match(css, /\.quote-negotiation-approved-total\{/);
 });
 
+test('open quotation item quantity can be edited and server totals are projected again', async () => {
+  const [summary, detail, dialog, api, hooks, migration] = await Promise.all([
+    readComponent('QuoteSummaryTab'),
+    readComponent('QuoteDetailPage'),
+    readComponent('QuoteItemQuantityDialog'),
+    readFile(new URL('../modules/cotacao/services/quoteApi.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../modules/cotacao/hooks/useQuotes.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../supabase/migrations/20260929120354_quotation_item_quantity_update.sql', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(summary, /onEditQuantity\(item\)/);
+  assert.match(summary, /Alterar quantidade de/);
+  assert.match(detail, /<QuoteItemQuantityDialog\b/);
+  assert.match(detail, /mutations\.updateItemQuantity\(\{/);
+  assert.match(detail, /notifications\.updated\('Quantidade alterada\./);
+  assert.match(dialog, /Os subtotais, descontos e valores aprovados serão recalculados/);
+  assert.match(dialog, /até três casas decimais/);
+  assert.match(api, /['"]quotations['"],['"]update-item-quantity['"]/);
+  assert.match(hooks, /updateItemQuantity:\(input:QuoteItemQuantityInput\)/);
+  assert.match(migration, /p_action<>'update-item-quantity'/);
+  assert.match(migration, /FOR UPDATE/);
+  assert.match(migration, /SET quantity=v_quantity/);
+  assert.match(migration, /billing_private\.quotation_json\(v_quote\)/);
+  assert.match(migration, /v_quote\.status<>'open'/);
+});
+
 test('suppliers tab uses a semantic table and Export opens PdfExportDialog', async () => {
   const source = await readComponent('QuoteProvidersTab');
 
   assert.match(source, /import\s*\{PdfExportDialog\}\s*from\s*['"]@\/shared\/reporting\/PdfExportDialog['"]/);
-  assert.match(source, /import\s*\{createQuotationRequestPdfInWorker\}\s*from\s*['"]\.\.\/reporting\/quotationRequestPdfWorker['"]/);
+  assert.match(source, /import\s*\{[\s\S]*?createQuotationRequestPdf[\s\S]*?\}\s*from\s*['"]\.\.\/reporting\/quotationRequestPdf['"]/);
   assert.match(source, /<table\b/);
   assert.match(source, /<thead>[\s\S]*?<tbody>/);
   assert.match(source, /<th\b[^>]*scope="col"/);
@@ -295,7 +322,8 @@ test('suppliers tab uses a semantic table and Export opens PdfExportDialog', asy
   assert.match(source, /<button\b[^>]*onClick=\{[^}]*setPdf[^}]*\}[^>]*>[\s\S]*?Exportar[\s\S]*?<\/button>/);
   assert.match(source, /\{pdf&&[\s\S]*?<PdfExportDialog\b/);
   assert.match(source, /snapshot=\{pdf\}/);
-  assert.match(source, /createPdf=\{createQuotationRequestPdfInWorker\}/);
+  assert.match(source, /createPdf=\{createQuotationRequestPdf\}/);
+  assert.doesNotMatch(source, /\bWorker\b/);
   assert.match(source, /onClose=\{\(\)=>setPdf\(null\)\}/);
 });
 

@@ -11,8 +11,6 @@ const {build} = require(require.resolve('esbuild', {paths: [require.resolve('vit
 const jsPdfModulePath = require.resolve('jspdf');
 const pdfSourceUrl = new URL('../modules/cotacao/reporting/quotationRequestPdf.ts', import.meta.url);
 const providersSourceUrl = new URL('../modules/cotacao/components/QuoteProvidersTab.tsx', import.meta.url);
-const workerClientSourceUrl = new URL('../modules/cotacao/reporting/quotationRequestPdfWorker.ts', import.meta.url);
-const workerSourceUrl = new URL('../modules/cotacao/reporting/quotationRequestPdf.worker.ts', import.meta.url);
 
 const onePixelPng = [
   137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82,
@@ -102,11 +100,9 @@ function textDraw(draws, value) {
 }
 
 test('quotation request snapshot receives only signed images selected by the quotation RPC', async () => {
-  const [pdfSource, providersSource, workerClientSource, workerSource] = await Promise.all([
+  const [pdfSource, providersSource] = await Promise.all([
     readFile(pdfSourceUrl, 'utf8'),
     readFile(providersSourceUrl, 'utf8'),
-    readFile(workerClientSourceUrl, 'utf8'),
-    readFile(workerSourceUrl, 'utf8'),
   ]);
 
   assert.match(
@@ -114,26 +110,37 @@ test('quotation request snapshot receives only signed images selected by the quo
     /type\s+QuotationRequestItem\s*=\s*QuoteItem\s*&\s*\{[^}]*materialImageUrl\??\s*:\s*string\s*\|\s*null/s,
     'the export-only item type must accept the signed catalog image URL',
   );
+  assert.doesNotMatch(
+    pdfSource,
+    /from\s+['"]@\/shared\/reporting['"]/,
+    'the PDF generator must not import the reporting barrel because it also exports React/Next UI modules',
+  );
+  for (const pureModule of [
+    'companyBrand',
+    'pdfHeader',
+    'pdfWatermark',
+    'reportLayout',
+    'types',
+  ]) {
+    assert.match(
+      pdfSource,
+      new RegExp(`from\\s+['"]@/shared/reporting/${pureModule}['"]`),
+      `the PDF generator must import the pure ${pureModule} module directly`,
+    );
+  }
   assert.match(
     providersSource,
     /item\.materialImageUrl\s*\?\?\s*null/,
     'the supplier export must use only the signed image returned for each quotation item',
   );
   assert.doesNotMatch(providersSource, /\buseMaterials\s*\(/, 'export must not load the complete material catalog');
-  assert.match(providersSource, /createPdf=\{createQuotationRequestPdfInWorker\}/);
   assert.match(
-    workerClientSource,
-    /new Worker\(\s*new URL\('\.\/quotationRequestPdf\.worker\.ts', import\.meta\.url\),\s*\{type: 'module'\},?\s*\)/,
-    'the worker must use the standard static URL constructor supported by development and production bundlers',
+    providersSource,
+    /import\s*\{[\s\S]*?createQuotationRequestPdf[\s\S]*?\}\s*from\s*['"]\.\.\/reporting\/quotationRequestPdf['"]/,
+    'the supplier export must use the browser-safe PDF generator directly',
   );
-  assert.doesNotMatch(
-    workerClientSource,
-    /quotationRequestPdf\.worker\?worker/,
-    'the worker client must not depend on a Vite-only query import',
-  );
-  assert.match(workerClientSource, /worker\.terminate\(\)/, 'closing or completing a job must release the worker');
-  assert.match(workerSource, /doc\.output\('arraybuffer'\)/, 'PDF serialization must happen inside the worker');
-  assert.match(workerSource, /doc\.autoPrint\(\)/, 'the worker must prepare printing without rebuilding layout on the UI thread');
+  assert.match(providersSource, /createPdf=\{createQuotationRequestPdf\}/);
+  assert.doesNotMatch(providersSource, /\bWorker\b/, 'supplier PDF generation must not use the incompatible Web Worker bundle');
   assert.match(pdfSource, /maxWidth:\s*360[\s\S]*maxHeight:\s*360/, 'item photos must be bounded before jsPDF embeds them');
   assert.doesNotMatch(
     pdfSource,

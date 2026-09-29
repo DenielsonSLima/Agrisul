@@ -8,9 +8,9 @@ import {formatReportPhone} from '@/shared/reporting';
 import {useWorkspaceCompany} from '@/shared/state/WorkspaceCompanyProvider';
 import {moneyLabel} from '@/shared/utils/presentation';
 import {
+  createQuotationRequestPdf,
   type QuotationRequestSnapshot,
 } from '../reporting/quotationRequestPdf';
-import {createQuotationRequestPdfInWorker} from '../reporting/quotationRequestPdfWorker';
 import type {Quote, QuoteProvider} from '../types';
 
 function quotationRequestSnapshot(
@@ -207,7 +207,7 @@ export function QuoteProvidersTab({
         <PdfExportDialog
           snapshot={pdf}
           companyId={activeCompanyId}
-          createPdf={createQuotationRequestPdfInWorker}
+          createPdf={createQuotationRequestPdf}
           orientation="portrait"
           fitPreviewToWidth
           showPreviewToolbar

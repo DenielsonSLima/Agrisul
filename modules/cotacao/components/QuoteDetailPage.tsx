@@ -21,6 +21,7 @@ import {
 } from './QuoteScopeDialogs';
 import {QuoteSummaryTab} from './QuoteSummaryTab';
 import {QuoteComparisonTab} from './QuoteComparisonTab';
+import {QuoteItemQuantityDialog} from './QuoteItemQuantityDialog';
 
 type QuoteDetailTab = 'summary' | 'negotiation' | 'providers' | 'comparison';
 
@@ -59,6 +60,7 @@ function QuoteDetailContent({quote}: {quote: Quote}) {
   const [addingProviders, setAddingProviders] = useState(false);
   const [editingDetails, setEditingDetails] = useState(false);
   const [removingItemId, setRemovingItemId] = useState('');
+  const [editingQuantityItem, setEditingQuantityItem] = useState<QuoteItem | null>(null);
   const [removingProviderId, setRemovingProviderId] = useState('');
   const [finalizeError, setFinalizeError] = useState('');
   const materialsQuery = useMaterials(tab === 'negotiation' || addingMaterial);
@@ -232,6 +234,24 @@ function QuoteDetailContent({quote}: {quote: Quote}) {
     }
   };
 
+  const updateItemQuantity = async (quantity: string) => {
+    if (!editingQuantityItem || quote.status !== 'open') return;
+    try {
+      await mutations.updateItemQuantity({
+        id: quote.id,
+        quotationItemId: editingQuantityItem.id,
+        quantity,
+      });
+      setEditingQuantityItem(null);
+      setFinalizeError('');
+      notifications.updated('Quantidade alterada. Os valores da cotação foram recalculados.');
+    } catch (reason) {
+      const message = (reason as Error).message || 'Não foi possível alterar a quantidade.';
+      notifications.error(message);
+      throw reason;
+    }
+  };
+
   const removeProvider = async (provider: QuoteProvider) => {
     if (quote.status !== 'open' || mutations.scopeSaving) return;
     const accepted = await confirm({
@@ -318,6 +338,7 @@ function QuoteDetailContent({quote}: {quote: Quote}) {
             finalizeError={finalizeError}
             onFinalize={finalize}
             onAddMaterials={() => setAddingMaterial(true)}
+            onEditQuantity={setEditingQuantityItem}
             onRemoveMaterial={removeMaterial}
             removingItemId={removingItemId}
           />
@@ -388,6 +409,14 @@ function QuoteDetailContent({quote}: {quote: Quote}) {
           onReload={requestersQuery.reload}
           onClose={() => setEditingDetails(false)}
           onSave={updateDetails}
+        />
+      )}
+      {editingQuantityItem && (
+        <QuoteItemQuantityDialog
+          item={editingQuantityItem}
+          saving={mutations.updatingQuantity}
+          onClose={() => setEditingQuantityItem(null)}
+          onSave={updateItemQuantity}
         />
       )}
     </section>

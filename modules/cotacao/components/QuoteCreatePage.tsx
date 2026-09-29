@@ -8,15 +8,18 @@ import {
   Check,
   ClipboardCheck,
   ClipboardList,
+  FileText,
   Loader2,
   PackageOpen,
   PackagePlus,
+  Paperclip,
   Pencil,
   Plus,
   RefreshCw,
   Save,
   Trash2,
   Users,
+  X,
 } from 'lucide-react';
 import {Field, LocalSearch} from '@/shared/components/Common';
 import {
@@ -34,7 +37,7 @@ import {useProviders} from '@/modules/cadastro/prestadores/hooks/useProviders';
 import {providerDocument} from '@/modules/cadastro/prestadores/presentation';
 import type {ServiceProvider} from '@/modules/cadastro/prestadores/types';
 import {useMaterials, useQuotationRequesters, useQuoteMutations} from '../hooks/useQuotes';
-import type {Material, QuoteItem, QuoteProvider} from '../types';
+import type {Material, QuoteAttachment, QuoteItem, QuoteProvider} from '../types';
 import {emptyItem, listHref, today} from './QuoteShared';
 import {MaterialThumbnail, QuoteMaterialPicker} from './QuoteMaterialPicker';
 import {quoteMaterialOptions} from './quoteMaterialOptions';
@@ -46,6 +49,7 @@ type Draft = {
   notes: string;
   items: QuoteItem[];
   providers: QuoteProvider[];
+  attachment: QuoteAttachment | null;
 };
 
 const initial = (): Draft => ({
@@ -55,6 +59,7 @@ const initial = (): Draft => ({
   notes: '',
   items: [emptyItem()],
   providers: [],
+  attachment: null,
 });
 
 const steps = [
@@ -125,6 +130,25 @@ export function QuoteCreatePage() {
     }));
   };
 
+  const updateAttachment = (file: File | null) => {
+    if (!file) {
+      patch({attachment: null});
+      setError('');
+      return;
+    }
+    if (
+      file.type !== 'application/pdf'
+      || !file.name.toLocaleLowerCase('pt-BR').endsWith('.pdf')
+      || !file.size
+      || file.size > 10 * 1024 * 1024
+    ) {
+      setError('Selecione um arquivo PDF de até 10 MB.');
+      return;
+    }
+    patch({attachment: {file, token: crypto.randomUUID()}});
+    setError('');
+  };
+
   const validateStep = (target: number) => {
     if (target === 0 && (!draft.requestDate || !draft.requesterId)) {
       return 'Informe a data e selecione o solicitante.';
@@ -180,7 +204,7 @@ export function QuoteCreatePage() {
         notes: draft.notes.trim(),
         items: draft.items,
         providers: draft.providers,
-      });
+      }, draft.attachment);
       notifications.created('Cotação criada. O número foi gerado automaticamente.');
       navigate(`/cotacao?cotacao=${encodeURIComponent(saved.id)}`, {replace: true});
     } catch (reason) {
@@ -232,6 +256,7 @@ export function QuoteCreatePage() {
               loadError={requestersQuery.error}
               onReload={requestersQuery.reload}
               patch={patch}
+              onAttachmentChange={updateAttachment}
             />
           )}
           {step === 1 && (
@@ -310,6 +335,7 @@ function DataStep({
   loadError,
   onReload,
   patch,
+  onAttachmentChange,
 }: {
   draft: Draft;
   requesters: Signature[];
@@ -317,6 +343,7 @@ function DataStep({
   loadError: string;
   onReload: () => Promise<void>;
   patch: (value: Partial<Draft>) => void;
+  onAttachmentChange: (file: File | null) => void;
 }) {
   return (
     <section>
@@ -370,6 +397,34 @@ function DataStep({
           placeholder="Prazo, condição de entrega ou orientações"
         />
       </Field>
+      <label className="quote-pdf-upload">
+        <Paperclip size={22}/>
+        <span>
+          <strong>Anexar PDF (opcional)</strong>
+          <small>Documento de apoio da cotação · arquivo PDF de até 10 MB</small>
+        </span>
+        <input
+          type="file"
+          accept="application/pdf,.pdf"
+          aria-label="Adicionar PDF à cotação"
+          onChange={event => {
+            onAttachmentChange(event.target.files?.[0] ?? null);
+            event.target.value = '';
+          }}
+        />
+      </label>
+      {draft.attachment && (
+        <div className="quote-pdf-selected">
+          <FileText size={19}/>
+          <span>
+            <strong>{draft.attachment.file.name}</strong>
+            <small>{new Intl.NumberFormat('pt-BR', {maximumFractionDigits: 1}).format(draft.attachment.file.size / 1024)} KB</small>
+          </span>
+          <button type="button" className="icon-btn" aria-label={`Remover ${draft.attachment.file.name}`} onClick={() => onAttachmentChange(null)}>
+            <X size={16}/>
+          </button>
+        </div>
+      )}
     </section>
   );
 }
@@ -591,6 +646,7 @@ function ReviewStep({draft, materials, onEdit}: {draft: Draft; materials: Materi
             <div><dt>Número</dt><dd>Automático</dd></div>
             <div><dt>Data</dt><dd>{dateLabel(draft.requestDate)}</dd></div>
             <div><dt>Solicitante</dt><dd>{draft.requester}</dd></div>
+            <div><dt>Anexo PDF</dt><dd>{draft.attachment?.file.name || 'Nenhum anexo'}</dd></div>
           </dl>
           <div className="quote-review-note">
             <span>Observações gerais</span>

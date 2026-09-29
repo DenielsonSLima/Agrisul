@@ -336,13 +336,14 @@ export function QuoteNegotiationTab({
                                     <del title="Valor unitário sem desconto">{moneyLabel(currentOffer.unitPrice)}</del>
                                   </span>
                                   <small>
-                                    {discountLabel(currentOffer.discountType, currentOffer.discountValue)} · total líquido {moneyLabel(currentOffer.lineTotal)}
+                                    {discountLabel(currentOffer.discountType, currentOffer.discountValue)} · subtotal {moneyLabel(currentOffer.lineSubtotal)} · total líquido {moneyLabel(currentOffer.lineTotal)}
                                   </small>
                                 </>
                               ) : (
                                 <>
                                   <strong>{currentPrice ? moneyLabel(currentPrice) : 'Informar preço'}</strong>
                                   <small>
+                                    {currentOffer ? `Subtotal ${moneyLabel(currentOffer.lineSubtotal)} · ` : ''}
                                     {providerHistory.length
                                       ? `${providerHistory.length} ${providerHistory.length === 1 ? 'versão' : 'versões'}`
                                       : 'Sem histórico'}

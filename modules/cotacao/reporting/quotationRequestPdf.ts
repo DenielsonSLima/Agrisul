@@ -1,12 +1,12 @@
+import {formatReportCnpj} from '@/shared/reporting/companyBrand';
+import {loadReportImage} from '@/shared/reporting/loadReportImage';
 import {
   drawReportPdfHeader,
-  drawReportPdfWatermark,
-  formatReportCnpj,
-  REPORT_MARGIN_MM,
-  type ReportPdfBrand,
   type ReportPdfImage,
-} from '@/shared/reporting';
-import {loadReportImage} from '@/shared/reporting/loadReportImage';
+} from '@/shared/reporting/pdfHeader';
+import {drawReportPdfWatermark} from '@/shared/reporting/pdfWatermark';
+import {REPORT_MARGIN_MM} from '@/shared/reporting/reportLayout';
+import type {ReportPdfBrand} from '@/shared/reporting/types';
 import {dateLabel} from '@/shared/utils/presentation';
 import type {jsPDF as JsPdf} from 'jspdf';
 import type {QuoteItem, QuoteProvider} from '../types';

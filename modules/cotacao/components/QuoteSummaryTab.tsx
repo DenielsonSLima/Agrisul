@@ -5,9 +5,12 @@ import {
   Banknote,
   CheckCircle2,
   ClipboardCheck,
+  ExternalLink,
   FileDown,
+  FileText,
   Loader2,
   PackageOpen,
+  Pencil,
   Plus,
   Trash2,
   Trophy,
@@ -25,6 +28,7 @@ type QuoteSummaryTabProps = {
   onFinalize: () => Promise<void>;
   onAddMaterials: () => void;
   onRemoveMaterial: (item: QuoteItem) => Promise<void>;
+  onEditQuantity: (item: QuoteItem) => void;
   removingItemId: string;
 };
 
@@ -56,6 +60,7 @@ export function QuoteSummaryTab({
   onFinalize,
   onAddMaterials,
   onRemoveMaterial,
+  onEditQuantity,
   removingItemId,
 }: QuoteSummaryTabProps) {
   const [exportProviderId, setExportProviderId] = useState<string | null>(null);
@@ -112,6 +117,20 @@ export function QuoteSummaryTab({
           <div><dt>Situação</dt><dd>{quote.status === 'open' ? 'Em aberto' : 'Finalizada'}</dd></div>
         </dl>
         {quote.notes && <div className="quote-summary-notes"><strong>Observações</strong><p>{quote.notes}</p></div>}
+        {quote.attachmentKey && (
+          <div className="quote-summary-attachment">
+            <FileText size={19}/>
+            <span>
+              <strong>{quote.attachmentName}</strong>
+              <small>{quote.attachmentSize ? `${new Intl.NumberFormat('pt-BR', {maximumFractionDigits: 1}).format(quote.attachmentSize / 1024)} KB` : 'Documento PDF'}</small>
+            </span>
+            {quote.attachmentUrl ? (
+              <a className="btn" href={quote.attachmentUrl} target="_blank" rel="noopener noreferrer">
+                <ExternalLink size={15}/>Abrir PDF
+              </a>
+            ) : <small>Não foi possível preparar o arquivo agora.</small>}
+          </div>
+        )}
       </article>
 
       <article className="quote-summary-section">
@@ -145,7 +164,23 @@ export function QuoteSummaryTab({
                       {item.notes && <small>{item.notes}</small>}
                     </td>
                     <td>{references || 'Sem referência'}</td>
-                    <td><strong>{item.quantity} {item.unit}</strong></td>
+                    <td>
+                      <span className="quote-summary-quantity">
+                        <strong>{item.quantity} {item.unit}</strong>
+                        {quote.status === 'open' && (
+                          <button
+                            className="icon-btn"
+                            type="button"
+                            disabled={busy}
+                            title={`Alterar quantidade de ${item.materialName}`}
+                            aria-label={`Alterar quantidade de ${item.materialName}`}
+                            onClick={() => onEditQuantity(item)}
+                          >
+                            <Pencil size={14}/>
+                          </button>
+                        )}
+                      </span>
+                    </td>
                     <td>
                       {provider && award ? (
                         <span className="quote-summary-award"><strong>{provider.providerName}</strong><small>{moneyLabel(award.lineTotal)}</small></span>

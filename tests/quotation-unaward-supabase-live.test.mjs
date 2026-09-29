@@ -29,6 +29,7 @@ const admin = createClient(url, adminKey, options);
 const users = [];
 const clients = [];
 const record = join(tmpdir(), `quotation-unaward-live-users-${randomUUID()}.json`);
+let quotationAttachmentKey = '';
 
 async function account() {
   const email = `quotation-unaward-${randomUUID()}@example.com`;
@@ -59,7 +60,7 @@ try {
   const outsider = await account();
   const anonymous = createClient(url, publicKey, options);
   clients.push(anonymous);
-  await rpc(owner.client, 'settings', 'get');
+  const ownerSettings = (await rpc(owner.client, 'settings', 'get')).settings;
   await rpc(outsider.client, 'settings', 'get');
 
   const signature = (await rpc(owner.client, 'signatures', 'save', {
@@ -96,6 +97,14 @@ try {
   const quotationItemId = randomUUID();
   const removableItemId = randomUUID();
   const quotationProviderId = randomUUID();
+  quotationAttachmentKey = `${ownerSettings.workspaceId}/quotations/${randomUUID()}.pdf`;
+  const attachment = Buffer.from('%PDF-1.4\n% isolated quotation test\n');
+  const upload = await owner.client.storage.from('billing-quotation-files').upload(
+    quotationAttachmentKey,
+    attachment,
+    {contentType: 'application/pdf', upsert: false},
+  );
+  assert.ifError(upload.error);
   const saved = await rpc(owner.client, 'quotations', 'save', {
     title: 'Cotação temporária para desaprovação',
     number: '',
@@ -131,8 +140,18 @@ try {
       sentAt: null,
       values: {[quotationItemId]: '', [removableItemId]: ''},
     }],
+    attachmentKey: quotationAttachmentKey,
+    attachmentName: 'apoio-temporario.pdf',
+    attachmentSize: attachment.length,
   });
   const quotationId = saved.quote.id;
+  assert.equal(saved.quote.attachmentKey, quotationAttachmentKey);
+  assert.equal(saved.quote.attachmentName, 'apoio-temporario.pdf');
+  assert.equal(saved.quote.attachmentSize, attachment.length);
+  const ownerPdf = await owner.client.storage.from('billing-quotation-files').createSignedUrl(quotationAttachmentKey, 60);
+  assert.ifError(ownerPdf.error);
+  const outsiderPdf = await outsider.client.storage.from('billing-quotation-files').createSignedUrl(quotationAttachmentKey, 60);
+  assert.ok(outsiderPdf.error);
   await rpc(owner.client, 'quotations', 'record-negotiation', {
     id: quotationId,
     quotationProviderId,
@@ -151,6 +170,45 @@ try {
   assert.equal(awarded.quote.awardedItemCount, 1);
   assert.equal(awarded.quote.awardedGrossTotal, '20');
   assert.equal(awarded.quote.awardedTotal, '18.6');
+
+  await assert.rejects(
+    rpc(outsider.client, 'quotations', 'update-item-quantity', {
+      id: quotationId,
+      quotationItemId,
+      quantity: '4',
+    }),
+    error => error.code === 'P0002',
+  );
+  await assert.rejects(
+    rpc(anonymous, 'quotations', 'update-item-quantity', {
+      id: quotationId,
+      quotationItemId,
+      quantity: '4',
+    }),
+    error => error.code === '42501' || error.code === '28000',
+  );
+  const directQuantity = await owner.client
+    .from('billing_quotation_items')
+    .update({quantity: 4})
+    .eq('id', quotationItemId);
+  assert.equal(directQuantity.error?.code, '42501');
+  const resized = await rpc(owner.client, 'quotations', 'update-item-quantity', {
+    id: quotationId,
+    quotationItemId,
+    quantity: '4',
+  });
+  assert.equal(resized.quote.items.find(item => item.id === quotationItemId)?.quantity, '4');
+  assert.equal(resized.quote.providers[0].offers[quotationItemId].lineSubtotal, '40');
+  assert.equal(resized.quote.providers[0].offers[quotationItemId].lineTotal, '37.2');
+  assert.equal(resized.quote.awardedGrossTotal, '40');
+  assert.equal(resized.quote.awardedTotal, '37.2');
+  const restoredQuantity = await rpc(owner.client, 'quotations', 'update-item-quantity', {
+    id: quotationId,
+    quotationItemId,
+    quantity: '2',
+  });
+  assert.equal(restoredQuantity.quote.awardedGrossTotal, '20');
+  assert.equal(restoredQuantity.quote.awardedTotal, '18.6');
 
   const cleared = await rpc(owner.client, 'quotations', 'unaward-item', {
     id: quotationId,
@@ -263,9 +321,13 @@ try {
     }),
     error => error.code === '23514',
   );
-  console.log('PASS: remote unaward and item removal preserve totals, clear only linked quotation data and enforce isolation.');
+  console.log('PASS: private quotation PDF, quantity recalculation, unaward and item removal enforce RPC isolation.');
 } finally {
   for (const client of clients) await client.removeAllChannels();
+  if (quotationAttachmentKey) {
+    const removed = await admin.storage.from('billing-quotation-files').remove([quotationAttachmentKey]);
+    assert.ifError(removed.error);
+  }
   const failures = [];
   for (const id of [...users].reverse()) {
     const {error} = await admin.auth.admin.deleteUser(id);

@@ -114,6 +114,10 @@ export type Quote = {
   requester: string;
   requesterSignatureId?: string | null;
   notes: string;
+  attachmentKey: string | null;
+  attachmentName: string;
+  attachmentSize: number | null;
+  attachmentUrl?: string | null;
   createdAt: string;
   status: QuoteStatus;
   items: QuoteItem[];
@@ -169,6 +173,7 @@ export type QuoteScopeProviderInput = Pick<QuoteProvider, 'id' | 'providerId' | 
 export type QuoteAddItemsInput = { id: string; items: QuoteScopeItemInput[] };
 export type QuoteAddProvidersInput = { id: string; providers: QuoteScopeProviderInput[] };
 export type QuoteRemoveItemInput = { id: string; quotationItemId: string };
+export type QuoteItemQuantityInput = { id: string; quotationItemId: string; quantity: string };
 export type QuoteRemoveProviderInput = { id: string; quotationProviderId: string };
 export type QuoteDetailsInput = {
   id: string;
@@ -206,4 +211,9 @@ export type QuoteInput = {
   notes: string;
   items: QuoteItem[];
   providers: QuoteProvider[];
+};
+
+export type QuoteAttachment = {
+  file: File;
+  token: string;
 };

@@ -144,6 +144,34 @@ test('provider step and review explain that suppliers can be added later', async
   assert.match(review, /adicioná-los depois/);
 });
 
+test('new quotation accepts one private PDF and includes it in the review and save flow', async () => {
+  const [source, api, migration, baseMigration] = await Promise.all([
+    readFile(createPath, 'utf8'),
+    readFile(new URL('../modules/cotacao/services/quoteApi.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../supabase/migrations/20260929121639_quotation_pdf_attachment_create_flow.sql', import.meta.url), 'utf8'),
+    readFile(new URL('../supabase/migrations/20260929120027_quotation_pdf_attachment.sql', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(source, /Anexar PDF \(opcional\)/);
+  assert.match(source, /accept="application\/pdf,\.pdf"/);
+  assert.match(source, /10 \* 1024 \* 1024/);
+  assert.match(source, /attachment:\s*\{file,\s*token:\s*crypto\.randomUUID\(\)\}/);
+  assert.match(source, /mutation\.save\([\s\S]*?draft\.attachment\)/);
+  assert.match(source, /<dt>Anexo PDF<\/dt>/);
+  assert.match(api, /QUOTATION_ATTACHMENT_BUCKET=['"]billing-quotation-files['"]/);
+  assert.match(api, /createSignedUrl\(quote\.attachmentKey,3600\)/);
+  assert.match(api, /attachmentKey,attachmentName:file\.name,attachmentSize:file\.size/);
+  assert.match(migration, /attachment_key LIKE owner_id::text \|\| '\/quotations\/%\.pdf'/);
+  assert.match(migration, /p_payload-ARRAY\['attachmentKey','attachmentName','attachmentSize'\]/);
+  assert.match(migration, /v_quote_id=nullif\(v_result->'quote'->>'id',''\)::uuid/);
+  assert.match(migration, /NOT EXISTS\([\s\S]*?storage\.objects/);
+  assert.match(baseMigration, /VALUES\([\s\S]*?'billing-quotation-files'/);
+  assert.match(baseMigration, /public=false/);
+  assert.match(baseMigration, /allowed_mime_types=excluded\.allowed_mime_types/);
+  assert.match(baseMigration, /billing_private\.can_access_storage_owner\([\s\S]*?'quotations\.read'/);
+  assert.match(baseMigration, /billing_private\.can_access_storage_owner\([\s\S]*?'quotations\.write'/);
+});
+
 test('quotation modal uses four desktop columns and no lateral summary column', async () => {
   const css = await readFile(stylesPath, 'utf8');
   const stepRules = [...css.matchAll(/\.quote-steps\{([^}]*)\}/g)].map(match => match[1]);
