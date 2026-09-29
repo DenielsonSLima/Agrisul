@@ -48,3 +48,12 @@ test('a payment method can be created and selected without leaving the order dra
   assert.ok(saveAt>=0&&selectAt>saveAt&&feedbackAt>selectAt&&closeAt>feedbackAt,'the returned payment method must be selected before feedback and closing');
   assert.match(formSource,/import '\.\.\/styles\.css';/);
 });
+
+test('purchase-order cards contain long provider names without pushing values outside',async()=>{
+  const styles=await readFile(new URL('../modules/pedidos/styles.css',import.meta.url),'utf8');
+  assert.match(styles,/\.purchase-order-card\{grid-template-columns:minmax\(0,1fr\)\}/);
+  assert.match(styles,/\.purchase-order-card>\*\{min-width:0;max-width:100%\}/);
+  assert.match(styles,/\.purchase-order-company h3,\.purchase-order-company p\{overflow-wrap:anywhere\}/);
+  assert.match(styles,/\.purchase-order-company p\{[^}]*white-space:normal[^}]*-webkit-line-clamp:2/);
+  assert.match(styles,/\.purchase-order-card header \.purchase-order-status,\.purchase-order-card footer>strong\{flex:none;white-space:nowrap\}/);
+});
