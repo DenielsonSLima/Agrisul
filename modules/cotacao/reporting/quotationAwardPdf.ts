@@ -14,6 +14,7 @@ import type {Quote, QuoteItem, QuoteProvider} from '../types';
 export type QuotationAwardItem = QuoteItem & {
   materialImageUrl?: string | null;
   unitPrice: string;
+  availableQuantity: string | null;
   discountType: 'none' | 'percentage' | 'amount';
   discountValue: string;
   discountAmount: string;
@@ -33,7 +34,7 @@ export type QuotationAwardSnapshot = {
 const COLUMNS = [
   {label: 'Foto', width: 22},
   {label: 'Produto aprovado', width: 65},
-  {label: 'Quantidade', width: 22},
+  {label: 'Qtd. aprovada', width: 22},
   {label: 'Unitário bruto', width: 25},
   {label: 'Desconto', width: 23},
   {label: 'Total líquido', width: 25},
@@ -119,6 +120,7 @@ export function createQuotationAwardSnapshot(
         ...item,
         materialImageUrl: materialImages.get(item.materialId) ?? null,
         unitPrice: award.unitPrice,
+        availableQuantity: award.availableQuantity,
         discountType: award.discountType ?? 'none',
         discountValue: award.discountValue ?? '0',
         discountAmount: award.discountAmount ?? '0',
@@ -306,7 +308,7 @@ export async function createQuotationAwardPdf(
     x += productWidth;
 
     const cells = [
-      `${item.quantity} ${item.unit}`.trim(),
+      `${item.availableQuantity ?? item.quantity} ${item.unit}`.trim(),
       moneyLabel(item.unitPrice),
       item.discountType === 'none'
         ? '—'

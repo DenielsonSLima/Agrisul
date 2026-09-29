@@ -8,7 +8,7 @@ import {AuthExperience} from './AuthExperience';
 import {Button} from '@/components/ui/button';
 import {canApplyAccessCheck,planAuthSessionTransition} from './authLifecycle';
 
-export type WorkspaceAccess='checking'|'ready'|'invite'|'disabled'|'removed'|'invalid'|'error';
+export type WorkspaceAccess='checking'|'ready'|'invite'|'password'|'disabled'|'removed'|'invalid'|'error';
 export type RefreshAccessOptions={silent?:boolean};
 type AuthState={user:User|null;session:Session|null;ready:boolean;error:string;access:WorkspaceAccess;signOut:()=>Promise<void>;refreshAccess:(options?:RefreshAccessOptions)=>Promise<WorkspaceAccess>};
 const AuthContext=createContext<AuthState|null>(null);
@@ -36,7 +36,7 @@ export function AuthProvider({children}:{children:ReactNode}){
   if(!current){if(canApply())setAccess('ready');return'ready';}
   if(!silent&&canApply())setAccess('checking');
   const {data,error:rpcError}=await client.rpc('billing_rpc',{p_resource:'onboarding',p_action:'inspect',p_payload:{}});
-  const status=rpcError?'error':(['ready','invite','disabled','removed','invalid'].includes(data?.status)?data.status:'error') as WorkspaceAccess;
+  const status=rpcError?'error':(['ready','invite','password','disabled','removed','invalid'].includes(data?.status)?data.status:'error') as WorkspaceAccess;
   if(canApply())setAccess(status);
   return status;
  },[]);
@@ -106,6 +106,7 @@ export function AuthGate({children}:{children:ReactNode}){
  if(auth.user){
   if(mode==='recovery')return <AuthExperience initialMode="recovery"/>;
   if(auth.access==='checking')return <main className="auth-screen"><div className="auth-loading"><Clock3/><span>Validando seu acesso…</span></div></main>;
+  if(auth.access==='password')return <AuthExperience initialMode="temporary-password"/>;
   if(auth.access==='invite')return <AuthExperience initialMode="invite"/>;
   if(auth.access==='disabled'||auth.access==='removed'||auth.access==='invalid')return <AccessBlocked kind={auth.access}/>;
   if(auth.access==='error')return <main className="auth-screen"><section className="auth-blocked"><span><AlertTriangle/></span><h1>Não foi possível validar o acesso</h1><p>Confira sua conexão e tente novamente.</p><Button onClick={()=>void auth.refreshAccess()}><RefreshCw/>Tentar novamente</Button></section></main>;

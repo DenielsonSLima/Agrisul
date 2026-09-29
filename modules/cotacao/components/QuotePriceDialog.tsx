@@ -59,6 +59,7 @@ export function QuotePriceDialog({
   onSave,
 }: QuotePriceDialogProps) {
   const [unitPrice, setUnitPrice] = useState(currentOffer?.unitPrice ?? '');
+  const [availableQuantity, setAvailableQuantity] = useState(currentOffer?.availableQuantity ?? '');
   const [discountType, setDiscountType] = useState<QuoteOffer['discountType']>(
     currentOffer?.discountType ?? 'none',
   );
@@ -80,6 +81,20 @@ export function QuotePriceDialog({
       setValidationError('Informe o valor unitário bruto.');
       return;
     }
+    const requestedQuantity = Number(item.quantity.replace(',', '.'));
+    const normalizedAvailableQuantity = availableQuantity.trim().replace(',', '.');
+    if (normalizedAvailableQuantity) {
+      const quantity = Number(normalizedAvailableQuantity);
+      if (
+        !/^\d+(?:[.,]\d{1,3})?$/.test(availableQuantity.trim())
+        || !Number.isFinite(quantity)
+        || quantity < 0
+        || quantity > requestedQuantity
+      ) {
+        setValidationError(`Informe uma quantidade disponível entre 0 e ${item.quantity} ${item.unit}.`);
+        return;
+      }
+    }
     if (discountType !== 'none' && !discountValue.trim()) {
       setValidationError('Informe o valor do desconto.');
       return;
@@ -89,6 +104,7 @@ export function QuotePriceDialog({
       quotationProviderId: provider.id,
       quotationItemId: item.id,
       unitPrice: unitPrice.trim(),
+      availableQuantity: availableQuantity.trim(),
       discountType,
       discountValue: discountType === 'none' ? '0' : discountValue.trim(),
       notes: normalizedNotes,
@@ -106,6 +122,7 @@ export function QuotePriceDialog({
         quotationProviderId: provider.id,
         quotationItemId: item.id,
         unitPrice,
+        availableQuantity,
         discountType,
         discountValue: discountType === 'none' ? '0' : discountValue,
         notes: normalizedNotes,
@@ -162,6 +179,35 @@ export function QuotePriceDialog({
                 aria-describedby={validationError ? 'quote-price-validation-error' : undefined}
               />
             </Field>
+            <div className="quote-price-quantity-grid">
+              <Field label="Quantidade solicitada">
+                <input
+                  type="text"
+                  value={`${item.quantity} ${item.unit}`.trim()}
+                  readOnly
+                  aria-label="Quantidade solicitada"
+                />
+              </Field>
+              <Field label={`Quantidade disponível (máx. ${item.quantity} ${item.unit})`}>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={availableQuantity}
+                  onChange={event => {
+                    setAvailableQuantity(event.target.value);
+                    setValidationError('');
+                    setRequestError('');
+                  }}
+                  placeholder={`Em branco = ${item.quantity}`}
+                  aria-label="Quantidade disponível no fornecedor"
+                  aria-invalid={!!validationError}
+                  aria-describedby={validationError ? 'quote-price-validation-error' : 'quote-available-quantity-help'}
+                />
+              </Field>
+            </div>
+            <p id="quote-available-quantity-help" className="quote-price-availability-note">
+              Aceita zero. Se ficar em branco, o fornecedor atende toda a quantidade solicitada.
+            </p>
             <div className="quote-price-discount-grid">
               <Field label="Tipo de desconto">
                 <select
@@ -210,7 +256,7 @@ export function QuotePriceDialog({
             </div>
             {discountType !== 'none' && (
               <p className="quote-price-discount-note">
-                O desconto é aplicado ao subtotal completo deste material, considerando a quantidade solicitada.
+                O desconto é aplicado ao subtotal deste material, considerando a quantidade disponível informada.
               </p>
             )}
             <Field label="Observação (opcional)">
@@ -243,7 +289,10 @@ export function QuotePriceDialog({
                     <span className="quote-history-version">Versão {entry.version}</span>
                     <div className="quote-history-copy">
                       <strong><time dateTime={entry.createdAt}>{timestampLabel(entry.createdAt)}</time></strong>
-                      <small>{entry.notes || 'Sem observação'}</small>
+                      <small>
+                        Disponível: {entry.availableQuantity ?? item.quantity} {item.unit}
+                        {entry.notes ? ` · ${entry.notes}` : ' · Sem observação'}
+                      </small>
                     </div>
                     <div className="quote-history-values">
                       <strong>{moneyLabel(entry.lineTotal)}</strong>

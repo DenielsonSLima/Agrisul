@@ -357,7 +357,16 @@ export async function createQuotationNegotiationPdf(
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(5.3);
       doc.setTextColor(54, 87, 63);
-      doc.text(`Total ${moneyLabel(offer.lineTotal)}`, x + inset, rowTop + 14.1);
+      doc.text(
+        limitedLines(
+          doc,
+          `Disp. ${offer.availableQuantity ?? item.quantity} ${item.unit} · Total ${moneyLabel(offer.lineTotal)}`,
+          providerWidth - inset * 2,
+          1,
+        )[0] ?? '',
+        x + inset,
+        rowTop + 14.1,
+      );
     }
   };
 

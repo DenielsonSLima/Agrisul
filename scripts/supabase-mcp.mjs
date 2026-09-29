@@ -2,7 +2,9 @@ import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 export const PROJECT_REF = 'rbuscpwntzpyqsuycqmv';
 export function getMcpCredentials() {
- const configPath=process.env.BILLING_MCP_CONFIG || `${process.env.HOME}/.gemini/antigravity/mcp_config.json`;
+ const userRoot=process.env.HOME||process.env.USERPROFILE;
+ const configPath=process.env.BILLING_MCP_CONFIG||(userRoot?`${userRoot}/.gemini/antigravity/mcp_config.json`:'');
+ if(!configPath)throw new Error('Defina BILLING_MCP_CONFIG para usar o Supabase MCP.');
  const config=JSON.parse(readFileSync(configPath,'utf8'));
  const server=config.mcpServers?.['supabase-controle-faturamento'];
  if(!server || new URL(server.serverUrl).searchParams.get('project_ref')!==PROJECT_REF) throw new Error('MCP do Controle de Faturamento não está configurado para o projeto esperado.');

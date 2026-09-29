@@ -5,7 +5,7 @@ const {PGlite}=await import(process.env.BILLING_PGLITE_MODULE || '@electric-sql/
 import {readFileSync} from 'node:fs';
 const db=new PGlite();
 await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated;
-CREATE SCHEMA auth; CREATE TABLE auth.users(id uuid PRIMARY KEY,email text,email_confirmed_at timestamptz,raw_user_meta_data jsonb DEFAULT '{}');
+CREATE SCHEMA auth; CREATE TABLE auth.users(id uuid PRIMARY KEY,email text,email_confirmed_at timestamptz,encrypted_password text,raw_user_meta_data jsonb DEFAULT '{}');
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
 GRANT USAGE ON SCHEMA auth TO authenticated,anon; GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated,anon;
 CREATE SCHEMA storage; CREATE TABLE storage.buckets(id text PRIMARY KEY,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
@@ -462,5 +462,19 @@ try {
  await db.exec(readFileSync(new URL('../migrations/20260928195730_contract_load_optional_plot.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('./contract_load_optional_plot.sql',import.meta.url),'utf8'));
  console.log('Optional load plots: required farm, safe optional plot, detail, list, reports, agenda, executive totals and isolation passed');
+} catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
+try {
+ await db.exec(readFileSync(new URL('../migrations/20260929142429_require_temporary_password_change.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./temporary_password_change.sql',import.meta.url),'utf8'));
+ console.log('Temporary password: first-login gate, server proof, RPC blocking and private provisioning passed');
+} catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
+try {
+ await db.exec(readFileSync(new URL('../migrations/20260929142433_quotation_available_quantity.sql',import.meta.url),'utf8'));
+ console.log('Quotation availability: migration, projections, history and purchase-order quantity compiled successfully');
+} catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
+try {
+ await db.exec(readFileSync(new URL('../migrations/20260929142847_clone_workspace_snapshot.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./workspace_clone.sql',import.meta.url),'utf8'));
+ console.log('Workspace clone: fresh identifiers, remapped relationships, empty transactions and first-access gate passed');
 } catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
 await db.close();

@@ -105,6 +105,10 @@ function discountLabel(type: QuoteOffer['discountType'], value: string) {
   return '';
 }
 
+function availabilityLabel(item: QuoteItem, offer?: QuoteOffer) {
+  return `disponível ${offer?.availableQuantity ?? item.quantity} ${item.unit}`.trim();
+}
+
 function ProviderHeading({provider}: {provider: QuoteProvider}) {
   return (
     <TooltipProvider delayDuration={180}>
@@ -312,7 +316,9 @@ export function QuoteNegotiationTab({
                         const approvalKey = `${item.id}:${provider.id}`;
                         const selected = approvedProviderByItem[item.id] === provider.id;
                         const approving = approvingKey === approvalKey;
-                        const cannotApprove = !currentPrice || quote.status !== 'open';
+                        const cannotApprove = !currentPrice
+                          || Number(currentOffer?.availableQuantity ?? item.quantity) <= 0
+                          || quote.status !== 'open';
                         return (
                           <td className={selected ? 'is-approved' : undefined} key={approvalKey}>
                             <button
@@ -336,14 +342,14 @@ export function QuoteNegotiationTab({
                                     <del title="Valor unitário sem desconto">{moneyLabel(currentOffer.unitPrice)}</del>
                                   </span>
                                   <small>
-                                    {discountLabel(currentOffer.discountType, currentOffer.discountValue)} · subtotal {moneyLabel(currentOffer.lineSubtotal)} · total líquido {moneyLabel(currentOffer.lineTotal)}
+                                    {availabilityLabel(item, currentOffer)} · {discountLabel(currentOffer.discountType, currentOffer.discountValue)} · subtotal {moneyLabel(currentOffer.lineSubtotal)} · total líquido {moneyLabel(currentOffer.lineTotal)}
                                   </small>
                                 </>
                               ) : (
                                 <>
                                   <strong>{currentPrice ? moneyLabel(currentPrice) : 'Informar preço'}</strong>
                                   <small>
-                                    {currentOffer ? `Subtotal ${moneyLabel(currentOffer.lineSubtotal)} · ` : ''}
+                                    {currentOffer ? `${availabilityLabel(item, currentOffer)} · Subtotal ${moneyLabel(currentOffer.lineSubtotal)} · ` : ''}
                                     {providerHistory.length
                                       ? `${providerHistory.length} ${providerHistory.length === 1 ? 'versão' : 'versões'}`
                                       : 'Sem histórico'}
@@ -370,7 +376,11 @@ export function QuoteNegotiationTab({
                             ) : quote.status === 'open' ? (
                               <label
                                 className={`quote-matrix-approval${cannotApprove ? ' disabled' : ''}`}
-                                title={!currentPrice ? 'Informe um preço antes de aprovar.' : `Aprovar ${provider.providerName} para ${item.materialName}`}
+                                title={!currentPrice
+                                  ? 'Informe um preço antes de aprovar.'
+                                  : Number(currentOffer?.availableQuantity ?? item.quantity) <= 0
+                                    ? 'O fornecedor informou quantidade disponível zero.'
+                                    : `Aprovar ${provider.providerName} para ${item.materialName}`}
                               >
                                 <input
                                   type="radio"
@@ -453,7 +463,7 @@ export function QuoteNegotiationTab({
                       <div className="quote-history-copy">
                         <strong>{item?.materialName || 'Material não encontrado'}</strong>
                         <small>
-                          {provider?.providerName || 'Fornecedor não encontrado'} · {timestampLabel(entry.createdAt)}
+                          {provider?.providerName || 'Fornecedor não encontrado'} · disponível {entry.availableQuantity ?? item?.quantity ?? '—'} {item?.unit ?? ''} · {timestampLabel(entry.createdAt)}
                           {entry.notes ? ` · ${entry.notes}` : ''}
                         </small>
                       </div>

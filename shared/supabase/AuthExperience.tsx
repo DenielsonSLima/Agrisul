@@ -8,7 +8,7 @@ import {getSupabaseBrowserClient} from './client';
 import {RpcError,rpcRequest} from './rpc';
 import {useAuth} from './AuthProvider';
 
-type AuthMode='login'|'signup'|'forgot'|'recovery'|'invite';
+type AuthMode='login'|'signup'|'forgot'|'recovery'|'invite'|'temporary-password';
 type Message={tone:'error'|'success';text:string}|null;
 
 const modeCopy:Record<AuthMode,{kicker:string;title:string;text:string;submit:string}>={
@@ -17,6 +17,7 @@ const modeCopy:Record<AuthMode,{kicker:string;title:string;text:string;submit:st
   forgot:{kicker:'Recuperar acesso',title:'Esqueceu a senha?',text:'Informe seu e-mail. Se ele estiver cadastrado, enviaremos um link seguro.',submit:'Enviar link de recuperação'},
   recovery:{kicker:'Nova senha',title:'Proteja sua conta',text:'Crie uma nova senha para voltar ao sistema com segurança.',submit:'Atualizar senha'},
   invite:{kicker:'Convite aceito',title:'Conclua seu cadastro',text:'Defina como seu nome aparecerá e crie uma senha pessoal para acessar o espaço.',submit:'Concluir e acessar'},
+  'temporary-password':{kicker:'Primeiro acesso',title:'Crie sua senha pessoal',text:'A senha informada para o primeiro acesso é temporária. Defina uma nova senha antes de entrar no sistema.',submit:'Trocar senha e acessar'},
 };
 
 function authErrorMessage(caught:unknown){
@@ -64,8 +65,8 @@ export function AuthExperience({initialMode='login',configurationError=''}:{init
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState<Message>(configurationError?{tone:'error',text:configurationError}:null);
   const copy=modeCopy[mode];
-  const needsPassword=mode==='login'||mode==='signup'||mode==='recovery'||mode==='invite';
-  const needsConfirmation=mode==='signup'||mode==='recovery'||mode==='invite';
+  const needsPassword=mode==='login'||mode==='signup'||mode==='recovery'||mode==='invite'||mode==='temporary-password';
+  const needsConfirmation=mode==='signup'||mode==='recovery'||mode==='invite'||mode==='temporary-password';
   const returnTo=useMemo(()=>{
     if(typeof window==='undefined')return'/';
     const candidate=new URLSearchParams(window.location.search).get('returnTo');
@@ -111,6 +112,10 @@ export function AuthExperience({initialMode='login',configurationError=''}:{init
         try{sessionStorage.setItem('billing:session-notice','password');}catch{}
         window.location.replace('/');return;
       }
+      if(mode==='temporary-password'){
+        const {error}=await client.auth.updateUser({password});if(error)throw error;
+        await rpcRequest('onboarding','complete-password',{});await refreshAccess();window.location.replace('/');return;
+      }
       const cleanName=name.trim();if(cleanName.length<2)throw new RpcError('Informe seu nome com pelo menos 2 caracteres.');
       const {error:updateError}=await client.auth.updateUser({password,data:{display_name:cleanName,onboarding_required:false}});if(updateError)throw updateError;
       await rpcRequest('onboarding','complete',{name:cleanName});await refreshAccess();window.location.replace('/');
@@ -124,8 +129,8 @@ export function AuthExperience({initialMode='login',configurationError=''}:{init
     {mode==='invite'&&<div className="auth-invite-note"><CheckCircle2/><span>Seu e-mail já foi validado pelo convite.</span></div>}
     <form onSubmit={submit}>
       {(mode==='signup'||mode==='invite')&&<label className="auth-field"><span>Nome completo</span><span className="auth-input-wrap"><UserRound aria-hidden="true"/><Input required minLength={2} value={name} onChange={event=>setName(event.target.value)} autoComplete="name" placeholder="Como devemos chamar você?"/></span></label>}
-      {(mode==='login'||mode==='signup'||mode==='forgot'||mode==='invite')&&<label className="auth-field"><span>{mode==='invite'?'Usuário de acesso':'E-mail'}</span><span className="auth-input-wrap"><Mail aria-hidden="true"/><Input required type="email" value={email} onChange={event=>setEmail(event.target.value)} autoComplete="email" readOnly={mode==='invite'} placeholder="voce@empresa.com.br"/></span></label>}
-      {needsPassword&&<PasswordField label={mode==='login'?'Senha':'Crie uma senha'} value={password} onChange={setPassword} autoComplete={mode==='login'?'current-password':'new-password'} action={mode==='login'?<button type="button" className="auth-forgot" onClick={()=>changeMode('forgot')}>Esqueci minha senha</button>:undefined}/>} 
+      {(mode==='login'||mode==='signup'||mode==='forgot'||mode==='invite'||mode==='temporary-password')&&<label className="auth-field"><span>{mode==='invite'||mode==='temporary-password'?'Usuário de acesso':'E-mail'}</span><span className="auth-input-wrap"><Mail aria-hidden="true"/><Input required type="email" value={email} onChange={event=>setEmail(event.target.value)} autoComplete="email" readOnly={mode==='invite'||mode==='temporary-password'} placeholder="voce@empresa.com.br"/></span></label>}
+      {needsPassword&&<PasswordField label={mode==='login'?'Senha':mode==='temporary-password'?'Nova senha':'Crie uma senha'} value={password} onChange={setPassword} autoComplete={mode==='login'?'current-password':'new-password'} action={mode==='login'?<button type="button" className="auth-forgot" onClick={()=>changeMode('forgot')}>Esqueci minha senha</button>:undefined}/>}
       {needsConfirmation&&<PasswordField label="Confirme a senha" value={confirmation} onChange={setConfirmation} autoComplete="new-password"/>}
       {message&&<p className={`auth-message auth-message-${message.tone}`} role={message.tone==='error'?'alert':'status'}>{message.tone==='success'?<CheckCircle2/>:null}{message.text}</p>}
       <Button type="submit" className="auth-submit" size="lg" disabled={busy||!!configurationError}>{busy?<Loader2 className="animate-spin"/>:<LockKeyhole/>}{busy?'Aguarde…':copy.submit}</Button>

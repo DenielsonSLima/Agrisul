@@ -106,7 +106,8 @@ export function QuoteComparisonTab({
                   <thead>
                     <tr>
                       <th scope="col">Item</th>
-                      <th scope="col">Quantidade</th>
+                      <th scope="col">Solicitada</th>
+                      <th scope="col">Disponível</th>
                       <th scope="col">Unitário bruto</th>
                       <th scope="col">Desconto</th>
                       <th scope="col">Total</th>
@@ -120,6 +121,7 @@ export function QuoteComparisonTab({
                           {item.materialCode && <small>Cód. {item.materialCode}</small>}
                         </td>
                         <td><strong>{item.quantity} {item.unit}</strong></td>
+                        <td><strong>{award.availableQuantity ?? item.quantity} {item.unit}</strong></td>
                         <td>{moneyLabel(award.unitPrice)}</td>
                         <td>{discountText(award)}</td>
                         <td><strong>{moneyLabel(award.lineTotal)}</strong></td>

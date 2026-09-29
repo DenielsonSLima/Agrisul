@@ -183,7 +183,10 @@ export function QuoteSummaryTab({
                     </td>
                     <td>
                       {provider && award ? (
-                        <span className="quote-summary-award"><strong>{provider.providerName}</strong><small>{moneyLabel(award.lineTotal)}</small></span>
+                        <span className="quote-summary-award">
+                          <strong>{provider.providerName}</strong>
+                          <small>Disponível: {award.availableQuantity ?? item.quantity} {item.unit} · {moneyLabel(award.lineTotal)}</small>
+                        </span>
                       ) : <span className="quote-result-badge pending">Pendente</span>}
                     </td>
                     <td className="quote-summary-row-actions">

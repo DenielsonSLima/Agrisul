@@ -3,6 +3,7 @@ export type QuoteDiscountType = 'none' | 'percentage' | 'amount';
 
 export type QuoteOffer = {
   unitPrice: string;
+  availableQuantity: string | null;
   discountType: QuoteDiscountType;
   discountValue: string;
   lineSubtotal: string;
@@ -83,6 +84,7 @@ export type QuoteNegotiation = {
   itemId: string;
   version: number;
   unitPrice: string;
+  availableQuantity: string | null;
   discountType: QuoteDiscountType;
   discountValue: string;
   lineSubtotal: string;
@@ -97,6 +99,7 @@ export type QuoteItemAward = {
   itemId: string;
   providerId: string;
   unitPrice: string;
+  availableQuantity: string | null;
   discountType: QuoteDiscountType;
   discountValue: string;
   lineSubtotal: string;
@@ -189,6 +192,7 @@ export type QuoteNegotiationInput = {
   quotationProviderId: string;
   quotationItemId: string;
   unitPrice: string;
+  availableQuantity: string;
   discountType: QuoteDiscountType;
   discountValue: string;
   notes: string;
