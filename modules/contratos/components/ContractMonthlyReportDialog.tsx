@@ -3,7 +3,6 @@ import {useState} from 'react';
 import {Download,FileText,Loader2,Printer,RefreshCw} from 'lucide-react';
 import {Dialog,DialogContent,DialogDescription,DialogHeader,DialogTitle} from '@/components/ui/dialog';
 import {notifications} from '@/shared/feedback';
-import {activeReportHeader} from '@/modules/configuracoes/cabecalho-relatorios/types';
 import {useReportHeader} from '@/modules/configuracoes/cabecalho-relatorios/hooks/useReportHeader';
 import type {BillingContract} from '../types';
 import {useContractLoads} from '../hooks/useContractLoads';
@@ -15,11 +14,11 @@ import {ContractSummaryPdfPreview} from './ContractSummaryPdfPreview';
 import '../summary-details.css';
 
 export function ContractMonthlyReportDialog({open,onOpenChange,contract,period,dailyPeriod}:{open:boolean;onOpenChange:(open:boolean)=>void;contract:BillingContract;period:ContractMonthlyPeriod;dailyPeriod:ContractDailyLoadPeriod}){
- const report=useReportHeader(contract.companyId),summary=contractSummaryDetails(contract);
+ const report=useReportHeader(contract.companyId,'landscape'),summary=contractSummaryDetails(contract);
  const visibleMonths=filterContractMonths(summary.months,period);
  const dailyLoads=useContractLoads(contract.id,{search:'',from:dailyPeriod.from,to:dailyPeriod.to,groupBy:'day'},open);
  const [action,setAction]=useState<'download'|'print'|null>(null);
- const brand:ContractMonthlyReportBrand={orientation:report.settings.orientation,header:activeReportHeader(report.settings),company:report.company,watermark:report.watermark,issuer:report.issuer,issuedAt:report.issuedAt};
+ const brand:ContractMonthlyReportBrand={orientation:'landscape',header:report.settings.landscape,company:report.company,watermark:report.watermark,issuer:report.issuer,issuedAt:report.issuedAt};
  const freshBrand=async():Promise<ContractMonthlyReportBrand>=>({...brand,watermark:await report.refreshWatermark(),issuedAt:new Date()});
  const download=async()=>{if(!dailyLoads.data)return;setAction('download');try{await downloadContractMonthlySummaryPdf(contract,await freshBrand(),period,dailyLoads.data,dailyPeriod);notifications.saved('O resumo do período selecionado foi baixado em PDF.');}catch(error){notifications.error((error as Error).message||'Não foi possível gerar o PDF.');}finally{setAction(null);}};
  const print=async()=>{if(!dailyLoads.data)return;const popup=window.open('about:blank','_blank');if(!popup){notifications.error('Permita pop-ups para imprimir o resumo do contrato.');return;}popup.document.title='Preparando impressão…';setAction('print');try{await printContractMonthlySummaryPdf(contract,await freshBrand(),popup,period,dailyLoads.data,dailyPeriod);}catch(error){popup.close();notifications.error((error as Error).message||'Não foi possível preparar a impressão.');}finally{setAction(null);}};
