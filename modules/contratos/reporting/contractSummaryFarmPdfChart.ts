@@ -25,6 +25,62 @@ function clipped(doc:JsPdf,value:string,width:number){
  return value.slice(0,end)+'…';
 }
 
+function singleFarm(ctx:ContractPdfChartContext,row:ContractFarmTotals){
+ const {doc,x,y,width,height}=ctx;
+ const left=x+5,top=y+25,inner=width-10;
+ const white:Color=[255,255,255],forest:Color=[21,64,44];
+ const available=height-37,header=20,metricsHeight=25;
+ doc.setFillColor(...forest);doc.roundedRect(left,top,inner,header,2,2,'F');
+ font(doc,6,true,[174,211,184]);doc.text('FAZENDA EM DESTAQUE',left+5,top+6);
+ font(doc,13,true,white);
+ const name=row.name||'Fazenda não informada';
+ const nameWidth=inner-48;
+ fit(doc,name,nameWidth,13);doc.setTextColor(...white);
+ doc.text(clipped(doc,name,nameWidth),left+5,top+14);
+ font(doc,7,true,white);
+ doc.text(`${row.loadCount} ${row.loadCount===1?'carregamento':'carregamentos'}`,left+inner-5,top+12,{align:'right'});
+
+ const metricTop=top+header+3,cell=(inner-6)/3;
+ const items=[
+  {label:'QUANTIDADE ENTREGUE',value:number(row.volume),unit:'toneladas',color:palette.volume},
+  {label:'FATURAMENTO BRUTO',value:row.billingPending?'Pendente':money(row.grossAmount),unit:'R$',color:palette.gross},
+  {label:'VALOR LÍQUIDO',value:row.billingPending?'Pendente':money(row.netAmount),unit:'R$',color:palette.net},
+ ];
+ items.forEach((item,index)=>{
+  const cellX=left+index*(cell+3);
+  doc.setFillColor(...(index===2?[232,244,236]:[246,249,247]) as Color);
+  doc.roundedRect(cellX,metricTop,cell,metricsHeight,1.6,1.6,'F');
+  font(doc,6,true,palette.muted);doc.text(item.label,cellX+4,metricTop+6);
+  fit(doc,item.value,cell-8,17);doc.setTextColor(...(row.billingPending&&index>0?palette.pending:item.color));
+  doc.text(item.value,cellX+4,metricTop+15);
+  font(doc,6,false,palette.muted);doc.text(item.unit,cellX+4,metricTop+21);
+ });
+
+ const chartTop=metricTop+metricsHeight+4,chartHeight=available-header-metricsHeight-7;
+ doc.setFillColor(248,251,249);doc.setDrawColor(...palette.border);
+ doc.roundedRect(left,chartTop,inner,chartHeight,1.6,1.6,'FD');
+ font(doc,7,true);doc.text('COMPARATIVO FINANCEIRO',left+4,chartTop+6);
+ font(doc,5.8,false,palette.muted);doc.text('Bruto e líquido na mesma escala · R$',left+inner-4,chartTop+6,{align:'right'});
+ const labelWidth=21,barX=left+labelWidth,barWidth=inner-labelWidth-6;
+ const band=Math.max(6,(chartHeight-13)/2),barHeight=Math.min(7,band*.48);
+ const maximum=Math.max(1,numeric(row.grossAmount)??0,numeric(row.netAmount)??0);
+ for(const [index,key] of (['grossAmount','netAmount'] as const).entries()){
+  const barY=chartTop+11+index*band,value=row.billingPending?null:numeric(row[key]);
+  font(doc,7,true,key==='grossAmount'?palette.muted:palette.net);
+  doc.text(key==='grossAmount'?'Bruto':'Líquido',left+4,barY+barHeight*.7);
+  doc.setFillColor(...palette.border);doc.rect(barX,barY,barWidth,barHeight,'F');
+  if(value!==null&&value>0){
+   doc.setFillColor(...(key==='grossAmount'?palette.gross:palette.net));
+   doc.rect(barX,barY,barWidth*Math.min(1,value/maximum),barHeight,'F');
+  }
+ }
+ // Quantity has its own scale and is intentionally separate from currency.
+ const quantity=numeric(row.volume);
+ if(quantity!==null&&quantity>0){
+  doc.setFillColor(...palette.volume);doc.rect(left+4,metricTop+metricsHeight-1.2,cell-8,.8,'F');
+ }
+}
+
 // Values and totals arrive from the RPC. Arithmetic below measures geometry only.
 export function drawContractFarmPdfChart(ctx:ContractPdfChartContext,rows:ContractFarmTotals[],period:string){
  const {doc,x,y,width,height}=ctx;
@@ -35,6 +91,12 @@ export function drawContractFarmPdfChart(ctx:ContractPdfChartContext,rows:Contra
  font(doc,11,true);doc.text('Quantidade, faturamento bruto e líquido',x+9,y+13);
  font(doc,6.5,false,palette.muted);doc.text(`Período: ${period} · ${rows.length} ${rows.length===1?'fazenda':'fazendas'}`,x+5,y+19);
  if(!rows.length){font(doc,9,false,palette.muted);doc.text('Nenhuma fazenda com carregamento no período selecionado.',x+5,y+32);return;}
+ if(rows.length===1){
+  singleFarm(ctx,rows[0]);
+  font(doc,5.8,false,palette.muted);
+  doc.text('Valores do período selecionado · Quantidade em toneladas e faturamento em reais.',x+5,y+height-5);
+  return;
+ }
 
  const maxColumns=width>=230?3:2;
  const columns=Math.min(maxColumns,Math.max(1,Math.ceil(rows.length/9)));

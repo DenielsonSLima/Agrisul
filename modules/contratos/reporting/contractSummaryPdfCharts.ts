@@ -155,7 +155,6 @@ export function drawContractFinancialPdfChart(ctx:ContractPdfChartContext,rows:C
   {label:'Data',values:rows.map(row=>row.label)},
   {label:'Bruto (R$)',values:rows.map(row=>row.gross===null?'Pendente':money(row.gross))},
   {label:'Líquido (R$)',values:rows.map(row=>row.gross===null||row.net===null?'Pendente':money(row.net)),color:colors.net},
-  {label:'Volume (t)',values:rows.map(row=>number(row.volume))},
  ],left,right,y+height-(sampled?18:13));
  const base=band.top-4,top=y+29,plotHeight=base-top,slot=band.slot;
  const maximum=Math.max(0,...rows.map(row=>row.gross??0));

@@ -74,6 +74,7 @@ try{
   const quantityBars=operation.shapes.filter(shape=>shape.fill.join(',')==='84,168,115'&&shape.args[3]>3&&shape.args[0]>ctx.x+20);
   assert.equal(quantityBars.length,count,`${orientation}: retain every one of ${count} operational buckets`);
   assertVisibleValues(operation,rows);
+  assert.ok(operation.texts.some(text=>text.value==='Volume (t)'),'Operational chart retains the volume row');
   doc.addPage();const finance=observe(doc);
   drawContractFinancialPdfChart(ctx,rows,copy,'Período sintético','ATR Bruto · Acumulado');
   assert.equal(doc.getNumberOfPages(),2,'The complete financial chart must fit one additional page');
@@ -88,6 +89,7 @@ try{
    assert.ok(bar.args[2]<=8.5+.01,'Financial columns must follow the narrow operational width cap');
   });
   assertVisibleValues(finance,rows,true);
+  assert.ok(!finance.texts.some(text=>text.value==='Volume (t)'),'Financial chart must not repeat the operational volume row');
   assert.equal(JSON.stringify(rows),snapshot,'Rendering must not mutate authoritative data');
   if(process.env.BILLING_SUMMARY_ARTIFACTS){
    const folder=resolve(process.env.BILLING_SUMMARY_ARTIFACTS);await mkdir(folder,{recursive:true});
@@ -149,6 +151,15 @@ try{
   const drawing=observe(doc);drawContractFarmPdfChart(ctx,rows,'Período sintético');assertDrawingBounds(drawing,ctx);
   const text=drawing.texts.map(entry=>entry.value).join(' ');
   for(const expected of ['Fazenda Santa Maria','Rio Comprido','Pendente','-123,45','0,00'])assert.ok(text.includes(expected),'Farm page lost long name or edge state '+expected);
+  for(const row of rows){
+   const single=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+   const singleDrawing=observe(single);
+   drawContractFarmPdfChart({...ctx,doc:single},[row],'Período sintético');
+   assertDrawingBounds(singleDrawing,ctx);
+   const singleText=singleDrawing.texts.map(entry=>entry.value).join(' ');
+   assert.ok(singleText.includes(row.name),'Single-farm highlight must retain long farm names');
+   assert.ok(singleText.includes(row.billingPending?'Pendente':format.format(Number(row.netAmount))),'Single-farm highlight must preserve pending, negative and zero amounts');
+  }
  }
  console.log('Passed: daily density through365, dedicated pages, farm density through50, exact displayed values, explicit daily-label sampling, shared bar geometry, bounds and edge states.');
 }finally{await rm(directory,{recursive:true,force:true});}
