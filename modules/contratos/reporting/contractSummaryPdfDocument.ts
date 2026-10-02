@@ -2,7 +2,7 @@ import {drawReportPdfHeader,drawReportPdfWatermark,REPORT_MARGIN_MM,type ReportP
 import {formatCnpj} from '@/shared/utils/cnpj';
 import type {BillingContract,ContractLoadsData} from '../types';
 import {contractSummaryDetails,summaryReceivedNote,type SummaryTable} from '../utils/contractSummaryDetails';
-import {contractDailyLoadGranularityCopy,contractDailyLoadsChartPages,contractDailyLoadsChartRows,contractLoadFinancialChartRows,type ContractDailyLoadPeriod,type ContractLoadFinancialChartRow} from '../utils/contractDailyLoadsPresentation';
+import {contractDailyLoadGranularityCopy,contractDailyLoadsChartRows,contractLoadFinancialChartRows,type ContractDailyLoadPeriod,type ContractLoadFinancialChartRow} from '../utils/contractDailyLoadsPresentation';
 import {formatAtr,formatAtrCriterion,formatContractDate,formatContractMonth,formatContractVolume} from '../utils/contractFormat';
 import {filterContractMonths,monthIsInContractPeriod,type ContractMonthlyPeriod} from '../utils/contractMonthlyPeriod';
 import type {ContractMonthlyReportBrand} from './contractMonthlySummaryPdf';
@@ -76,30 +76,43 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
  const fitValue=(value:string,maxWidth:number,size:number)=>{
   font(size,true);while(size>7&&doc.getTextWidth(value)>maxWidth){size-=.25;font(size,true);}return size;
  };
- const metricLayout=(item:SummaryCard,cardWidth:number,kind?:SummaryIcon)=>{
-  const textWidth=cardWidth-(kind?15.5:7),label=lines(item.label,6.4,textWidth),hint=lines(item.hint,5.7,textWidth);
-  const size=fitValue(item.value,textWidth,10.6),value=lines(item.value,size,textWidth,true);
-  return {label,hint,size,value,height:4+label.length*2.9+value.length*size*.41+hint.length*2.3+2.5};
+ const metricLayout=(item:SummaryCard,cardWidth:number,kind?:SummaryIcon,compact=false)=>{
+  const textWidth=cardWidth-(kind?15.5:7),labelSize=compact?6.1:6.4,hintSize=compact?5.4:5.7,labelStep=compact?2.6:2.9,hintStep=compact?2.2:2.3,topPadding=compact?3:4,bottomPadding=compact?2:2.5;
+  const label=lines(item.label,labelSize,textWidth),hint=lines(item.hint,hintSize,textWidth);
+  const size=fitValue(item.value,textWidth,compact?9.8:10.6),value=lines(item.value,size,textWidth,true);
+  return {label,hint,size,value,labelSize,hintSize,labelStep,hintStep,topPadding,bottomPadding,height:topPadding+label.length*labelStep+value.length*size*.41+hint.length*hintStep+bottomPadding};
  };
- const metric=(item:SummaryCard,x:number,top:number,cardWidth:number,cardHeight:number,kind?:SummaryIcon)=>{
+ const metric=(item:SummaryCard,x:number,top:number,cardWidth:number,cardHeight:number,kind?:SummaryIcon,compact=false)=>{
   const dark=item.key==='pending',received=item.key==='received',remaining=item.label==='Falta entregar',textX=x+(kind?12:3.5);
   panel(x,top,cardWidth,cardHeight,dark?palette.dark:remaining?[255,244,242]:received?[237,248,241]:[255,255,255],dark?palette.dark:remaining?[247,192,184]:palette.border);
   if(kind)icon(kind,x+2.5,top+(cardHeight-7.5)/2);
-  const {label,hint,size,value}=metricLayout(item,cardWidth,kind);
-  font(6.4,false,dark?[255,255,255]:remaining?[180,35,24]:palette.muted);doc.text(label,textX,top+4,{lineHeightFactor:1.2});
-  font(size,true,dark?[255,255,255]:remaining?[180,35,24]:received?[25,139,88]:palette.ink);doc.text(value,textX,top+4+label.length*2.9+size*.3,{lineHeightFactor:1.15});
-  font(5.7,false,dark?[180,210,191]:remaining?[145,57,47]:palette.muted);doc.text(hint,textX,top+cardHeight-2.5-(hint.length-1)*2.3,{lineHeightFactor:1.15});
+  const {label,hint,size,value,labelSize,hintSize,labelStep,hintStep,topPadding,bottomPadding}=metricLayout(item,cardWidth,kind,compact);
+  font(labelSize,false,dark?[255,255,255]:remaining?[180,35,24]:palette.muted);doc.text(label,textX,top+topPadding,{lineHeightFactor:1.2});
+  font(size,true,dark?[255,255,255]:remaining?[180,35,24]:received?[25,139,88]:palette.ink);doc.text(value,textX,top+topPadding+label.length*labelStep+size*.3,{lineHeightFactor:1.15});
+  font(hintSize,false,dark?[180,210,191]:remaining?[145,57,47]:palette.muted);doc.text(hint,textX,top+cardHeight-bottomPadding-(hint.length-1)*hintStep,{lineHeightFactor:1.15});
+ };
+ const financialOverviewLayout=()=>{
+  const items=summary.financialItems.filter(item=>item.key!=='received'&&item.key!=='pending'&&item.key!=='credit'),gap=2.2,padding=4,cardWidth=(content-padding*2-gap*(items.length-1))/items.length;
+  const cards=items.map(item=>{const label=lines(item.label,7,cardWidth-5),hint=lines(item.hint,5.9,cardWidth-5),size=fitValue(item.value,cardWidth-5,10.2),value=lines(item.value,size,cardWidth-5,true);return {item,label,hint,size,value};});
+  const cardHeight=Math.max(...cards.map(card=>6+card.label.length*3.1+card.value.length*card.size*.4+card.hint.length*2.6));
+  const note=lines(summaryReceivedNote,6.5,content-padding*2),notice=summary.notice?lines(summary.notice,6.5,content-padding*2-6):[];
+  const cardsTop=14,noteGap=4,panelHeight=cardsTop+cardHeight+noteGap+note.length*3+(notice.length?notice.length*3+8:0)+3;
+  return {gap,padding,cardWidth,cards,cardHeight,note,notice,cardsTop,noteGap,panelHeight};
  };
  const hero=()=>{
-  const gap=3,overviewWidth=content*.43,kpiWidth=(content-overviewWidth-gap*2)/2,copyX=margin+34,copyWidth=overviewWidth-38,valueWidth=(copyWidth-2)/2;
+  let gap=3,kpiWidth=(content-content*.43-gap*2)/2;
+  const overviewWidth=content*.43,copyX=margin+34,copyWidth=overviewWidth-38,valueWidth=(copyWidth-2)/2;
   const quantities=[summary.operationalItems[0],summary.operationalItems[1],summary.operationalItems[3],summary.operationalItems[2]],money=summary.financialItems.filter(item=>item.key==='received'||item.key==='pending'||item.key==='credit'),balances:SummaryCard[]=[
    money[0],money[1],{label:summary.salePerTon.label,value:`Bruto ${summary.salePerTon.gross}`,hint:`Líquido: ${summary.salePerTon.net}`},money[2],
   ];
   const copyValues=[quantities[1],quantities[0]].map(item=>{const size=fitValue(item.value,valueWidth,8.5);return {size,value:lines(item.value,size,valueWidth,true)};});
   const copyExtra=(Math.max(...copyValues.map(item=>item.value.length))-1)*3.5;
-  const rowHeight=Math.max(...quantities.map(item=>metricLayout(item,kpiWidth,'scale').height),...balances.map(item=>metricLayout(item,kpiWidth).height));
-  const heroHeight=Math.max(60+copyExtra,rowHeight*4+gap*3),kpiHeight=(heroHeight-gap*3)/4;
-  ensure(heroHeight+6);panel(margin,y,overviewWidth,heroHeight,[242,249,245]);
+  const rowsHeight=(compact=false)=>Math.max(...quantities.map(item=>metricLayout(item,kpiWidth,'scale',compact).height),...balances.map(item=>metricLayout(item,kpiWidth,undefined,compact).height));
+  // Reserve the financial panel below the hero, including any pending-data notice.
+  const compact=doc.getNumberOfPages()===1&&y+Math.max(60+copyExtra,rowsHeight()*4+gap*3)+financialOverviewLayout().panelHeight+8>bottom;
+  if(compact){gap=2;kpiWidth=(content-overviewWidth-gap*2)/2;}
+  const heroHeight=Math.max(60+copyExtra,rowsHeight(compact)*4+gap*3),kpiHeight=(heroHeight-gap*3)/4;
+  ensure(heroHeight+4);panel(margin,y,overviewWidth,heroHeight,[242,249,245]);
   icon('gauge',margin+4,y+4);font(5.7,true,palette.muted);doc.text('VISÃO OPERACIONAL',margin+14,y+6.5);
   font(8.7,true);doc.text('Avanço do carregamento',margin+14,y+11);
   const statusWidth=Math.max(12,doc.getTextWidth(contract.status)*.65+4),statusX=margin+overviewWidth-statusWidth-4;
@@ -127,10 +140,10 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
   if(percent>0){doc.setFillColor(...palette.green);doc.roundedRect(copyX,y+51+copyExtra,Math.max(.5,copyWidth*percent/100),1.8,Math.min(.9,copyWidth*percent/200),.9,'F');}
   quantities.forEach((item,index)=>{
    const top=y+index*(kpiHeight+gap),x=margin+overviewWidth+gap;
-   metric(item,x,top,kpiWidth,kpiHeight,(['scale','package','gauge','truck'] as const)[index]);
-   metric(balances[index],x+kpiWidth+gap,top,kpiWidth,kpiHeight);
+   metric(item,x,top,kpiWidth,kpiHeight,(['scale','package','gauge','truck'] as const)[index],compact);
+   metric(balances[index],x+kpiWidth+gap,top,kpiWidth,kpiHeight,undefined,compact);
   });
-  y+=heroHeight+6;
+  y+=heroHeight+4;
  };
  const dailyChart=()=>{
   if(!dailyLoads)return;
@@ -150,58 +163,69 @@ export async function createContractSummaryDocument(contract:BillingContract,bra
    ensure(34);panel(margin,y,content,30);chartHeading(y,4);
    font(7,false,chartSecondary);doc.text(`Período: ${period} · Nenhum carregamento no período selecionado.`,margin+4,y+23);y+=36;return;
   }
-  const chartPages=contractDailyLoadsChartPages(rows);
-  for(const [pageIndex,pageRows] of chartPages.entries()){
-   const padding=5,remaining=bottom-y,canUseFirstPageGap=pageIndex===0&&doc.getNumberOfPages()===1&&remaining>=58;
-   const panelHeight=canUseFirstPageGap?Math.min(70,remaining):70;
-   ensure(panelHeight);panel(margin,y,content,panelHeight);chartHeading(y,padding);
-   font(5.8,false,chartSecondary);doc.text(`Barras em toneladas e linha pontilhada do ${granularityCopy.atr.toLowerCase()} · Período: ${period}`,margin+padding,y+14);
-   const top=y+17,innerHeight=panelHeight-19,left=margin+padding+15,right=width-margin-padding-12,plotWidth=right-left;
-   const metricsY=y+panelHeight-3.5,legendY=metricsY-5,base=legendY-7.5,plotTop=top+4,plotHeight=Math.max(18,base-plotTop),slot=plotWidth/pageRows.length;
-   panel(margin+padding,top,content-padding*2,innerHeight,palette.surface);
-   const maxVolume=Math.max(1,...pageRows.map(row=>row.volume));
-   for(let index=0;index<=3;index++){
-    const gridY=base-plotHeight*index/3;doc.setDrawColor(220,228,222);doc.setLineWidth(.2);doc.setLineDashPattern([1,1.4],0);doc.line(left,gridY,right,gridY);doc.setLineDashPattern([],0);
-    font(5.6,false,chartSecondary);doc.text(numberLabel(maxVolume*index/3),left-2,gridY+.8,{align:'right'});
-   }
-   const centers=pageRows.map((_,index)=>left+(index+.5)*slot);
-   const atrY=(value:number)=>base-(value-atrScaleMinimum)/(atrScaleMaximum-atrScaleMinimum)*plotHeight;
-   const atrPoints=pageRows.map((row,index)=>{const value=row.averageAtr;return value===null||!Number.isFinite(value)?null:{x:centers[index],y:atrY(value),label:`ATR ${formatAtr(row.averageAtrText)}`};});
-   pageRows.forEach((row,index)=>{
-    const center=centers[index],barWidth=Math.min(5.4,slot*.32),barHeight=row.volume/maxVolume*plotHeight;
-    doc.setFillColor(84,168,115);doc.roundedRect(center-barWidth/2,base-barHeight,barWidth,barHeight,Math.min(.7,barHeight/2),Math.min(.7,barHeight/2),'F');
-    font(5.6,true,chartInk);doc.text(numberLabel(row.volume),center,base-barHeight-1.1,{align:'center'});
-    font(5.6,true,chartInk);doc.text(row.label,center,base+3.8,{align:'center'});
-   });
-   doc.setDrawColor(...chartOrange);doc.setLineWidth(.65);doc.setLineDashPattern([1.2,1],0);let previousAtr:{x:number;y:number}|null=null;
-   atrPoints.forEach(point=>{if(!point){previousAtr=null;return;}if(previousAtr)doc.line(previousAtr.x,previousAtr.y,point.x,point.y);previousAtr=point;});doc.setLineDashPattern([],0);
-   atrPoints.forEach(point=>{if(!point)return;doc.setFillColor(255,255,255);doc.setDrawColor(...chartOrange);doc.circle(point.x,point.y,.9,'FD');font(5.3,true,chartInk);doc.text(point.label,point.x+1.7,point.y-1.5);});
-   if(atrValues.length){font(5.2,true,chartInk);doc.text(formatAtr(String(atrScaleMaximum)),right+2,plotTop+.8);doc.text(formatAtr(String(atrScaleMinimum)),right+2,base+.8);}
-   const quantityLegendX=margin+padding+3;doc.setFillColor(84,168,115);doc.rect(quantityLegendX,legendY-1.6,2.8,2,'F');font(5.3,true,chartInk);doc.text(granularityCopy.quantity,quantityLegendX+4,legendY);
-   const atrLegendX=margin+padding+39;doc.setDrawColor(...chartOrange);doc.setLineWidth(.65);doc.setLineDashPattern([1.2,1],0);doc.line(atrLegendX,legendY-1,atrLegendX+7,legendY-1);doc.setLineDashPattern([],0);font(5.3,true,chartInk);doc.text(`${granularityCopy.atr} (kg/t)`,atrLegendX+9,legendY);
-   const averageVolume=granularity==='day'?dailyLoads.summary.averageDailyVolume:String(rows.reduce((total,row)=>total+row.volume,0)/rows.length);
-   const monthCount=Number(dailyLoads.summary.monthCount),monthMetric=monthCount===1?'1 mês movimentado':`${monthCount} meses movimentados`;
-   const metrics=[`Média ${granularityCopy.average} ${formatContractVolume(averageVolume)}`,`Volume ${formatContractVolume(dailyLoads.summary.volume)}`,`ATR médio ${formatAtr(dailyLoads.summary.averageAtr)} kg/t`,monthMetric];
-   font(5.3,true,chartInk);doc.text(metrics.join('  ·  '),width-margin-padding-3,metricsY,{align:'right'});
-   y+=panelHeight+6;
+  const pageRows=rows,padding=5,remaining=bottom-y,canUseFirstPageGap=doc.getNumberOfPages()===1&&remaining>=58;
+  const panelHeight=canUseFirstPageGap?Math.min(70,remaining):70;
+  ensure(panelHeight);panel(margin,y,content,panelHeight);chartHeading(y,padding);
+  font(5.8,false,chartSecondary);doc.text(`Barras em toneladas e linha pontilhada do ${granularityCopy.atr.toLowerCase()} · Período: ${period}`,margin+padding,y+14);
+  const top=y+17,innerHeight=panelHeight-19,left=margin+padding+15,right=width-margin-padding-12,plotWidth=right-left;
+  const metricsY=y+panelHeight-3.5,legendY=metricsY-5,base=legendY-7.5,plotTop=top+4,plotHeight=Math.max(18,base-plotTop),slot=plotWidth/pageRows.length;
+  // Draw every bar in one panel; thin labels only when the selected range is dense.
+  const labelEvery=Math.max(1,Math.ceil(8/slot)),labelWidth=slot*labelEvery-1;
+  const showLabel=(index:number)=>index===pageRows.length-1||(index%labelEvery===0&&pageRows.length-1-index>=labelEvery);
+  const chartLabel=(value:string,center:number,labelY:number,startSize:number)=>{
+   let size=startSize;font(size,true,chartInk);
+   while(size>4.3&&doc.getTextWidth(value)>labelWidth){size=Math.max(4.3,size-.2);font(size,true,chartInk);}
+   const halfWidth=doc.getTextWidth(value)/2,labelX=Math.max(left+halfWidth,Math.min(right-halfWidth,center));
+   doc.text(value,labelX,labelY,{align:'center'});
+  };
+  panel(margin+padding,top,content-padding*2,innerHeight,palette.surface);
+  const maxVolume=Math.max(1,...pageRows.map(row=>row.volume));
+  for(let index=0;index<=3;index++){
+   const gridY=base-plotHeight*index/3;doc.setDrawColor(220,228,222);doc.setLineWidth(.2);doc.setLineDashPattern([1,1.4],0);doc.line(left,gridY,right,gridY);doc.setLineDashPattern([],0);
+   font(5.6,false,chartSecondary);doc.text(numberLabel(maxVolume*index/3),left-2,gridY+.8,{align:'right'});
   }
+  const centers=pageRows.map((_,index)=>left+(index+.5)*slot);
+  const atrY=(value:number)=>base-(value-atrScaleMinimum)/(atrScaleMaximum-atrScaleMinimum)*plotHeight;
+  const atrPoints=pageRows.map((row,index)=>{const value=row.averageAtr;return value===null||!Number.isFinite(value)?null:{x:centers[index],y:atrY(value),label:`ATR ${formatAtr(row.averageAtrText)}`};});
+  const volumeLabelYs=pageRows.map((row,index)=>{
+   const labelY=base-row.volume/maxVolume*plotHeight-1.1,point=atrPoints[index];
+   return point&&Math.abs(point.y-labelY)<2.5?Math.min(labelY,point.y-3):labelY;
+  });
+  pageRows.forEach((row,index)=>{
+   const center=centers[index],barWidth=Math.min(5.4,slot*.32),barHeight=row.volume/maxVolume*plotHeight;
+   doc.setFillColor(84,168,115);doc.roundedRect(center-barWidth/2,base-barHeight,barWidth,barHeight,Math.min(.7,barHeight/2),Math.min(.7,barHeight/2),'F');
+   if(showLabel(index)){chartLabel(numberLabel(row.volume),center,volumeLabelYs[index],5.6);chartLabel(row.label,center,base+3.8,5.6);}
+  });
+  doc.setDrawColor(...chartOrange);doc.setLineWidth(.65);doc.setLineDashPattern([1.2,1],0);let previousAtr:{x:number;y:number}|null=null;
+  atrPoints.forEach(point=>{if(!point){previousAtr=null;return;}if(previousAtr)doc.line(previousAtr.x,previousAtr.y,point.x,point.y);previousAtr=point;});doc.setLineDashPattern([],0);
+  atrPoints.forEach((point,index)=>{
+   if(!point)return;doc.setFillColor(255,255,255);doc.setDrawColor(...chartOrange);doc.circle(point.x,point.y,.9,'FD');
+   if(showLabel(index)){
+    const labelY=Math.abs(point.y-1.5-volumeLabelYs[index])<2.8?Math.min(base-2,point.y+3.5):point.y-1.5;
+    chartLabel(point.label,point.x,labelY,5.3);
+   }
+  });
+  if(atrValues.length){font(5.2,true,chartInk);doc.text(formatAtr(String(atrScaleMaximum)),right+2,plotTop+.8);doc.text(formatAtr(String(atrScaleMinimum)),right+2,base+.8);}
+  const quantityLegendX=margin+padding+3;doc.setFillColor(84,168,115);doc.rect(quantityLegendX,legendY-1.6,2.8,2,'F');font(5.3,true,chartInk);doc.text(granularityCopy.quantity,quantityLegendX+4,legendY);
+  const atrLegendX=margin+padding+39;doc.setDrawColor(...chartOrange);doc.setLineWidth(.65);doc.setLineDashPattern([1.2,1],0);doc.line(atrLegendX,legendY-1,atrLegendX+7,legendY-1);doc.setLineDashPattern([],0);font(5.3,true,chartInk);doc.text(`${granularityCopy.atr} (kg/t)`,atrLegendX+9,legendY);
+  const averageVolume=granularity==='day'?dailyLoads.summary.averageDailyVolume:String(rows.reduce((total,row)=>total+row.volume,0)/rows.length);
+  const monthCount=Number(dailyLoads.summary.monthCount),monthMetric=monthCount===1?'1 mês movimentado':`${monthCount} meses movimentados`;
+  const metrics=[`Média ${granularityCopy.average} ${formatContractVolume(averageVolume)}`,`Volume ${formatContractVolume(dailyLoads.summary.volume)}`,`ATR médio ${formatAtr(dailyLoads.summary.averageAtr)} kg/t`,monthMetric];
+  font(5.3,true,chartInk);doc.text(metrics.join('  ·  '),width-margin-padding-3,metricsY,{align:'right'});
+  y+=panelHeight+6;
  };
  const financialOverview=()=>{
-  const items=summary.financialItems.filter(item=>item.key!=='received'&&item.key!=='pending'&&item.key!=='credit'),gap=2.2,padding=4,cardWidth=(content-padding*2-gap*(items.length-1))/items.length;
-  const cards=items.map(item=>{const label=lines(item.label,7,cardWidth-5),hint=lines(item.hint,5.9,cardWidth-5),size=fitValue(item.value,cardWidth-5,10.2),value=lines(item.value,size,cardWidth-5,true);return {item,label,hint,size,value};});
-  const cardHeight=Math.max(...cards.map(card=>8+card.label.length*3.1+card.value.length*card.size*.4+card.hint.length*2.6));
-  const note=lines(summaryReceivedNote,6.5,content-padding*2),notice=summary.notice?lines(summary.notice,6.5,content-padding*2-6):[];
-  const panelHeight=18+cardHeight+5+note.length*3+(notice.length?notice.length*3+8:0)+3;
-  ensure(panelHeight+6);panel(margin,y,content,panelHeight);heading(margin+padding,y+4,'VISÃO FINANCEIRA · TODO O CONTRATO','Da entrega ao recebimento','money');
+  const {gap,padding,cardWidth,cards,cardHeight,note,notice,cardsTop,noteGap,panelHeight}=financialOverviewLayout();
+  ensure(panelHeight+4);panel(margin,y,content,panelHeight);heading(margin+padding,y+4,'VISÃO FINANCEIRA · TODO O CONTRATO','Da entrega ao recebimento','money');
   cards.forEach((card,index)=>{
-   const x=margin+padding+index*(cardWidth+gap),top=y+18;panel(x,top,cardWidth,cardHeight,palette.surface);
+   const x=margin+padding+index*(cardWidth+gap),top=y+cardsTop;panel(x,top,cardWidth,cardHeight,palette.surface);
    font(7,false,palette.muted);doc.text(card.label,x+2.5,top+4.5,{lineHeightFactor:1.25});
    font(card.size,true);doc.text(card.value,x+2.5,top+6+card.label.length*3.1,{lineHeightFactor:1.2});
    font(5.9,false,palette.muted);doc.text(card.hint,x+2.5,top+cardHeight-3-(card.hint.length-1)*2.6,{lineHeightFactor:1.25});
   });
-  const noteY=y+18+cardHeight+5;font(6.5,false,palette.muted);doc.text(note,margin+padding,noteY,{lineHeightFactor:1.3});
+  const noteY=y+cardsTop+cardHeight+noteGap;font(6.5,false,palette.muted);doc.text(note,margin+padding,noteY,{lineHeightFactor:1.3});
   if(notice.length){const noticeY=noteY+note.length*3+2;panel(margin+padding,noticeY,content-padding*2,notice.length*3+5,[251,248,239],[233,223,201]);font(6.5,false,[137,110,60]);doc.text(notice,margin+padding+3,noticeY+4,{lineHeightFactor:1.3});}
-  y+=panelHeight+6;
+  y+=panelHeight+4;
  };
  const charts=()=>{
   const granularity=dailyPeriod?.granularity??'month',granularityCopy=contractDailyLoadGranularityCopy[granularity];

@@ -42,14 +42,12 @@ try{
  assert.match(pdfSource,/setLineDashPattern\(\[1\.2,1\],0\)/,'The PDF daily ATR line must be dotted');
  assert.match(pdfSource,/contractDailyLoadsChartRows\(dailyLoads,granularity\)/,'The PDF must aggregate the chart with the selected screen granularity');
  const pdfDailyChartSource=pdfSource.slice(pdfSource.indexOf(' const dailyChart=()=>'),pdfSource.indexOf(' const financialOverview=()=>'));
- assert.match(pdfDailyChartSource,/canUseFirstPageGap=pageIndex===0&&doc\.getNumberOfPages\(\)===1&&remaining>=58/,'The first operational chart must reuse the available space on page one');
  assert.match(pdfDailyChartSource,/barWidth=Math\.min\(5\.4,slot\*\.32\)/,'The operational PDF chart must keep narrow bars');
  assert.match(pdfDailyChartSource,/chartInk:Color=\[18,18,18\]/,'The operational PDF chart must use high-contrast black text');
  assert.match(pdfDailyChartSource,/doc\.rect\(quantityLegendX,legendY-1\.6,2\.8,2,'F'\)/,'The operational PDF legend must draw a real quantity swatch');
  const pdfSectionOrder=['hero();','financialOverview();','dailyChart();','charts();'].map(call=>pdfSource.indexOf(call));
  assert.ok(pdfSectionOrder.every((position,index)=>position>=0&&(index===0||position>pdfSectionOrder[index-1])),'The PDF must mirror the screen order: operational, financial, load evolution and delivery/billing summary');
  const pdfFinancialChartSource=pdfSource.slice(pdfSource.indexOf(' const charts=()=>'),pdfSource.indexOf(' const table='));
- assert.equal(pdfSource.match(/doc\.text\(point\.label,point\.x\+1\.7,point\.y-1\.5\)/g)?.length,1,'Only the upper load chart must label ATR points');
  assert.doesNotMatch(pdfSource,/doc\.text\(`ATR \$\{formatAtr\(row\.averageAtrText\)\}`[^;]+base\+/,'The PDF must not keep ATR labels below bars or periods');
  assert.doesNotMatch(pdfFinancialChartSource,/atrValues|atrScaleMinimum|const points=|granularityCopy\.atr|point\.label|setLineDashPattern\(\[1\.2,1\],0\)/,'The lower PDF financial chart must not draw an ATR series, axis, point label or legend');
  assert.match(pdfFinancialChartSource,/for\(let offset=0;offset<rows\.length;offset\+=6\)[\s\S]+rows\.slice\(offset,offset\+6\)/,'The line-free financial chart must paginate in non-overlapping blocks');
@@ -96,6 +94,30 @@ try{
  assert.equal(noFinance.financialItems.find(item=>item.key==='received').value,'—');
  assert.deepEqual(noFinance.salePerTon,{label:'Valor de venda por tonelada',gross:'—',net:'—'});
  const brand={orientation:'portrait',header:{variant:'detailed',logoAlignment:'left',showCnpj:true,showContact:true},company:null,watermark:{imageUrl:null,opacity:15,size:60},issuer:{id:'user',name:'Responsável',email:'responsavel@example.test'},issuedAt:new Date('2026-09-15T12:00:00Z')};
+ const textCommands=commands=>commands.flatMap(command=>[...command.matchAll(/\(((?:\\.|[^\\)])*)\)\s*Tj/g)].map(match=>match[1].replace(/\\([\\()])/g,'$1')));
+ const assertFooterSafety=(doc,orientation)=>{
+  for(const page of doc.internal.pages.slice(1))for(const command of page){
+   if(!command.includes(' Tj')||/Emitido por|Página/.test(command))continue;
+   const position=command.match(/[-\d.]+ ([-\d.]+) Td/),leading=command.match(/([-\d.]+) TL/);
+   if(position){const lastY=Number(position[1])-(command.match(/T\*/g)?.length??0)*Number(leading?.[1]??0);assert.ok(lastY>23*72/25.4,'Body text must stay above the footer in '+orientation);}
+  }
+ };
+ const assertSingleOperationalChart=(doc,groups,orientation)=>{
+  const pages=doc.internal.pages.slice(1),title='Quantidade carregada por dia';
+  assert.equal(pages.flatMap(textCommands).filter(text=>text===title).length,1,`${orientation}: ${groups.length} days must produce one operational chart panel`);
+  const page=pages.find(commands=>textCommands(commands).includes(title));
+  assert.ok(page,`${orientation}: the operational chart must be present`);
+  const start=page.findIndex(command=>command.includes('EVOLUÇÃO DOS CARREGAMENTOS'));
+  const following=page.findIndex((command,index)=>index>start&&(/RESUMO MENSAL|Entregas e faturamento por mês|Entradas e saldos por mês|Observações do contrato/.test(command)));
+  const labels=textCommands(page.slice(start,following<0?page.length:following));
+  for(const group of groups){
+   const label=group.key.slice(8,10)+'/'+group.key.slice(5,7),atr='ATR '+new Intl.NumberFormat('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:4}).format(Number(group.averageAtr));
+   assert.equal(labels.filter(text=>text===label).length,1,`${orientation}: ${label} must appear once in the complete chart on one page`);
+   const matchingAtrCount=groups.filter(row=>Number(row.averageAtr)===Number(group.averageAtr)).length;
+   assert.equal(labels.filter(text=>text===atr).length,matchingAtrCount,`${orientation}: ${label} must retain its daily ATR label without pagination duplicates`);
+  }
+  assertFooterSafety(doc,orientation);
+ };
  const pricedLoad=(id,loadedAt,volume,atr,grossAmount,discountAmount,netAmount)=>({id,contractId:contract.id,loadedAt,farmId:'farm',plotId:'plot',farmName:'Fazenda teste',plotName:'Talhão teste',volume,atr,atrReferenceMonth:'2026-09',atrQuote:'1.2',grossAmount,discountAmount,netAmount,billingPending:false,document:'',notes:'',createdAt:'',updatedAt:''});
  const firstLoad=pricedLoad('load-1','2026-09-15','100','120','60000.30','800.10','59200.20'),secondLoad=pricedLoad('load-2','2026-09-16','150','122.5','90000.45','1200.15','88800.30');
  const dailyLoads={filters:{search:'',from:'2026-09-01',to:'2026-09-30',groupBy:'day'},summary:{loadCount:2,volume:'250',farmCount:1,plotCount:1,activeDayCount:2,monthCount:1,averageDailyVolume:'125',averageAtr:'121.5',firstLoadedAt:'2026-09-15',lastLoadedAt:'2026-09-16',grossAmount:'150000.75',discountAmount:'2000.25',netAmount:'148000.50',billingPending:false},monthlyVolumes:[{month:'2026-09',volume:'250',loadCount:2}],groups:[{key:'2026-09-15',label:'2026-09-15',loadCount:1,volume:'100',averageAtr:'120',loads:[firstLoad]},{key:'2026-09-16',label:'2026-09-16',loadCount:1,volume:'150',averageAtr:'122.5',loads:[secondLoad]}]};
@@ -114,11 +136,7 @@ try{
    assert.ok(firstPageOrder.every((position,index)=>position>=0&&(index===0||position>firstPageOrder[index-1])),'Portrait page one must contain operational, financial and load-evolution panels in the screen order');
    for(const text of ['15/09','16/09','ATR 120,00','ATR 122,50'])assert.ok(firstPageCommands.includes(text),'Portrait page-one load evolution lost '+text);
   }
-  for(const page of doc.internal.pages.slice(1))for(const command of page){
-   if(!command.includes(' Tj')||/Emitido por|Página/.test(command))continue;
-   const position=command.match(/[-\d.]+ ([-\d.]+) Td/),leading=command.match(/([-\d.]+) TL/);
-   if(position){const lastY=Number(position[1])-(command.match(/T\*/g)?.length??0)*Number(leading?.[1]??0);assert.ok(lastY>23*72/25.4,'Body text must stay above the footer in '+orientation);}
-  }
+  assertFooterSafety(doc,orientation);
   if(process.env.BILLING_SUMMARY_ARTIFACTS){const folder=resolve(process.env.BILLING_SUMMARY_ARTIFACTS);await mkdir(folder,{recursive:true});await writeFile(join(folder,'resumo-'+orientation+'.pdf'),new Uint8Array(doc.output('arraybuffer')));await writeFile(join(folder,'contract.json'),JSON.stringify(contract));}
  }
  const weeklyPeriod={...dailyDayPeriod,granularity:'week'};
@@ -126,11 +144,46 @@ try{
  const {doc:weeklyDoc}=await createContractMonthlySummaryPdf(intervalContract,brand,{from:'2026-08',to:'2026-10'},dailyLoads,weeklyPeriod),weeklyCommands=weeklyDoc.internal.pages.flat().join('\n');
  for(const text of ['Quantidade carregada por semana','ATR médio semanal','ATR 121,50','Média semanal 250,00 t','Faturamento bruto e líquido por semana','R$ 150.000,75','R$ 148.000,50','Período: 01/09/2026 a 30/09/2026'])assert.ok(weeklyCommands.includes(text),'Weekly PDF lost '+text);
  assert.ok(!weeklyCommands.includes('Out/2026'),'The shared daily interval must exclude October from the PDF monthly summary');
- const nineDayLoads={...dailyLoads,summary:{...dailyLoads.summary,loadCount:9,volume:'450',activeDayCount:9,averageDailyVolume:'50',averageAtr:'114'},groups:Array.from({length:9},(_,index)=>({key:`2026-09-${String(index+1).padStart(2,'0')}`,label:`2026-09-${String(index+1).padStart(2,'0')}`,loadCount:1,volume:'50',averageAtr:String(110+index),loads:[]}))};
- const {doc:pagedDoc}=await createContractMonthlySummaryPdf(contract,brand,undefined,nineDayLoads,dailyDayPeriod),pagedCommands=pagedDoc.internal.pages.flat().join('\n');
- assert.equal(pagedCommands.match(/Quantidade carregada por dia/g)?.length,2,'Nine daily bars must produce two finite PDF chart panels');
- assert.equal(pagedCommands.match(/08\/09/g)?.length,2,'The safe pagination overlap must repeat only the boundary bar');
- assert.equal(pagedCommands.match(/09\/09/g)?.length,1,'The final daily bar must render once');
+ for(const dayCount of [9,15]){
+  const loads={...dailyLoads,summary:{...dailyLoads.summary,loadCount:dayCount,volume:String(dayCount*50),activeDayCount:dayCount,averageDailyVolume:'50'},groups:Array.from({length:dayCount},(_,index)=>({key:`2026-09-${String(index+1).padStart(2,'0')}`,label:`2026-09-${String(index+1).padStart(2,'0')}`,loadCount:1,volume:'50',averageAtr:String(110+index),loads:[]}))};
+  for(const orientation of ['portrait','landscape']){
+   const {doc}=await createContractMonthlySummaryPdf(contract,{...brand,orientation},undefined,loads,dailyDayPeriod);
+   assertSingleOperationalChart(doc,loads.groups,orientation);
+  }
+ }
+ const screenshotPeriod={from:'2026-09-18',to:'2026-10-02',granularity:'day'};
+ const screenshotCompany={id:'company',name:'AGRISUL AGRICOLA LTDA EM RECUPERACAO JUDICIAL',legalName:'AGRISUL AGRICOLA LTDA EM RECUPERACAO JUDICIAL',cnpj:'04773159000523',phone:'1132261428',email:'',street:'FAZENDA FAZENDA SANTANA',number:'S/N',complement:'',district:'ZONA RURAL',city:'Japoatã',state:'SE',zipCode:'49950000',logoUrl:null};
+ const screenshotMetrics={...metrics,loadedVolume:'3313.43',averageAtr:'122.5677',grossAmount:'519182.95',grossPerTon:'156.69',discountAmount:'248507.25',netAmount:'270675.70',netPerTon:'81.69',advanceAmount:'0',receiptAmount:'0',refundedAmount:'0',receivedAmount:'0',pendingAmount:'270675.70',creditAmount:'0'};
+ const screenshotContract={...contract,companyName:screenshotCompany.name,clientName:'USINA SAO JOSE DO PINHEIRO LTDA',clientCnpj:'13324215000100',contractNumber:'',typeName:'Contrato Semiautomático',contractedVolume:'40000',loadedVolume:'3313.43',remainingVolume:'36686.57',averageAtr:'122.5677',monthlySummary:{...contract.monthlySummary,totals:{...contract.monthlySummary.totals,contractedVolume:'40000',loadedVolume:'3313.43',remainingVolume:'36686.57',averageLoadAtr:'122.5677'}},financialSummary:{...contract.financialSummary,totals:screenshotMetrics}};
+ const screenshotDailyLoads={...dailyLoads,filters:{...dailyLoads.filters,from:screenshotPeriod.from,to:screenshotPeriod.to},summary:{...dailyLoads.summary,loadCount:11,volume:'2843.67',activeDayCount:11,averageDailyVolume:'258.52',averageAtr:'121.73',firstLoadedAt:'2026-09-18',lastLoadedAt:'2026-09-30'},groups:[['18','142.75','118.75'],['21','192.12','121.06'],['22','482.09','123.49'],['23','201.90','124.89'],['24','274.61','115.76'],['25','316.65','113.92'],['26','189.18','117.09'],['27','285.76','117.09'],['28','228.81','127.83'],['29','306.33','136.23'],['30','223.47','119.70']].map(([day,volume,atr])=>{
+  const loadedAt='2026-09-'+day,load=pricedLoad('screenshot-'+day,loadedAt,volume,atr,(Number(volume)*156.69).toFixed(2),(Number(volume)*75).toFixed(2),(Number(volume)*81.69).toFixed(2));
+  return {key:loadedAt,label:loadedAt,loadCount:1,volume,averageAtr:atr,loads:[load]};
+ })};
+ for(const orientation of ['portrait','landscape']){
+  const {doc}=await createContractMonthlySummaryPdf(screenshotContract,{...brand,orientation,company:screenshotCompany},undefined,screenshotDailyLoads,screenshotPeriod);
+  assertSingleOperationalChart(doc,screenshotDailyLoads.groups,orientation);
+  const firstPage=doc.internal.pages[1],firstPageText=textCommands(firstPage),heroPosition=firstPageText.indexOf('Avanço do carregamento'),financePosition=firstPageText.indexOf('Da entrega ao recebimento');
+  assert.ok(heroPosition>=0&&financePosition>heroPosition,`${orientation}: the detailed company header must leave the financial overview below the hero on page one`);
+  const financeStart=firstPage.findIndex(command=>command.includes('VISÃO FINANCEIRA'));
+  const following=firstPage.findIndex((command,index)=>index>financeStart&&command.includes('EVOLUÇÃO DOS CARREGAMENTOS'));
+  const financeLabels=textCommands(firstPage.slice(financeStart,following<0?firstPage.length:following)).map(text=>text.replace(/\s+/g,' ')),financeText=financeLabels.join(' ');
+  for(const item of contractSummaryDetails(screenshotContract).financialItems.filter(item=>['gross','discount','net','advance','receipt','refund'].includes(item.key))){
+   const labelPosition=financeLabels.indexOf(item.label);
+   assert.ok(labelPosition>=0,`${orientation}: first-page finance lost ${item.label}`);
+   assert.equal(financeLabels[labelPosition+1],item.value.replace(/\s+/g,' '),`${orientation}: first-page finance lost the value for ${item.label}`);
+  }
+  assert.ok(financeText.includes('O total recebido considera adiantamentos e recebimentos, menos os estornos.'),`${orientation}: first-page finance must retain the receipt explanation`);
+  assert.ok(financeText.includes('o saldo geral é o do contrato inteiro.'),`${orientation}: first-page finance must retain the contract balance explanation`);
+  if(process.env.BILLING_SUMMARY_ARTIFACTS){const folder=resolve(process.env.BILLING_SUMMARY_ARTIFACTS);await mkdir(folder,{recursive:true});await writeFile(join(folder,'resumo-captura-'+orientation+'.pdf'),new Uint8Array(doc.output('arraybuffer')));}
+ }
+ for(const orientation of ['portrait','landscape'])for(const availability of ['pending','unavailable']){
+  const noticeContract={...screenshotContract,financialSummary:availability==='unavailable'?undefined:{...screenshotContract.financialSummary,totals:{...screenshotMetrics,billingPending:true,grossAmount:'',netAmount:'',pendingAmount:'',creditAmount:''}}};
+  const {doc}=await createContractMonthlySummaryPdf(noticeContract,{...brand,orientation,company:screenshotCompany},undefined,screenshotDailyLoads,screenshotPeriod);
+  const firstPageText=textCommands(doc.internal.pages[1]).join(' ').replace(/\s+/g,' '),notice=contractSummaryDetails(noticeContract).notice.replace(/\s+/g,' ');
+  assert.ok(firstPageText.includes('Da entrega ao recebimento'),`${orientation}: ${availability} finance must stay below the hero on page one`);
+  assert.ok(notice&&firstPageText.includes(notice),`${orientation}: the complete ${availability} finance notice must stay on page one`);
+  assertFooterSafety(doc,orientation);
+ }
  const sevenFinancialLoads={...dailyLoads,summary:{...dailyLoads.summary,loadCount:7,volume:'700',activeDayCount:7,averageDailyVolume:'100'},groups:Array.from({length:7},(_,index)=>{const day=String(index+1).padStart(2,'0'),load=pricedLoad(`financial-${day}`,`2026-09-${day}`,'100',String(120+index),String(60000+index),String(1000+index),String(59000+index));return {key:load.loadedAt,label:load.loadedAt,loadCount:1,volume:load.volume,averageAtr:load.atr,loads:[load]};})};
  const {doc:financialPagedDoc}=await createContractMonthlySummaryPdf(contract,brand,undefined,sevenFinancialLoads,dailyDayPeriod),financialPagedCommands=financialPagedDoc.internal.pages.flat().join('\n');
  assert.equal(financialPagedCommands.match(/Faturamento bruto e líquido por dia/g)?.length,2,'Seven financial buckets must produce two non-overlapping panels');
