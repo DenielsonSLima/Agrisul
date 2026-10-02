@@ -54,14 +54,18 @@ try{
  const chartCss=await readFile('modules/contratos/components/details/contract-daily-loads-chart.css','utf8');
  assert.match(component,/onClick=\{resetPeriod\}[\s\S]*Últimos 15 dias/,'The quick action must restore the shared fifteen-day range');
  assert.match(component,/defaultContractDailyLoadPeriod\(\),granularity/,'The quick action must preserve the selected visualization granularity');
- assert.match(component,/data=\{rows\}/);assert.match(component,/dataKey="averageAtr"/);assert.match(component,/yAxisId="atr"/);assert.match(component,/strokeDasharray="6 5"/);assert.match(component,/strokeOpacity=\{\.52\}/);
+ assert.match(component,/data=\{rows\}/);assert.match(component,/dataKey="averageAtr"/);assert.match(component,/yAxisId="atr"/);assert.match(component,/strokeDasharray="6 5"/);assert.match(component,/connectNulls=\{false\}/,'Absent ATR must break the line rather than invent a value');
  assert.match(component,/contractDailyLoadGranularities\.map/);assert.match(component,/aria-pressed=\{granularity===value\}/);assert.match(component,/<PeriodAxisTick rows=\{rows\}\/>/);
- assert.doesNotMatch(component,/contract-daily-loads-axis-atr/,'The x-axis must contain only the period label');
- assert.match(component,/<LabelList dataKey="averageAtr" position="top" offset=\{10\} dx=\{8\} textAnchor="start" formatter=\{atrPointLabel\} className="contract-daily-loads-line-atr" aria-hidden="true"\/>/,'Each ATR must be placed above and to the right of its line marker');
- assert.match(component,/padding=\{\{left:8,right:72\}\}/,'The final ATR label needs reserved horizontal space');
- assert.match(chartCss,/\.contract-daily-loads-line-atr\{[^}]*paint-order:stroke[^}]*pointer-events:none/,'Line labels must remain legible without intercepting pointer interaction');
+ assert.match(component,/contract-daily-loads-axis-atr/,'Each period must expose its ATR in the separate lower band');
+ assert.doesNotMatch(component,/<LabelList dataKey="averageAtr"/,'ATR labels must not overlap the bars or the line');
+ assert.match(component,/row\.averageAtr===null\?'—':formatAtr\(row\.averageAtrText\)/,'Absent ATR must remain unavailable rather than zero');
+ assert.match(component,/padding=\{\{left:8,right:8\}\}/,'Centered labels need balanced end padding');
+ assert.match(chartCss,/\.contract-daily-loads-axis-atr\{[^}]*fill:/,'The separate ATR band must define legible text contrast');
+ const lowerChart=await readFile('modules/contratos/components/details/ContractMonthlyCharts.tsx','utf8');
+ assert.match(lowerChart,/maxBarSize=\{38\}/,'Both charts must use the same narrow bar width cap');
+ assert.equal(lowerChart.match(/const slotWidth[^\n]+/)?.[0],component.match(/const slotWidth[^\n]+/)?.[0],'Both charts must preserve equal spacing for each granularity');
  assert.doesNotMatch(component,/linePercent|variationLabel|VariationDot|Variação percentual/,'The screen chart must not retain percentage-transition semantics');
  assert.match(component,/copy\.atr/);assert.match(component,/ATR médio do período/);
  assert.doesNotMatch(component,/Volume total por mês/,'The redundant monthly volume cards must stay removed');
- console.log('Passed: fifteen-day window, daily/weekly/fortnightly/monthly aggregation, weighted ATR line, point-adjacent ATR labels and period KPI.');
+ console.log('Passed: fifteen-day window, aggregation, weighted ATR, separate readable ATR band, matching bar widths and period KPI.');
 }finally{await rm(directory,{recursive:true,force:true});}

@@ -1,39 +1,43 @@
 import {useMemo} from 'react';
-import {Bar,CartesianGrid,ComposedChart,Legend,ResponsiveContainer,Tooltip,XAxis,YAxis,type BarShapeProps} from 'recharts';
+import {Bar,CartesianGrid,ComposedChart,ResponsiveContainer,Tooltip,XAxis,YAxis,type BarShapeProps} from 'recharts';
 import type {ContractLoadsData} from '../../types';
-import {contractDailyLoadGranularityCopy,contractLoadFinancialChartRows,type ContractDailyLoadPeriod,type ContractLoadFinancialChartRow} from '../../utils/contractDailyLoadsPresentation';
+import {contractDailyLoadGranularityCopy,contractLoadFinancialChartRows,type ContractDailyLoadGranularity,type ContractDailyLoadPeriod,type ContractLoadFinancialChartRow} from '../../utils/contractDailyLoadsPresentation';
 import {formatContractBilling,formatContractVolume} from '../../utils/contractFormat';
 import './contract-monthly-overview.css';
 
 type Props={data?:ContractLoadsData;period:ContractDailyLoadPeriod;loading?:boolean;error?:string};
-type MonthTickProps={x?:number;y?:number;payload?:{value:string}};
+type MonthTickProps={x?:number;y?:number;payload?:{value:string};rows:FinancialChartRow[]};
 type FinancialChartRow=ContractLoadFinancialChartRow&{axis:string;grossPlot:number};
 type FinancialTooltipProps={active?:boolean;payload?:Array<{payload?:FinancialChartRow}>};
 
-const fullMoney=(value:number)=>formatContractBilling(String(value));
+const compactMoney=(value:number)=>'R$ '+new Intl.NumberFormat('pt-BR',{notation:'compact',maximumFractionDigits:1}).format(value);
+const slotWidth:Record<ContractDailyLoadGranularity,number>={day:102,week:116,fortnight:138,month:112};
 
-function MonthTick({x=0,y=0,payload}:MonthTickProps){
+function MonthTick({x=0,y=0,payload,rows}:MonthTickProps){
  const [periodLabel,volume='']=String(payload?.value??'').split('|');
- return <g transform={`translate(${x},${y})`}><text textAnchor="middle" fill="#26372d" fontSize="11" fontWeight="600"><tspan x="0" dy="14">{periodLabel}</tspan><tspan x="0" dy="14" fill="#4e5e54" fontSize="11" fontWeight="500">{volume}</tspan></text></g>;
+ const row=rows.find(item=>item.axis===payload?.value);
+ return <g transform={`translate(${x},${y})`}>
+  <text textAnchor="middle" fill="#26372d" fontSize="11" fontWeight="600"><tspan x="0" dy="14">{periodLabel}</tspan><tspan x="0" dy="16" fill="#4e5e54" fontSize="10" fontWeight="500">{volume}</tspan></text>
+  <text className="contract-monthly-net-label" x="0" y="48" textAnchor="middle">Líq. {row?.net===null||row?.net===undefined?'Pendente':compactMoney(row.net)}</text>
+ </g>;
 }
 
 function CompositeMoneyBar({x,y,width,height,payload}:BarShapeProps){
- const row=payload as FinancialChartRow,gross=row.gross??0,hasNet=row.net!==null,net=row.net??0;
+ const row=payload as FinancialChartRow,gross=row.gross??0,net=row.net??0;
  if(width<=0||height<=0)return <g/>;
  if(row.gross===null||gross<=0){
-  const pending=row.gross===null,label=pending?'Pendente':fullMoney(gross),baseline=y+height;
+  const pending=row.gross===null,label=pending?'Pendente':compactMoney(gross),baseline=y+height;
   return <g className={`contract-monthly-empty-bar${pending?' is-pending':''}`}>
    <rect x={x} y={baseline-Math.min(7,height)} width={width} height={Math.min(7,height)} rx={3}/>
    <text x={x+width/2} y={baseline-10} textAnchor="middle">{label}</text>
   </g>;
  }
- const safeNet=Math.max(0,Math.min(net,gross)),inset=Math.min(6,width*.08),availableHeight=Math.max(0,height-inset*2),proportionalNetHeight=availableHeight*(safeNet/gross),netHeight=safeNet>0?Math.max(5,proportionalNetHeight):0,netY=y+height-inset-netHeight;
- const labelInsideNet=netHeight>=34&&width>=74,labelY=labelInsideNet?netY+netHeight/2+3:Math.max(y+14,netY-7);
+ // The ratio only controls SVG geometry; the RPC remains the source of both values.
+ const safeNet=Math.max(0,Math.min(net,gross)),netHeight=height*(safeNet/gross),netY=y+height-netHeight;
  return <g className="contract-monthly-composite-bar">
-  <rect className="contract-monthly-gross-bar" x={x} y={y} width={width} height={height} rx={7}/>
-  {safeNet>0&&<rect className="contract-monthly-net-bar" x={x+inset} y={netY} width={Math.max(0,width-inset*2)} height={netHeight} rx={4}/>}
-  <text className="contract-monthly-gross-label" x={x+width/2} y={y-10} textAnchor="middle">{fullMoney(gross)}</text>
-  {hasNet&&<text className={`contract-monthly-net-label${labelInsideNet?' is-inside':''}`} x={x+width/2} y={labelY} textAnchor="middle">{fullMoney(net)}</text>}
+  <rect className="contract-monthly-gross-bar" x={x} y={y} width={width} height={height} rx={6}/>
+  {safeNet>0&&<rect className="contract-monthly-net-bar" x={x} y={netY} width={width} height={netHeight} rx={Math.min(4,netHeight/2)}/>}
+  <text className="contract-monthly-gross-label" x={x+width/2} y={y-10} textAnchor="middle">{compactMoney(gross)}</text>
  </g>;
 }
 
@@ -63,18 +67,18 @@ export function ContractMonthlyCharts({data,period,loading=false,error=''}:Props
   const financialRows=contractLoadFinancialChartRows(data,granularity),maxGross=Math.max(0,...financialRows.map(row=>row.gross??0)),emptyPlot=maxGross>0?maxGross*.045:.02;
   return financialRows.map(row=>({...row,axis:`${row.label}|${formatContractVolume(row.volumeText)}`,grossPlot:row.gross!==null&&row.gross>0?row.gross:emptyPlot}));
  },[data,granularity]);
- const chartMinWidth=Math.max(680,rows.length*180+150),hasPositiveGross=rows.some(row=>row.gross!==null&&row.gross>0);
+ const chartMinWidth=Math.max(640,rows.length*slotWidth[granularity]+204),hasPositiveGross=rows.some(row=>row.gross!==null&&row.gross>0);
  return <section className="contract-monthly-combined" role="region" aria-label={`Gráfico financeiro ${copy.option.toLocaleLowerCase('pt-BR')}; deslize horizontalmente para consultar todos os períodos`}>
    <header><h4>Entregas e faturamento por {copy.noun}</h4><span>Bruto na barra total e líquido preenchido dentro dela</span></header>
    {loading?<div className="contract-monthly-combined-empty" role="status">Carregando faturamento do período…</div>:error?<div className="contract-monthly-combined-empty" role="alert">{error}</div>:!rows.length?<div className="contract-monthly-combined-empty">Nenhuma movimentação no período selecionado.</div>:<div className="contract-monthly-combined-scroll" tabIndex={0}><div className="contract-monthly-combined-chart" style={{minWidth:chartMinWidth}} role="img" aria-label={`Resumo ${copy.option.toLocaleLowerCase('pt-BR')}: `+rows.map(item=>`${item.label}, ${formatContractVolume(item.volumeText)}, faturado ${item.gross===null?'pendente':formatContractBilling(String(item.gross))}, líquido ${item.net===null?'pendente':formatContractBilling(String(item.net))}`).join('; ')}>
-    <ResponsiveContainer width="100%" height="100%"><ComposedChart data={rows} margin={{top:42,right:24,left:8,bottom:22}}>
+    <ResponsiveContainer width="100%" height="100%"><ComposedChart data={rows} margin={{top:50,right:48,left:0,bottom:2}}>
      <CartesianGrid vertical={false} stroke="#e7eee9" strokeDasharray="4 5"/>
-     <XAxis dataKey="axis" axisLine={false} tickLine={false} height={46} interval={0} tick={<MonthTick/>} padding={{left:24,right:24}}/>
-     <YAxis yAxisId="money" domain={hasPositiveGross?[0,'auto']:[0,1]} ticks={hasPositiveGross?undefined:[0]} tickCount={5} tickFormatter={value=>fullMoney(Number(value))} axisLine={false} tickLine={false} width={124} tick={{fontSize:10,fill:'#26372d',fontWeight:600}}/>
+     <XAxis dataKey="axis" axisLine={false} tickLine={false} height={62} interval={0} tick={<MonthTick rows={rows}/>} padding={{left:8,right:8}}/>
+     <YAxis yAxisId="money" domain={hasPositiveGross?[0,'auto']:[0,1]} ticks={hasPositiveGross?undefined:[0]} tickCount={5} tickFormatter={value=>compactMoney(Number(value))} axisLine={false} tickLine={false} width={76} tick={{fontSize:10,fill:'#26372d',fontWeight:600}}/>
      <Tooltip filterNull={false} cursor={{fill:'#edf6f0',fillOpacity:.65}} content={<FinancialTooltip/>}/>
-     <Legend content={<FinancialLegend/>} wrapperStyle={{paddingTop:8}}/>
-     <Bar yAxisId="money" dataKey="grossPlot" name="Faturado bruto" shape={CompositeMoneyBar} maxBarSize={112}/>
+     <Bar yAxisId="money" dataKey="grossPlot" name="Faturado bruto" shape={CompositeMoneyBar} maxBarSize={38} isAnimationActive={false}/>
     </ComposedChart></ResponsiveContainer>
    </div></div>}
+   {!loading&&!error&&rows.length>0&&<FinancialLegend/>}
   </section>;
 }
