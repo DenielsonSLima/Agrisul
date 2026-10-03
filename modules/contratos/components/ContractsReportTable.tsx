@@ -16,11 +16,11 @@ export function ContractsReportTable({contracts}:{contracts:BillingContract[]}){
  return <table className="contracts-list-report-table" aria-label="Quantidades e financeiro por contrato">
   <colgroup>{contractsReportColumns.map(column=><col key={column.key} style={{width:column.width+'%'}}/>)}</colgroup>
   <thead><tr>{contractsReportColumns.map(column=><th scope="col" key={column.key}>{column.label}</th>)}</tr></thead>
-  {contracts.map(contract=>{
+  {contracts.map((contract,index)=>{
    const row=contractsReportRow(contract);
    return <tbody key={contract.id} className="contracts-report-group" aria-label={`Contrato ${contract.contractNumber||contract.title}`}>
     <tr className="contracts-report-quantities">
-     <th scope="rowgroup" rowSpan={2} className="contracts-report-client"><strong>{row.client}</strong><span>CNPJ: {row.cnpj}</span></th>
+     <th scope="rowgroup" rowSpan={2} className="contracts-report-client"><small>C{String(index+1).padStart(2,'0')}</small><strong>{row.client}</strong><span>CNPJ: {row.cnpj}</span><span>Tipo: {row.type}</span></th>
      {row.operational.map(cell=><td key={cell.key} data-metric={cell.key} style={metricStyle(cell.tone)}><strong>{cell.value}</strong>{cell.detail&&<small>{cell.detail}</small>}</td>)}
     </tr>
     <tr className="contracts-report-financial">{row.financial.map(cell=><td key={cell.key} data-metric={cell.key} style={metricStyle(cell.tone)}><dl><dt>{cell.label}</dt><dd>{cell.value}</dd></dl></td>)}</tr>

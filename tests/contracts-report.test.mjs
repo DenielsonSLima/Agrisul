@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {mkdtemp,rm} from 'node:fs/promises';
+import {mkdtemp,rm,mkdir,writeFile,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createRequire} from 'node:module';
@@ -9,13 +9,20 @@ const require=createRequire(import.meta.url);const {build}=require(require.resol
 const directory=await mkdtemp(join(tmpdir(),'contracts-report-'));
 try{
  const output=join(directory,'contracts-report.mjs');
- await build({entryPoints:['modules/contratos/reporting/contractsPdf.ts'],outfile:output,bundle:true,platform:'node',format:'esm'});
- const {createContractsPdf}=await import(pathToFileURL(output));
+ await build({stdin:{contents:"export {createContractsPdf} from './modules/contratos/reporting/contractsPdf'; export {contractsReportRow,contractsReportColors} from './modules/contratos/reporting/contractsReportPresentation';",resolveDir:process.cwd(),loader:'ts'},outfile:output,bundle:true,platform:'node',format:'esm'});
+ const {createContractsPdf,contractsReportRow,contractsReportColors}=await import(pathToFileURL(output));
  const contracts=Array.from({length:20},(_,index)=>({id:String(index),title:`Contrato ${index+1}`,contractNumber:`CTR-${index+1}`,companyId:'company',companyName:'Empresa A',companyCnpj:'',clientId:'client',clientName:`Cliente ${index+1}`,clientCnpj:'11222333000181',typeId:'type',typeName:'Fornecimento',stages:[],status:'Ativo',startDate:'2026-09-01',endDate:'',contractedVolume:'1000.125',atrPriceType:'net',atrPeriodType:'monthly',loadedVolume:'100.125',remainingVolume:'900',averageAtr:'121.5',billingAmount:'15000.25',billingPending:false,value:'',notes:'',createdAt:'',updatedAt:''}));
  const filters={bucket:'open',search:'Empresa A',from:'2026-09-01',to:'2026-09-30'};
  for(const [index,contract] of contracts.entries()){contract.atrQuoteSummary={average:'1.234567',pending:false,loadedMonths:['2026-09'],referenceMonths:['2026-08']};contract.financialTotals={grossAmount:'15000.25',discountAmount:'456.78',netAmount:'14543.47',receivedAmount:'1300.75',advanceAmount:'1000',pendingAmount:`13242.${String(index).padStart(2,'0')}`,creditAmount:'0',billingPending:false};}
  contracts[0].clientName='USINA COM NOME COMPRIDO PARA CONFERIR A QUEBRA COMPLETA DO CLIENTE LTDA';
+ contracts[0].typeName='Fornecimento de cana com transporte e acompanhamento operacional';
  contracts[1].atrPeriodType='accumulated';contracts[1].atrPriceType='gross';contracts[1].atrQuoteSummary.average='1.987654';
+ const presentation=contractsReportRow(contracts[0]);
+ assert.equal(presentation.type,contracts[0].typeName,'The contract type must come from the existing RPC field');
+ assert.equal(presentation.financial.find(cell=>cell.key==='pending').tone,'pending');
+ assert.notEqual(presentation.operational.find(cell=>cell.key==='remaining').tone,'pending','Operational volume must not get the receivable warning color');
+ assert.equal(contractsReportColors.pending.text,'#a61b29');
+ assert.notEqual(contractsReportColors.net.background,contractsReportColors.neutral.background);
  const company={id:'company',name:'AGRISUL AGRICOLA LTDA',legalName:'AGRISUL AGRICOLA LTDA',cnpj:'04773159000523',phone:'1132261428',email:'gerencia@example.test',street:'FAZENDA SANTA ANA',number:'S/N',complement:'ZONA RURAL',district:'CENTRO',city:'JAPOATA',state:'SE',zipCode:'49950000',logoUrl:null};
  const brand={orientation:'portrait',header:{variant:'detailed',logoAlignment:'left',showCnpj:true,showContact:true},company,watermark:{imageUrl:null,opacity:15,size:60},issuer:{id:'user',name:'Responsável',email:'responsavel@example.test'},issuedAt:new Date('2026-09-15T12:00:00Z')};
  const summary={loadedVolume:'2002.5',averageAtr:'1.234567',grossAmount:'123456.78',discountAmount:'2345.67',netAmount:'121111.11',advanceAmount:'1000',receiptAmount:'2000.75',receivedAmount:'3000.75',pendingAmount:'118110.36',creditAmount:'0',billingPending:false,pendingContractCount:0};
@@ -37,6 +44,10 @@ try{
  assert.match(pageCommands,/\(Cliente\) Tj/);
  assert.doesNotMatch(pageCommands,/Nº \/ Cliente/);
  assert.match(pageCommands,/CTR-1/);
+ assert.ok(doc.internal.pages[1].join('\n').includes('Visão executiva da carteira'),'The analytical page must precede the table');
+ assert.ok(!doc.internal.pages[1].join('\n').includes('(Cliente) Tj'),'The overview must have a dedicated page');
+ assert.ok(doc.internal.pages[2].join('\n').includes('(Cliente) Tj'),'The existing detail starts on page two');
+ for(const value of ['Tipo:','Fornecimento de cana','C01','C20'])assert.ok(pageCommands.includes(value),`Missing contract identity ${value}`);
  assert.match(pageCommands,/Faturado bruto/);
  assert.match(pageCommands,/ATR/);
  for(const value of ['1.000,13 t','900,00 t','121,50','1,234567','1,987654','456,78','14.543,47','1.300,75','1.000,00','13.242,00','Despesas²','Cotação média ATR¹','Mensal','Acumulado','Bruto','Líquido','Qtd. contratada','Qtd. pendente','Recebidos³','Adiantamentos³','A receber','Excedente recebido',...contracts[0].clientName.split(' ')])assert.ok(pageCommands.includes(value),`Missing report column value ${value}`);
@@ -68,5 +79,16 @@ try{
  for(const value of ['20.000,00','18.000,00','5.456,53'])assert.ok(creditContent.includes(value),'Show received, advance and excess independently');
  const empty=await createContractsPdf({contracts:[],total:0,summary:{...summary,loadedVolume:'0',averageAtr:'',grossAmount:'0',discountAmount:'0',netAmount:'0',receivedAmount:'0',pendingAmount:'0'}},{bucket:'finished',search:'Ausente',from:'',to:''},brand);
  assert.equal(empty.doc.getNumberOfPages(),1);assert.ok(empty.doc.internal.pages.flat().join('\n').includes('Nenhum contrato encontrado'));
+ const preview=await readFile('modules/contratos/components/ContractReportDialog.tsx','utf8');
+ assert.equal((preview.match(/await createContractsPdf\(/g)||[]).length,1,'Prepare one PDF snapshot for preview and actions');
+ for(const fragment of ['anchor.href=current.url','frame.src=current.url',"src={current.url+'#view=FitH'}",'URL.revokeObjectURL(url)','issuedAt:new Date()'])assert.ok(preview.includes(fragment),`Preview must preserve its Blob lifecycle: ${fragment}`);
+ assert.doesNotMatch(preview,/previewRows|contracts\.slice\(0,/,'Preview must show the full PDF');
+ if(process.env.BILLING_SUMMARY_ARTIFACTS){
+  await mkdir(process.env.BILLING_SUMMARY_ARTIFACTS,{recursive:true});
+  for(const count of [2,20]){
+   const result=await createContractsPdf({...data,contracts:contracts.slice(0,count),total:count},filters,brand);
+   await writeFile(join(process.env.BILLING_SUMMARY_ARTIFACTS,`contracts-complete-${count}.pdf`),new Uint8Array(result.doc.output('arraybuffer')));
+  }
+ }
  console.log('Passed: two rows per contract, quantities, receipts/advances/excess, pending ATR, full names, filtered KPIs and indivisible contract pagination above the footer.');
 }finally{await rm(directory,{recursive:true,force:true});}

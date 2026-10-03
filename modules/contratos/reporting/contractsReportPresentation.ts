@@ -22,9 +22,9 @@ export const contractsReportColors={
  atr:neutralMetric,
  gross:neutralMetric,
  discount:neutralMetric,
- net:{background:'#e4f0dc',accent:'#006b2d',text:'#004f20'},
+ net:{background:'#d5eadf',accent:'#137a4b',text:'#064e32'},
  received:{background:'#eff7e9',accent:'#006b2d',text:'#004f20'},
- pending:{background:'#eaf3e3',accent:'#006b2d',text:'#004f20'},
+ pending:{background:'#fff0f0',accent:'#bd303c',text:'#a61b29'},
  advance:neutralMetric,
  credit:neutralMetric,
 } as const;
@@ -46,7 +46,7 @@ export function contractsReportRow(contract:BillingContract){
   {key:'date',label:'Data',value:formatContractDate(contract.startDate),tone:'neutral'},
   {key:'contracted',label:'Qtd. contratada',value:formatContractVolume(contract.contractedVolume),tone:'volume'},
   {key:'loaded',label:'Qtd. carregada',value:formatContractVolume(contract.loadedVolume),tone:'volume'},
-  {key:'remaining',label:'Qtd. pendente',value:formatContractVolume(contract.remainingVolume),tone:'pending'},
+  {key:'remaining',label:'Qtd. pendente',value:formatContractVolume(contract.remainingVolume),tone:'volume'},
   {key:'atr',label:'ATR médio',value:formatAtr(contract.averageAtr),tone:'atr'},
   {key:'quote',label:'Cotação média ATR¹',value:quotation,detail:formatAtrCriterion(contract.atrPriceType,contract.atrPeriodType),tone:'atr'},
  ];
@@ -59,5 +59,5 @@ export function contractsReportRow(contract:BillingContract){
   {key:'pending',label:'A receber',value:financialValue('pendingAmount',true),tone:'pending'},
   {key:'credit',label:'Excedente recebido',value:financialValue('creditAmount',true),tone:'credit'},
  ];
- return {client:contract.clientName,cnpj:formatCnpj(contract.clientCnpj),operational,financial};
+ return {client:contract.clientName,cnpj:formatCnpj(contract.clientCnpj),type:contract.typeName||'Não informado',operational,financial};
 }

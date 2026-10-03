@@ -3,6 +3,7 @@ import type {BillingContract,ContractBucket,ContractListData} from '../types';
 import {formatContractDate} from '../utils/contractFormat';
 import {contractsReportColors,contractsReportColumns,contractsReportNote,contractsReportOrientation,contractsReportRow,type ContractsReportCell} from './contractsReportPresentation';
 import {contractSummaryItems,contractSummaryPendingNote} from '../utils/contractSummaryPresentation';
+import {drawContractsOverviewPdf} from './contractsOverviewPdf';
 
 export type ContractsReportBrand={orientation:ReportOrientation;header:ReportHeaderVariant;company:ReportCompanyBrand|null;watermark:ReportWatermarkBrand;issuer:ReportIssuer;issuedAt:Date};
 export type ContractsReportFilters={bucket:ContractBucket;search:string;from:string;to:string};
@@ -62,23 +63,29 @@ export async function createContractsPdf({contracts,summary,total}:ContractsRepo
   const clientLines=doc.splitTextToSize(row.client,widths[0]-6) as string[];
   doc.setFont('helvetica','normal');doc.setFontSize(7);
   const cnpjLines=doc.splitTextToSize(`CNPJ: ${row.cnpj}`,widths[0]-6) as string[];
+  doc.setFont('helvetica','bold');
+  const typeLines=doc.splitTextToSize(`Tipo: ${row.type}`,widths[0]-6) as string[];
   const operational=row.operational.map((cell,index)=>prepareCell(cell,index,false));
   const financial=row.financial.map((cell,index)=>prepareCell(cell,index,true));
   const topHeight=Math.max(12,...operational.map(cell=>(cell.lines.length+cell.detail.length)*lineHeight+5));
   const bottomHeight=Math.max(16,...financial.map(cell=>(cell.labels.length+cell.lines.length)*lineHeight+6));
-  const clientHeight=(clientLines.length+cnpjLines.length)*lineHeight+10;
+  const clientHeight=(clientLines.length+cnpjLines.length+typeLines.length+1)*lineHeight+12;
   const height=Math.max(topHeight+bottomHeight,clientHeight);
-  return {clientLines,cnpjLines,operational,financial,topHeight:topHeight+(height-topHeight-bottomHeight),bottomHeight,height};
+  return {clientLines,cnpjLines,typeLines,operational,financial,topHeight:topHeight+(height-topHeight-bottomHeight),bottomHeight,height};
  };
  const drawRow=(y:number,row:ReturnType<typeof prepareRow>,index:number)=>{
   doc.setFillColor(index%2?'#f4f8ee':'#ffffff');doc.rect(margin,y,contentWidth,row.height,'F');
   doc.setDrawColor('#b9cda9');doc.setLineWidth(.2);doc.rect(margin,y,widths[0],row.height,'S');
   doc.setFillColor('#006b2d');doc.rect(margin,y,1,row.height,'F');
-  let clientY=y+Math.max(5,(row.height-(row.clientLines.length+row.cnpjLines.length)*lineHeight-2)/2+2);
+  let clientY=y+Math.max(5,(row.height-(row.clientLines.length+row.cnpjLines.length+row.typeLines.length+1)*lineHeight-4)/2+2);
+  doc.setFont('helvetica','bold');doc.setFontSize(6.5);doc.setTextColor('#53614c');
+  doc.text(`C${String(index+1).padStart(2,'0')}`,margin+3,clientY);clientY+=lineHeight;
   doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor('#004f20');
   row.clientLines.forEach(line=>{doc.text(line,margin+3,clientY);clientY+=lineHeight;});
   clientY+=2;doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor('#53614c');
   row.cnpjLines.forEach(line=>{doc.text(line,margin+3,clientY);clientY+=lineHeight;});
+  doc.setFont('helvetica','bold');doc.setTextColor('#365b2d');
+  row.typeLines.forEach(line=>{doc.text(line,margin+3,clientY);clientY+=lineHeight;});
   const drawCells=(cells:ReturnType<typeof prepareCell>[],top:number,height:number,financial:boolean)=>{
    let x=margin+widths[0];
    cells.forEach((cell,column)=>{
@@ -105,6 +112,12 @@ export async function createContractsPdf({contracts,summary,total}:ContractsRepo
  };
  const drawFooter=(page:number,pages:number)=>{const y=pageHeight-margin+2;doc.setDrawColor(225,232,227);doc.line(margin,y-5,pageWidth-margin,y-5);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(125,141,130);doc.text(`Emitido por ${brand.issuer.name||brand.issuer.email} em ${emitted(brand.issuedAt)}`,margin,y);doc.text(`Página ${page} de ${pages}`,pageWidth-margin,y,{align:'right'});};
  const startPage=()=>{drawWatermark();return drawTableHeader(drawNote(drawSummary(drawFilters(drawHeader()+2))));};
+ if(contracts.length){
+  drawWatermark();
+  const overviewY=drawFilters(drawHeader()+2);
+  drawContractsOverviewPdf({doc,x:margin,y:overviewY,width:contentWidth,height:pageHeight-margin-10-overviewY},{contracts,summary,total});
+  doc.addPage();
+ }
  let y=startPage();
  contracts.forEach((contract,index)=>{
   const row=prepareRow(contract);
