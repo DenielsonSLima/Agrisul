@@ -4,6 +4,8 @@ import {formatContractDate} from '../utils/contractFormat';
 import {contractsReportColors,contractsReportColumns,contractsReportNote,contractsReportOrientation,contractsReportRow,type ContractsReportCell} from './contractsReportPresentation';
 import {contractSummaryItems,contractSummaryPendingNote} from '../utils/contractSummaryPresentation';
 import {drawContractsOverviewPdf} from './contractsOverviewPdf';
+import {drawContractsOperationalPdf} from './contractsOperationalPdf';
+import {drawContractsConsolidatedPdf} from './contractsConsolidatedPdf';
 
 export type ContractsReportBrand={orientation:ReportOrientation;header:ReportHeaderVariant;company:ReportCompanyBrand|null;watermark:ReportWatermarkBrand;issuer:ReportIssuer;issuedAt:Date};
 export type ContractsReportFilters={bucket:ContractBucket;search:string;from:string;to:string};
@@ -112,12 +114,6 @@ export async function createContractsPdf({contracts,summary,total}:ContractsRepo
  };
  const drawFooter=(page:number,pages:number)=>{const y=pageHeight-margin+2;doc.setDrawColor(225,232,227);doc.line(margin,y-5,pageWidth-margin,y-5);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(125,141,130);doc.text(`Emitido por ${brand.issuer.name||brand.issuer.email} em ${emitted(brand.issuedAt)}`,margin,y);doc.text(`Página ${page} de ${pages}`,pageWidth-margin,y,{align:'right'});};
  const startPage=()=>{drawWatermark();return drawTableHeader(drawNote(drawSummary(drawFilters(drawHeader()+2))));};
- if(contracts.length){
-  drawWatermark();
-  const overviewY=drawFilters(drawHeader()+2);
-  drawContractsOverviewPdf({doc,x:margin,y:overviewY,width:contentWidth,height:pageHeight-margin-10-overviewY},{contracts,summary,total});
-  doc.addPage();
- }
  let y=startPage();
  contracts.forEach((contract,index)=>{
   const row=prepareRow(contract);
@@ -125,6 +121,13 @@ export async function createContractsPdf({contracts,summary,total}:ContractsRepo
   drawRow(y,row,index);y+=row.height;
  });
  if(!contracts.length){doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(104,123,110);doc.text('Nenhum contrato encontrado para os filtros selecionados.',margin+2,y+7);}
+ if(contracts.length){
+  for(const render of [drawContractsConsolidatedPdf,drawContractsOverviewPdf,drawContractsOperationalPdf]){
+   doc.addPage();drawWatermark();
+   const chartY=drawFilters(drawHeader()+2);
+   render({doc,x:margin,y:chartY,width:contentWidth,height:pageHeight-margin-10-chartY},{contracts,summary,total});
+  }
+ }
  const pages=doc.getNumberOfPages();for(let page=1;page<=pages;page++){doc.setPage(page);drawFooter(page,pages);}
  return {doc,fileName:fileName(brand.issuedAt,filters.bucket)};
 }

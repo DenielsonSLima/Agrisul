@@ -44,9 +44,12 @@ try{
  assert.match(pageCommands,/\(Cliente\) Tj/);
  assert.doesNotMatch(pageCommands,/Nº \/ Cliente/);
  assert.match(pageCommands,/CTR-1/);
- assert.ok(doc.internal.pages[1].join('\n').includes('Visão executiva da carteira'),'The analytical page must precede the table');
- assert.ok(!doc.internal.pages[1].join('\n').includes('(Cliente) Tj'),'The overview must have a dedicated page');
- assert.ok(doc.internal.pages[2].join('\n').includes('(Cliente) Tj'),'The existing detail starts on page two');
+ assert.ok(doc.internal.pages[1].join('\n').includes('(Cliente) Tj'),'The detailed table opens the report');
+ const analyticalPages=doc.internal.pages.slice(-3).map(page=>page.join('\n'));
+ assert.ok(analyticalPages[0].includes('CONSOLIDADO DA CARTEIRA'),'Consolidated page follows the tables');
+ assert.ok(analyticalPages.every(page=>!page.includes('(Cliente) Tj')),'Each analysis has a dedicated page');
+ assert.ok(analyticalPages[1].includes('Bruto')||analyticalPages[1].includes('bruto'));
+ assert.ok(analyticalPages[2].includes('ATR'));
  for(const value of ['Tipo:','Fornecimento de cana','C01','C20'])assert.ok(pageCommands.includes(value),`Missing contract identity ${value}`);
  assert.match(pageCommands,/Faturado bruto/);
  assert.match(pageCommands,/ATR/);
@@ -62,11 +65,11 @@ try{
   const content=result.doc.internal.pages.flat().join('\n');
   for(const contract of contracts)assert.ok(content.includes(contract.contractNumber),`Pagination lost ${contract.contractNumber}`);
   for(const [index,contract] of contracts.entries()){
-   const containingPages=result.doc.internal.pages.slice(1).filter(page=>page.some(command=>command.includes(`(${contract.contractNumber}) Tj`)));
+   const containingPages=result.doc.internal.pages.slice(1,-3).filter(page=>page.some(command=>command.includes(`(${contract.contractNumber}) Tj`)));
    assert.equal(containingPages.length,1,'Each contract appears once');
    assert.ok(containingPages[0].join('\n').includes(`13.242,${String(index).padStart(2,'0')}`),'Both rows of the contract must remain on the same page');
   }
-  for(const page of result.doc.internal.pages.slice(1)){
+  for(const page of result.doc.internal.pages.slice(1,-3)){
    const commands=page.join('\n');assert.ok(commands.includes('118.110,36'),'Repeat the filtered summary on every page');
    const lastBalance=page.filter(command=>/13\.242,/.test(command)).at(-1);
    if(lastBalance){const y=Number(lastBalance.match(/[\d.]+ ([\d.]+) Td/)[1]);assert.ok(y>24*72/25.4,'Financial rows must stay above the footer');}
@@ -79,6 +82,8 @@ try{
  for(const value of ['20.000,00','18.000,00','5.456,53'])assert.ok(creditContent.includes(value),'Show received, advance and excess independently');
  const empty=await createContractsPdf({contracts:[],total:0,summary:{...summary,loadedVolume:'0',averageAtr:'',grossAmount:'0',discountAmount:'0',netAmount:'0',receivedAmount:'0',pendingAmount:'0'}},{bucket:'finished',search:'Ausente',from:'',to:''},brand);
  assert.equal(empty.doc.getNumberOfPages(),1);assert.ok(empty.doc.internal.pages.flat().join('\n').includes('Nenhum contrato encontrado'));
+ const compact=await createContractsPdf({...data,contracts:contracts.slice(0,2),total:2},filters,brand);
+ assert.equal(compact.doc.getNumberOfPages(),4,'Two contracts fit on the opening table, followed by exactly three analytical pages');
  const preview=await readFile('modules/contratos/components/ContractReportDialog.tsx','utf8');
  assert.equal((preview.match(/await createContractsPdf\(/g)||[]).length,1,'Prepare one PDF snapshot for preview and actions');
  for(const fragment of ['anchor.href=current.url','frame.src=current.url',"src={current.url+'#view=FitH'}",'URL.revokeObjectURL(url)','issuedAt:new Date()'])assert.ok(preview.includes(fragment),`Preview must preserve its Blob lifecycle: ${fragment}`);
@@ -87,6 +92,7 @@ try{
   await mkdir(process.env.BILLING_SUMMARY_ARTIFACTS,{recursive:true});
   for(const count of [2,20]){
    const result=await createContractsPdf({...data,contracts:contracts.slice(0,count),total:count},filters,brand);
+   if(count===2)assert.equal(result.doc.getNumberOfPages(),4,'One detailed page followed by three analytical pages');
    await writeFile(join(process.env.BILLING_SUMMARY_ARTIFACTS,`contracts-complete-${count}.pdf`),new Uint8Array(result.doc.output('arraybuffer')));
   }
  }
