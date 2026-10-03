@@ -85,6 +85,8 @@ try{
  const compact=await createContractsPdf({...data,contracts:contracts.slice(0,2),total:2},filters,brand);
  assert.equal(compact.doc.getNumberOfPages(),4,'Two contracts fit on the opening table, followed by exactly three analytical pages');
  const preview=await readFile('modules/contratos/components/ContractReportDialog.tsx','utf8');
+ const compositor=await readFile('modules/contratos/reporting/contractsPdf.ts','utf8');
+ assert.ok(compositor.includes("doc.setFillColor('#ffffff');doc.rect(margin,y,contentWidth,row.height,'F');"),'Every contract starts on white; financial cells retain their semantic fills');
  assert.equal((preview.match(/await createContractsPdf\(/g)||[]).length,1,'Prepare one PDF snapshot for preview and actions');
  for(const fragment of ['anchor.href=current.url','frame.src=current.url',"src={current.url+'#view=FitH'}",'URL.revokeObjectURL(url)','issuedAt:new Date()'])assert.ok(preview.includes(fragment),`Preview must preserve its Blob lifecycle: ${fragment}`);
  assert.doesNotMatch(preview,/previewRows|contracts\.slice\(0,/,'Preview must show the full PDF');

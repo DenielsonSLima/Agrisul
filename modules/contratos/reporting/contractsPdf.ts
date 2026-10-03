@@ -76,7 +76,7 @@ export async function createContractsPdf({contracts,summary,total}:ContractsRepo
   return {clientLines,cnpjLines,typeLines,operational,financial,topHeight:topHeight+(height-topHeight-bottomHeight),bottomHeight,height};
  };
  const drawRow=(y:number,row:ReturnType<typeof prepareRow>,index:number)=>{
-  doc.setFillColor(index%2?'#f4f8ee':'#ffffff');doc.rect(margin,y,contentWidth,row.height,'F');
+  doc.setFillColor('#ffffff');doc.rect(margin,y,contentWidth,row.height,'F');
   doc.setDrawColor('#b9cda9');doc.setLineWidth(.2);doc.rect(margin,y,widths[0],row.height,'S');
   doc.setFillColor('#006b2d');doc.rect(margin,y,1,row.height,'F');
   let clientY=y+Math.max(5,(row.height-(row.clientLines.length+row.cnpjLines.length+row.typeLines.length+1)*lineHeight-4)/2+2);
