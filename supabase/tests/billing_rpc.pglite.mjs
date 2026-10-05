@@ -482,4 +482,9 @@ try {
  await db.exec(readFileSync(new URL('./summary_dashboard_selections.sql',import.meta.url),'utf8'));
  console.log('Summary selections: contract/status/company/date, weighted ATR, cent allocation, workspace scope, reset, pending values, permissions and isolation passed');
 } catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
+try {
+ await db.exec(readFileSync(new URL('../migrations/20261005112606_contract_operational_percentages.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./contract_operational_percentages.sql',import.meta.url),'utf8'));
+ console.log('Contract percentages: individual denominators, decimal text, list/detail parity, load edits, excess, contract edits, deletion and isolation passed');
+} catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
 await db.close();

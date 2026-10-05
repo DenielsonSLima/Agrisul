@@ -19,9 +19,10 @@ export type ContractMonthlyRow={month:string;atrReferenceMonth:string;loadedVolu
 export type ContractMonthlyTotals={contractedVolume:string;loadedVolume:string;remainingVolume:string;averageLoadAtr:string;billingAmount:string;billingPending:boolean;pendingQuoteMonths:number;expenseAmount:string;expensesPending:boolean;resultAmount:string};
 export type ContractMonthlySummary={criteria:{atrPriceType:ContractAtrPriceType;atrPeriodType:ContractAtrPeriodType};months:ContractMonthlyRow[];totals:ContractMonthlyTotals};
 export type ContractAtrQuoteSummary={average:string;pending:boolean;loadedMonths:string[];referenceMonths:string[]};
+export type ContractOperationalPercentages={contracted:string;loaded:string;remaining:string};
 export type BillingContract=ContractInput&{
  id:string;companyName:string;companyCnpj:string;clientName:string;clientCnpj:string;typeName:string;stages:ContractStage[];
- loadedVolume:string;remainingVolume:string;averageAtr:string;billingAmount:string;billingPending:boolean;monthlySummary?:ContractMonthlySummary;financialSummary?:ContractFinancialSummary;financialTotals?:ContractFinancialMetrics;atrQuoteSummary?:ContractAtrQuoteSummary;loads?:ContractLoad[];createdAt:string;updatedAt:string;
+ loadedVolume:string;remainingVolume:string;averageAtr:string;billingAmount:string;billingPending:boolean;monthlySummary?:ContractMonthlySummary;financialSummary?:ContractFinancialSummary;financialTotals?:ContractFinancialMetrics;atrQuoteSummary?:ContractAtrQuoteSummary;operationalPercentages?:ContractOperationalPercentages;loads?:ContractLoad[];createdAt:string;updatedAt:string;
 };
 export type ContractListSummary=ContractFinancialMetrics&{pendingContractCount:number};
 export type ContractListData={contracts:BillingContract[];counts:{open:number;finished:number};total:number;summary:ContractListSummary};

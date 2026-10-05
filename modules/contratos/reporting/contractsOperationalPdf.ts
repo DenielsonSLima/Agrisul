@@ -10,6 +10,7 @@ const C={forest:[21,61,44] as Color,ink:[24,48,37] as Color,muted:[88,105,95] as
  amber:[170,110,30] as Color,amberPaper:[253,247,234] as Color,quote:[63,119,133] as Color};
 const value=(raw:unknown):number|null=>raw===null||raw===undefined||raw===''?null:Number.isFinite(Number(raw))?Number(raw):null;
 const number=(amount:number|null,digits=2)=>amount===null?'n/d':amount.toLocaleString('pt-BR',{minimumFractionDigits:digits,maximumFractionDigits:digits});
+const percentage=(raw:unknown)=>{const amount=value(raw);return amount===null?'n/d':number(amount)+'%';};
 const reference=(index:number)=>`C${String(index+1).padStart(2,'0')}`;
 const date=(raw:string)=>/^\d{4}-\d{2}-\d{2}$/.test(raw)?raw.split('-').reverse().join('/'):'Data não informada';
 const quote=(contract:BillingContract)=>contract.atrQuoteSummary?.pending?null:value(contract.atrQuoteSummary?.average);
@@ -73,12 +74,14 @@ function compactRows(ctx:Context,contracts:BillingContract[]){
   fit(doc,`${reference(index)} · ${contract.typeName||'Tipo não informado'}`,x+3,center-3.5,identity-6,8,C.forest,true);
   fit(doc,contract.clientName||'Cliente não informado',x+3,center+.4,identity-6,7,C.ink);
   fit(doc,`${date(contract.startDate)} · Contrato ${contract.contractNumber||'sem número'}`,x+3,center+4.2,identity-6,6.5,C.muted);
-  const entries=[['Contratado',value(contract.contractedVolume),C.contracted],['Carregado',value(contract.loadedVolume),C.loaded],['Pendente',value(contract.remainingVolume),C.remaining]] as const;
-  entries.forEach(([label,amount,color],row)=>{
+  const percentages=contract.operationalPercentages;
+  const entries=[['Contratado',value(contract.contractedVolume),C.contracted,percentages?.contracted],['Carregado',value(contract.loadedVolume),C.loaded,percentages?.loaded],['Pendente',value(contract.remainingVolume),C.remaining,percentages?.remaining]] as const;
+  entries.forEach(([label,amount,color,percent],row)=>{
    const at=center+(row-1)*Math.min(5.5,(rowHeight-2*inner)/3);
    text(doc,label,volumeX+3,at+1,6.3,C.muted);
-   const trackX=volumeX+22,trackWidth=Math.max(8,volumeWidth-51);
+   const trackX=volumeX+22,trackWidth=Math.max(8,volumeWidth-67);
    track(doc,trackX,at-.4,trackWidth,amount,maximumVolume,color,1.8);
+   text(doc,percentage(percent),volumeX+volumeWidth-29,at+1,6.3,color===C.loaded?C.loaded:C.muted,true,'right');
    text(doc,number(amount),volumeX+volumeWidth-3,at+1,6.8,color===C.loaded?C.loaded:C.ink,true,'right');
   });
   fit(doc,number(value(contract.averageAtr),4),atrX+3,center-.5,atrWidth-6,11,C.amber,true);
@@ -145,5 +148,5 @@ export function drawContractsOperationalPdf(ctx:Context,data:Data):void{
  }
  const note=sampled?'Todos os contratos representados; apenas rótulos amostrados. C01... identifica os contratos na tabela anterior.':'C01... identifica os contratos na tabela anterior. ATR medido e cotação aplicada têm unidades e escalas diferentes.';
  text(doc,note,x,y+height-5,6,C.muted);
- text(doc,'ATR médio ponderado pelo volume. Pendente: volume ainda a carregar. n/d = dado não disponível; não representa zero.',x,y+height-1,6,C.muted);
+ text(doc,'ATR ponderado pelo volume. Pendente: volume a carregar. Barras em escala comum (t); percentuais sobre o contratado de cada contrato. n/d = dado não disponível.',x,y+height-1,6,C.muted);
 }

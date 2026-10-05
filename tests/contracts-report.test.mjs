@@ -84,6 +84,23 @@ try{
  assert.equal(empty.doc.getNumberOfPages(),1);assert.ok(empty.doc.internal.pages.flat().join('\n').includes('Nenhum contrato encontrado'));
  const compact=await createContractsPdf({...data,contracts:contracts.slice(0,2),total:2},filters,brand);
  assert.equal(compact.doc.getNumberOfPages(),4,'Two contracts fit on the opening table, followed by exactly three analytical pages');
+ const percentageContracts=[
+  {...contracts[0],typeName:'Contrato manual',contractedVolume:'20000',loadedVolume:'0',remainingVolume:'20000',operationalPercentages:{contracted:'100',loaded:'0',remaining:'100'}},
+  {...contracts[1],typeName:'Contrato Semiautomático',contractedVolume:'40000',loadedVolume:'3313.43',remainingVolume:'36686.57',operationalPercentages:{contracted:'100',loaded:'8.28',remaining:'91.72'}},
+ ];
+ const percentages=await createContractsPdf({...data,contracts:percentageContracts,total:2},filters,brand);
+ const operationalPage=percentages.doc.internal.pages.at(-1).join('\n');
+ for(const label of ['100,00%','0,00%','8,28%','91,72%','20.000,00','40.000,00','3.313,43','36.686,57'])assert.ok(operationalPage.includes(`(${label}) Tj`),`Operational bars lost ${label}`);
+ const percentageCommands=percentages.doc.internal.pages.at(-1);
+ const position=label=>{const command=percentageCommands.find(value=>value.includes(`(${label}) Tj`));const [,x,y]=command.match(/([0-9.]+) ([0-9.]+) Td/);return {x:Number(x),y:Number(y)};};
+ assert.equal(position('8,28%').y,position('3.313,43').y,'Percentage must share the loaded-volume baseline');
+ assert.ok(position('8,28%').x<position('3.313,43').x,'Percentage must sit between the bar and the tonne value');
+ const missingPercentages=await createContractsPdf({...data,contracts:[{...percentageContracts[0],operationalPercentages:undefined}],total:1},filters,brand);
+ const missingPage=missingPercentages.doc.internal.pages.at(-1).join('\n');
+ assert.ok(missingPage.includes('(n/d) Tj'),'Missing server percentages remain unavailable');
+ assert.ok(!missingPage.includes('(100,00%) Tj'),'The PDF must not calculate missing percentages from quantities');
+ const excessPercentages=await createContractsPdf({...data,contracts:[{...percentageContracts[1],loadedVolume:'41000',remainingVolume:'0',operationalPercentages:{contracted:'100',loaded:'102.5',remaining:'0'}}],total:1},filters,brand);
+ assert.ok(excessPercentages.doc.internal.pages.at(-1).join('\n').includes('(102,50%) Tj'),'Accepted excess must remain visible above 100%');
  const preview=await readFile('modules/contratos/components/ContractReportDialog.tsx','utf8');
  const compositor=await readFile('modules/contratos/reporting/contractsPdf.ts','utf8');
  assert.ok(compositor.includes("doc.setFillColor(index%2?'#f4f8ee':'#ffffff');doc.rect(margin,y,contentWidth,row.height,'F');"),'The company and contract identity column keeps alternating backgrounds');
@@ -98,6 +115,7 @@ try{
    if(count===2)assert.equal(result.doc.getNumberOfPages(),4,'One detailed page followed by three analytical pages');
    await writeFile(join(process.env.BILLING_SUMMARY_ARTIFACTS,`contracts-complete-${count}.pdf`),new Uint8Array(result.doc.output('arraybuffer')));
   }
+  await writeFile(join(process.env.BILLING_SUMMARY_ARTIFACTS,'contracts-percentages.pdf'),new Uint8Array(percentages.doc.output('arraybuffer')));
  }
  console.log('Passed: two rows per contract, quantities, receipts/advances/excess, pending ATR, full names, filtered KPIs and indivisible contract pagination above the footer.');
 }finally{await rm(directory,{recursive:true,force:true});}
