@@ -43,19 +43,20 @@ function drawArc(doc:JsPdf,cx:number,cy:number,radius:number,start:number,end:nu
 function drawTrendChart(doc:JsPdf,rows:ExecutiveSummaryMonth[],x:number,y:number,width:number,height:number){
  const chartX=x+8,chartY=y+19,chartWidth=width-14,chartHeight=height-29,base=chartY+chartHeight;
  const values=rows.flatMap(item=>[item.billingPending?0:numeric(item.grossAmount),item.billingPending?0:numeric(item.netAmount),numeric(item.receivedAmount)]);
- const maximum=Math.max(...values,1),groups=Math.max(rows.length,1),groupWidth=chartWidth/groups,barWidth=Math.min(3.4,groupWidth*.24);
+ const minimum=Math.min(...values,0),maximum=Math.max(...values,1),span=maximum-minimum,groups=Math.max(rows.length,1),groupWidth=chartWidth/groups,barWidth=Math.min(3.4,groupWidth*.24);
+ const yAt=(value:number)=>base-(value-minimum)/span*chartHeight,zero=yAt(0);
  doc.setFont('helvetica','normal');doc.setFontSize(5.3);textColor(doc,COLOR.muted);
  for(let index=0;index<=3;index++){
   const ratio=index/3,lineY=base-chartHeight*ratio;stroke(doc,COLOR.grid);doc.setLineDashPattern([1.2,1.4],0);doc.line(chartX,lineY,chartX+chartWidth,lineY);
-  doc.text(compactMoney(maximum*ratio),chartX-1.5,lineY+1.4,{align:'right'});
+  doc.text(compactMoney(minimum+span*ratio),chartX-1.5,lineY+1.4,{align:'right'});
  }
  doc.setLineDashPattern([],0);
  const receivedPoints:{x:number;y:number}[]=[];
  rows.forEach((item,index)=>{
   const center=chartX+groupWidth*(index+.5),gross=item.billingPending?0:numeric(item.grossAmount),net=item.billingPending?0:numeric(item.netAmount),received=numeric(item.receivedAmount);
   const series=[{value:gross,color:[197,213,202] as Color,offset:-barWidth*.58},{value:net,color:COLOR.green,offset:barWidth*.58}];
-  series.forEach(entry=>{const barHeight=entry.value/maximum*chartHeight;fill(doc,entry.color);doc.roundedRect(center+entry.offset-barWidth/2,base-barHeight,barWidth,barHeight,.65,.65,'F');});
-  receivedPoints.push({x:center,y:base-received/maximum*chartHeight});
+  series.forEach(entry=>{const top=Math.min(zero,yAt(entry.value)),barHeight=Math.abs(zero-yAt(entry.value));if(barHeight>0){fill(doc,entry.color);doc.roundedRect(center+entry.offset-barWidth/2,top,barWidth,barHeight,.65,.65,'F');}});
+  receivedPoints.push({x:center,y:yAt(received)});
   doc.setFontSize(5.1);textColor(doc,COLOR.muted);doc.text(`${monthLabel(item.month).slice(0,3)}/${item.month.slice(2,4)}`,center,base+4,{align:'center'});
   if(item.billingPending){textColor(doc,COLOR.amber);doc.setFont('helvetica','bold');doc.text('*',center,chartY+2,{align:'center'});doc.setFont('helvetica','normal');}
  });
@@ -80,7 +81,7 @@ function drawComposition(doc:JsPdf,data:ExecutiveSummaryData,x:number,y:number,w
  doc.setFontSize(11);textColor(doc,COLOR.ink);doc.text('Do bruto ao líquido',x+7,y+13);
  const cx=x+width/2,cy=y+33,radius=12,total=numeric(data.totals.netAmount)+numeric(data.totals.discountAmount);
  drawArc(doc,cx,cy,radius,-90,270,COLOR.grid,5);
- if(!data.totals.billingPending&&total>0){
+ if(!data.totals.billingPending&&total>0&&numeric(data.totals.netAmount)>=0&&numeric(data.totals.discountAmount)>=0){
   const split=-90+360*numeric(data.totals.netAmount)/total;
   drawArc(doc,cx,cy,radius,-88,split-2,COLOR.green,5);drawArc(doc,cx,cy,radius,split+2,268,COLOR.amber,5);
  }
@@ -95,8 +96,8 @@ export async function createSummaryPdf(snapshot:ExecutiveSummarySnapshot,brand:R
  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4',compress:true});
  const {data}=snapshot,margin=REPORT_MARGIN_MM,pageWidth=doc.internal.pageSize.getWidth(),pageHeight=doc.internal.pageSize.getHeight();
  const contentWidth=pageWidth-margin*2,bottom=pageHeight-margin-9;
- const operationalTotals=data.operationalTotals??{loadCount:data.totals.loadCount,loadedVolume:data.totals.loadedVolume,averageAtr:'',averageLoadVolume:data.totals.loadCount?String(numeric(data.totals.loadedVolume)/data.totals.loadCount):'0',contractCount:data.totals.contractCount,farmCount:data.totals.farmCount,plotCount:data.totals.plotCount};
- const monthlyOperations=data.monthlyOperations??data.months.map(item=>({month:item.month,loadCount:item.loadCount,loadedVolume:item.loadedVolume,averageAtr:'',averageLoadVolume:item.loadCount?String(numeric(item.loadedVolume)/item.loadCount):'0',contractCount:0,farmCount:0,plotCount:0}));
+ const operationalTotals=data.operationalTotals??{loadCount:data.totals.loadCount,loadedVolume:data.totals.loadedVolume,averageAtr:'',averageLoadVolume:'',contractCount:data.totals.contractCount,farmCount:data.totals.farmCount,plotCount:data.totals.plotCount};
+ const monthlyOperations=data.monthlyOperations??data.months.map(item=>({month:item.month,loadCount:item.loadCount,loadedVolume:item.loadedVolume,averageAtr:'',averageLoadVolume:'',contractCount:0,farmCount:0,plotCount:0}));
  const farmPerformance=data.farmPerformance??[];
  const plotPerformance=data.plotPerformance??[];
  const contractPerformanceRows=data.contractPerformance??[];
@@ -110,7 +111,9 @@ export async function createSummaryPdf(snapshot:ExecutiveSummarySnapshot,brand:R
   const line=drawReportPdfHeader({doc,pageWidth,margin,orientation:'landscape',settings:brand.header,company:brand.company,logo,title:'Resumo gerencial'});
   doc.setFont('helvetica','normal');doc.setFontSize(7);textColor(doc,COLOR.muted);doc.text(`${dateLabel(data.range.from)} a ${dateLabel(data.range.to)} · ${data.range.dayCount} dias`,margin,line+6);
   fill(doc,COLOR.greenSoft);doc.roundedRect(pageWidth-margin-39,line+1,39,8,4,4,'F');doc.setFont('helvetica','bold');doc.setFontSize(6);textColor(doc,COLOR.green);doc.text(safe(doc,section.toLocaleUpperCase('pt-BR'),33),pageWidth-margin-19.5,line+6.1,{align:'center'});
-  return line+13;
+  const selection=[data.filters?.contractLabel?`Contrato: ${data.filters.contractLabel}`:'Todos os contratos',data.filters?.status?`Status atual: ${data.filters.status}`:'Todos os status'].join(' · ');
+  doc.setFont('helvetica','normal');doc.setFontSize(6.2);textColor(doc,COLOR.muted);doc.text(safe(doc,selection,contentWidth),margin,line+11);
+  return line+18;
  };
  const newPage=(section:string)=>{doc.addPage();currentSection=section;y=pageHeader(section);};
  const ensure=(space:number,section=currentSection)=>{if(y+space>bottom)newPage(section);};
@@ -152,7 +155,7 @@ export async function createSummaryPdf(snapshot:ExecutiveSummarySnapshot,brand:R
  const metrics=[
   {label:'Faturamento bruto',value:moneyLabel(data.totals.grossAmount),detail:data.totals.billingPending?`${data.totals.pendingLoadCount} carga(s) a apurar`:'Valor das entregas',color:COLOR.green},
   {label:'Descontos',value:moneyLabel(data.totals.discountAmount),detail:'Acordos aplicados às cargas',color:COLOR.amber},
-  {label:'Entradas em caixa',value:moneyLabel(data.totals.receivedAmount),detail:`${moneyLabel(data.totals.advanceAmount)} adiantado`,color:COLOR.blue},
+  {label:'Entradas em caixa',value:moneyLabel(data.totals.receivedAmount),detail:`Adiantamentos/estornos: ${moneyLabel(data.totals.advanceAmount)}`,color:COLOR.blue},
   {label:'Diferença do recorte',value:moneyLabel(data.totals.pendingAmount),detail:'Líquido menos entradas nas datas',color:COLOR.green},
  ];
  const metricGap=4,metricWidth=(contentWidth-metricGap*3)/4,metricHeight=24;
@@ -191,8 +194,8 @@ export async function createSummaryPdf(snapshot:ExecutiveSummarySnapshot,brand:R
  y+=panelHeight+6;
  sectionTitle('PLANEJAMENTO DO WORKSPACE',data.planning.periodName||'Metas e execução agrícola',data.planning.periodName?`Safra em foco · acumulado até ${dateLabel(data.planning.progressAsOf)}`:'Nenhuma safra cruza o período selecionado.');
  const planningCards=[
-  {label:'PLANTIO',percent:data.planning.plantingPercent,value:`${decimalLabel(data.planning.plantedAreaHa)} ha`,target:`Meta ${decimalLabel(data.planning.targetAreaHa)} ha`},
-  {label:'COLHEITA',percent:data.planning.harvestPercent,value:`${decimalLabel(data.planning.harvestedTons)} t`,target:`Meta ${decimalLabel(data.planning.harvestTargetTons)} t`},
+  {label:'PLANTIO',percent:Number(data.planning.targetAreaHa)>0?data.planning.plantingPercent:'',value:`${decimalLabel(data.planning.plantedAreaHa)} ha`,target:Number(data.planning.targetAreaHa)>0?`Meta ${decimalLabel(data.planning.targetAreaHa)} ha`:'Sem meta definida'},
+  {label:'COLHEITA',percent:Number(data.planning.harvestTargetTons)>0?data.planning.harvestPercent:'',value:`${decimalLabel(data.planning.harvestedTons)} t`,target:Number(data.planning.harvestTargetTons)>0?`Meta ${decimalLabel(data.planning.harvestTargetTons)} t`:'Sem meta definida'},
   {label:'MANEJO',percent:'',value:`${decimalLabel(data.planning.managedAreaHa)} ha`,target:`${data.planning.managementEventCount} ocorrências`},
  ];
  const planningGap=5,planningWidth=(contentWidth-planningGap*2)/3,planningHeight=31;
@@ -205,15 +208,15 @@ export async function createSummaryPdf(snapshot:ExecutiveSummarySnapshot,brand:R
  table('DESEMPENHO DAS ORIGENS','Fazendas movimentadas',[{label:'Fazenda',width:68},{label:'Talhões',width:22,align:'right'},{label:'Cargas',width:22,align:'right'},{label:'Volume',width:38,align:'right'},{label:'ATR médio',width:32,align:'right'},{label:'Média/carga',width:34,align:'right'},{label:'t/ha',width:31,align:'right'},{label:'Contratos',width:22,align:'right'}],farmPerformance.map(item=>[item.name,String(item.plotCount),String(item.loadCount),`${decimalLabel(item.loadedVolume)} t`,decimalLabel(item.averageAtr),`${decimalLabel(item.averageLoadVolume)} t`,decimalLabel(item.tonsPerHa),String(item.contractCount)]));
  table('DESEMPENHO DAS ORIGENS','Talhões movimentados',[{label:'Fazenda / talhão',width:80},{label:'Área',width:30,align:'right'},{label:'Cargas',width:22,align:'right'},{label:'Volume',width:38,align:'right'},{label:'ATR médio',width:32,align:'right'},{label:'Média/carga',width:34,align:'right'},{label:'t/ha',width:33,align:'right'}],plotPerformance.map(item=>[`${item.farmName} · ${item.name}`,`${decimalLabel(item.areaHa)} ha`,String(item.loadCount),`${decimalLabel(item.loadedVolume)} t`,decimalLabel(item.averageAtr),`${decimalLabel(item.averageLoadVolume)} t`,decimalLabel(item.tonsPerHa)]));
  table('MANEJO REALIZADO','Práticas na safra em foco',[{label:'Prática',width:160},{label:'Ocorrências',width:45,align:'right'},{label:'Área manejada',width:64,align:'right'}],data.management.map(item=>[item.name,String(item.eventCount),`${decimalLabel(item.areaHa)} ha`]));
- table('METAS DA SAFRA','Progresso por fazenda',[{label:'Fazenda',width:80},{label:'Plantio',width:40,align:'right'},{label:'%',width:25,align:'right'},{label:'Colheita',width:40,align:'right'},{label:'%',width:25,align:'right'},{label:'Restante',width:37,align:'right'},{label:'Cargas',width:22,align:'right'}],planningPerformance.farms.map(item=>[item.name,`${decimalLabel(item.plantedAreaHa)} / ${decimalLabel(item.targetAreaHa)} ha`,`${decimalLabel(item.plantingPercent)}%`,`${decimalLabel(item.harvestedTons)} / ${decimalLabel(item.targetTons)} t`,`${decimalLabel(item.harvestPercent)}%`,`${decimalLabel(item.remainingTons)} t`,String(item.loadCount)]));
- table('METAS DA SAFRA','Progresso por talhão',[{label:'Fazenda / talhão',width:80},{label:'Plantio',width:40,align:'right'},{label:'%',width:25,align:'right'},{label:'Colheita',width:40,align:'right'},{label:'%',width:25,align:'right'},{label:'Restante',width:37,align:'right'},{label:'Cargas',width:22,align:'right'}],planningPerformance.plots.map(item=>[`${item.farmName} · ${item.name}`,`${decimalLabel(item.plantedAreaHa)} / ${decimalLabel(item.targetAreaHa)} ha`,`${decimalLabel(item.plantingPercent)}%`,`${decimalLabel(item.harvestedTons)} / ${decimalLabel(item.targetTons)} t`,`${decimalLabel(item.harvestPercent)}%`,`${decimalLabel(item.remainingTons)} t`,String(item.loadCount)]));
+ table('METAS DA SAFRA','Progresso por fazenda',[{label:'Fazenda',width:80},{label:'Plantio',width:40,align:'right'},{label:'%',width:25,align:'right'},{label:'Colheita',width:40,align:'right'},{label:'%',width:25,align:'right'},{label:'Restante',width:37,align:'right'},{label:'Cargas',width:22,align:'right'}],planningPerformance.farms.map(item=>[item.name,`${decimalLabel(item.plantedAreaHa)} / ${decimalLabel(item.targetAreaHa)} ha`,Number(item.targetAreaHa)>0?`${decimalLabel(item.plantingPercent)}%`:'Sem meta',`${decimalLabel(item.harvestedTons)} / ${decimalLabel(item.targetTons)} t`,Number(item.targetTons)>0?`${decimalLabel(item.harvestPercent)}%`:'Sem meta',Number(item.targetTons)>0?`${decimalLabel(item.remainingTons)} t`:'Sem meta',String(item.loadCount)]));
+ table('METAS DA SAFRA','Progresso por talhão',[{label:'Fazenda / talhão',width:80},{label:'Plantio',width:40,align:'right'},{label:'%',width:25,align:'right'},{label:'Colheita',width:40,align:'right'},{label:'%',width:25,align:'right'},{label:'Restante',width:37,align:'right'},{label:'Cargas',width:22,align:'right'}],planningPerformance.plots.map(item=>[`${item.farmName} · ${item.name}`,`${decimalLabel(item.plantedAreaHa)} / ${decimalLabel(item.targetAreaHa)} ha`,Number(item.targetAreaHa)>0?`${decimalLabel(item.plantingPercent)}%`:'Sem meta',`${decimalLabel(item.harvestedTons)} / ${decimalLabel(item.targetTons)} t`,Number(item.targetTons)>0?`${decimalLabel(item.harvestPercent)}%`:'Sem meta',Number(item.targetTons)>0?`${decimalLabel(item.remainingTons)} t`:'Sem meta',String(item.loadCount)]));
 
  // Contracts page(s), with all records and status context.
  newPage('Contratos e resultados');
- sectionTitle('CONTRATOS DA EMPRESA ATIVA','Contratos e resultados','Ordenados pelo volume movimentado no período selecionado.');
+ sectionTitle('CONTRATOS DA EMPRESA ATIVA','Contratos e resultados','Volume, ATR e valores no período. Entrega acumulada de todo o contrato.');
  if(data.contractStatus.length){let statusX=margin;data.contractStatus.forEach(item=>{const label=`${item.status}  ${item.count}`,pillWidth=Math.min(47,doc.getTextWidth(label)+12);fill(doc,COLOR.greenSoft);doc.roundedRect(statusX,y,pillWidth,8,4,4,'F');doc.setFont('helvetica','bold');doc.setFontSize(6);textColor(doc,COLOR.deepLight);doc.text(label,statusX+pillWidth/2,y+5.2,{align:'center'});statusX+=pillWidth+3;});y+=12;}
  const contractPerformance=new Map(contractPerformanceRows.map(item=>[item.id,item]));
- table('VISÃO CONTRATUAL','Movimentação por contrato',[{label:'Cliente / contrato',width:57},{label:'Status',width:20},{label:'Cargas',width:16,align:'right'},{label:'Volume',width:28,align:'right'},{label:'ATR',width:25,align:'right'},{label:'Entrega',width:33,align:'right'},{label:'Líquido',width:45,align:'right'},{label:'Entradas',width:45,align:'right'}],data.contracts.map(item=>{const performance=contractPerformance.get(item.id);return [`${item.clientName} · ${item.contractNumber||item.title}`,item.status,String(item.loadCount),`${decimalLabel(item.loadedVolume)} t`,decimalLabel(performance?.averageAtr),performance?`${decimalLabel(performance.deliveryPercent)}% · ${decimalLabel(performance.totalLoadedVolume)}/${decimalLabel(performance.contractedVolume)} t`:'—',moneyLabel(item.netAmount),moneyLabel(item.receivedAmount)];}));
+ table('VISÃO CONTRATUAL','Movimentação por contrato',[{label:'Cliente / contrato',width:57},{label:'Status',width:20},{label:'Cargas',width:16,align:'right'},{label:'Volume',width:28,align:'right'},{label:'ATR',width:25,align:'right'},{label:'Entrega acumulada',width:33,align:'right'},{label:'Líquido',width:45,align:'right'},{label:'Entradas',width:45,align:'right'}],data.contracts.map(item=>{const performance=contractPerformance.get(item.id);return [`${item.clientName} · ${item.contractNumber||item.title}`,item.status,String(item.loadCount),`${decimalLabel(item.loadedVolume)} t`,decimalLabel(performance?.averageAtr),performance?`${decimalLabel(performance.deliveryPercent)}% · ${decimalLabel(performance.totalLoadedVolume)}/${decimalLabel(performance.contractedVolume)} t`:'—',moneyLabel(item.netAmount),moneyLabel(item.receivedAmount)];}));
  sectionTitle('NOTAS DE LEITURA','Como interpretar este resumo');doc.setFont('helvetica','normal');doc.setFontSize(6.5);textColor(doc,COLOR.muted);
  const notes=[
   'Financeiro, contratos, carregamentos e fazendas movimentadas pertencem à empresa ativa. Planejamento, cadastro agrícola e manejo pertencem ao workspace.',
@@ -229,5 +232,5 @@ export async function createSummaryPdf(snapshot:ExecutiveSummarySnapshot,brand:R
   doc.setFont('helvetica','normal');doc.setFontSize(6);textColor(doc,COLOR.muted);doc.text(safe(doc,`Emitido por ${brand.issuer.name||brand.issuer.email} · ${emitted}`,contentWidth-35),margin,pageHeight-margin);
   doc.setFont('helvetica','bold');textColor(doc,COLOR.deepLight);doc.text(`${page} / ${pages}`,pageWidth-margin,pageHeight-margin,{align:'right'});
  }
- return {doc,fileName:`resumo-gerencial-${data.range.from}-a-${data.range.to}.pdf`};
+ return {doc,fileName:`resumo-gerencial-${data.range.from}-a-${data.range.to}${data.filters?.contractId||data.filters?.status?'-filtrado':''}.pdf`};
 }

@@ -10,6 +10,12 @@ export type SummaryData = {month: string; totals: {
 }; contracts: SummaryContract[]};
 
 export type SummaryRange = {from:string;to:string;dayCount:number;generatedAt:string};
+export type SummarySelection = {contractId:string;status:string};
+export type SummaryFilters = SummarySelection & {from:string;to:string};
+export type SummaryFilterOptions = {
+ contracts:{id:string;clientName:string;contractNumber:string;title:string;status:string}[];
+ statuses:string[];
+};
 
 export type ExecutiveFinancialMetrics = {
  loadCount:number;loadedVolume:string;billingPending:boolean;pendingLoadCount:number;
@@ -80,6 +86,8 @@ export type ExecutivePlanningSummary = {
 };
 
 export type ExecutiveSummaryData = {
+ filters?:SummarySelection & {companyId:string;contractLabel:string};
+ filterOptions?:SummaryFilterOptions;
  range:SummaryRange;totals:ExecutiveSummaryTotals;comparison:ExecutiveSummaryComparison;
  months:ExecutiveSummaryMonth[];contractStatus:{status:string;count:number}[];
  contracts:ExecutiveSummaryContract[];farms:ExecutiveSummaryFarm[];

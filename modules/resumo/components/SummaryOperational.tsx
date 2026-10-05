@@ -20,13 +20,13 @@ const rankValue=(item:ExecutiveFarmPerformance|ExecutiveSummaryData['plotPerform
 const rankLabel=(item:ExecutiveFarmPerformance|ExecutiveSummaryData['plotPerformance'][number],mode:RankMode)=>mode==='volume'?`${decimalLabel(item.loadedVolume)} t`:mode==='intensity'?`${decimalLabel(item.tonsPerHa)} t/ha`:`${decimalLabel(item.averageAtr)} kg/t`;
 
 export function PerformanceRankings({data}:{data:ExecutiveSummaryData}){
- const [mode,setMode]=useState<RankMode>('intensity');
- const farms=useMemo(()=>[...data.farmPerformance].sort((a,b)=>rankValue(b,mode)-rankValue(a,mode)||a.name.localeCompare(b.name,'pt-BR')).slice(0,6),[data.farmPerformance,mode]);
- const plots=useMemo(()=>[...data.plotPerformance].sort((a,b)=>rankValue(b,mode)-rankValue(a,mode)||a.name.localeCompare(b.name,'pt-BR')).slice(0,6),[data.plotPerformance,mode]);
+ const [mode,setMode]=useState<RankMode>('intensity'),[all,setAll]=useState(false);
+ const farms=useMemo(()=>[...data.farmPerformance].sort((a,b)=>rankValue(b,mode)-rankValue(a,mode)||a.name.localeCompare(b.name,'pt-BR')).slice(0,all?data.farmPerformance.length:6),[data.farmPerformance,mode,all]);
+ const plots=useMemo(()=>[...data.plotPerformance].sort((a,b)=>rankValue(b,mode)-rankValue(a,mode)||a.name.localeCompare(b.name,'pt-BR')).slice(0,all?data.plotPerformance.length:6),[data.plotPerformance,mode,all]);
  return <section className="summary-block summary-performance" aria-labelledby="summary-performance-title">
-  <div className="summary-block-heading"><div><span className="summary-kicker"><Trophy size={14}/>DESTAQUES DA PRODUÇÃO</span><h3 id="summary-performance-title">Fazendas e talhões mais produtivos</h3><p>Compare volume, intensidade por área cadastrada e ATR ponderado no período.</p></div><div className="summary-segmented summary-ranking-mode" aria-label="Critério do ranking"><button type="button" aria-pressed={mode==='volume'} onClick={()=>setMode('volume')}>Volume</button><button type="button" aria-pressed={mode==='intensity'} onClick={()=>setMode('intensity')}>t/ha</button><button type="button" aria-pressed={mode==='atr'} onClick={()=>setMode('atr')}>ATR</button></div></div>
+  <div className="summary-block-heading"><div><span className="summary-kicker"><Trophy size={14}/>DESTAQUES DA PRODUÇÃO</span><h3 id="summary-performance-title">Fazendas e talhões mais produtivos</h3><p>Top 6 por critério. Compare volume, intensidade por área cadastrada e ATR ponderado no período.</p></div><div className="summary-segmented summary-ranking-mode" aria-label="Critério do ranking"><button type="button" aria-pressed={mode==='volume'} onClick={()=>setMode('volume')}>Volume</button><button type="button" aria-pressed={mode==='intensity'} onClick={()=>setMode('intensity')}>t/ha</button><button type="button" aria-pressed={mode==='atr'} onClick={()=>setMode('atr')}>ATR</button></div></div>
   <div className="summary-ranking-grid"><RankingCard title="Fazendas em destaque" icon="farm" rows={farms.map(item=>({id:item.id,name:item.name,detail:`${item.plotCount} talhões · ${item.loadCount} cargas`,metric:rankLabel(item,mode),value:rankValue(item,mode)}))}/><RankingCard title="Talhões em destaque" icon="plot" rows={plots.map(item=>({id:item.id,name:item.name,detail:`${item.farmName} · ${item.loadCount} cargas`,metric:rankLabel(item,mode),value:rankValue(item,mode)}))}/></div>
-  <p className="summary-method-note"><Gauge size={13}/><span><strong>Leitura de t/ha:</strong> volume carregado no filtro dividido pela área atualmente cadastrada. É um indicador de intensidade do período, não uma estimativa agronômica de produtividade da safra.</span></p>
+  {(data.farmPerformance.length>6||data.plotPerformance.length>6)&&<button type="button" className="summary-text-button" aria-expanded={all} onClick={()=>setAll(!all)}>{all?'Mostrar top 6':'Ver todas as fazendas e talhões'}</button>}<p className="summary-method-note"><Gauge size={13}/><span><strong>Leitura de t/ha:</strong> volume carregado no filtro dividido pela área atualmente cadastrada. É um indicador de intensidade do período, não uma estimativa agronômica de produtividade da safra.</span></p>
  </section>;
 }
 
@@ -41,7 +41,7 @@ export function PlanningPerformanceTable({farms,plots}:{farms:ExecutivePlanningF
 }
 
 function PlanningRow({kind,name,secondary,planted,plantingTarget,plantingPercent,harvested,harvestTarget,harvestPercent,remaining,loads}:{kind:'farm'|'plot';name:string;secondary:string;planted:string;plantingTarget:string;plantingPercent:string;harvested:string;harvestTarget:string;harvestPercent:string;remaining:string;loads:number}){
- return <tr className={`summary-planning-${kind}`}><td><strong>{name}</strong><small>{secondary}</small></td><td>{decimalLabel(planted)} / {decimalLabel(plantingTarget)} ha</td><td><Progress value={plantingPercent}/></td><td>{decimalLabel(harvested)} / {decimalLabel(harvestTarget)} t</td><td><Progress value={harvestPercent}/></td><td>{decimalLabel(remaining)} t</td><td>{loads}</td></tr>;
+ return <tr className={`summary-planning-${kind}`}><td><strong>{name}</strong><small>{secondary}</small></td><td>{decimalLabel(planted)} / {decimalLabel(plantingTarget)} ha</td><td>{Number(plantingTarget)>0?<Progress value={plantingPercent}/>:<span>Sem meta</span>}</td><td>{decimalLabel(harvested)} / {decimalLabel(harvestTarget)} t</td><td>{Number(harvestTarget)>0?<Progress value={harvestPercent}/>:<span>Sem meta</span>}</td><td>{Number(harvestTarget)>0?`${decimalLabel(remaining)} t`:'Sem meta'}</td><td>{loads}</td></tr>;
 }
 
 export function Progress({value}:{value:string}){

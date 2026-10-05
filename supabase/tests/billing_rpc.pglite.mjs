@@ -477,4 +477,9 @@ try {
  await db.exec(readFileSync(new URL('./workspace_clone.sql',import.meta.url),'utf8'));
  console.log('Workspace clone: fresh identifiers, remapped relationships, empty transactions and first-access gate passed');
 } catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
+try {
+ await db.exec(readFileSync(new URL('../migrations/20261005031002_summary_dashboard_selections.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./summary_dashboard_selections.sql',import.meta.url),'utf8'));
+ console.log('Summary selections: contract/status/company/date, weighted ATR, cent allocation, workspace scope, reset, pending values, permissions and isolation passed');
+} catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
 await db.close();

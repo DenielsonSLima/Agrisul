@@ -14,6 +14,13 @@ try{
  const {fetchExecutiveSummary}=await import(pathToFileURL(servicePath).href),controller=new AbortController();
  await fetchExecutiveSummary('company-a','2025-09-18','2026-09-17',controller.signal);
  assert.deepEqual(calls,[['summary','dashboard',{companyId:'company-a',from:'2025-09-18',to:'2026-09-17'},controller.signal]]);
+ globalThis.__summaryRpc=async(...args)=>{calls.push(args);return {filters:{companyId:'company-a',contractId:'contract-a',status:'Ativo'}};};
+ await fetchExecutiveSummary('company-a','2025-09-18','2026-09-17',controller.signal,{contractId:'contract-a',status:'Ativo'});
+ assert.deepEqual(calls[1],['summary','dashboard',{companyId:'company-a',from:'2025-09-18',to:'2026-09-17',contractId:'contract-a',status:'Ativo'},controller.signal]);
+ globalThis.__summaryRpc=async()=>({filters:{companyId:'company-other',contractId:'contract-a',status:'Ativo'}});
+ await assert.rejects(fetchExecutiveSummary('company-a','2025-09-18','2026-09-17',controller.signal,{contractId:'contract-a',status:'Ativo'}),/Não foi possível aplicar/);
+ globalThis.__summaryRpc=async()=>({});
+ await assert.rejects(fetchExecutiveSummary('company-a','2025-09-18','2026-09-17',controller.signal,{contractId:'contract-a',status:''}),/Não foi possível aplicar/);
  for(const table of ['billing_contracts','billing_contract_loads','billing_contract_payments','billing_contract_discounts','billing_farms','billing_farm_plots','billing_planning_periods','billing_planning_allocations','billing_planning_harvest_targets','billing_planning_field_logs'])assert.ok(realtimeResources[table].includes('summary'),`${table} must refresh the executive summary`);
 
  const months=Array.from({length:25},(_,index)=>{const date=new Date(2024,8+index,1),month=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;return {month,loadCount:index+1,loadedVolume:String((index+1)*10),billingPending:index===24,pendingLoadCount:index===24?1:0,grossAmount:index===24?'':String((index+1)*1000),discountAmount:String((index+1)*10),netAmount:index===24?'':String((index+1)*990),advanceAmount:'0',receiptAmount:String(index*100),receivedAmount:String(index*100),pendingAmount:index===24?'':String(index*890),creditAmount:'0'};});
@@ -28,6 +35,20 @@ try{
  assert.equal(fileName,'resumo-gerencial-2024-09-01-a-2026-09-30.pdf');assert.ok(doc.getNumberOfPages()>=7,'Long series and tables must paginate');
  const commands=doc.internal.pages.slice(1).flat().join('\n');assert.ok(commands.includes('DASH-41'),'Final contract must reach the PDF');assert.ok(commands.includes('Cliente final do painel'));assert.ok(commands.includes('Safra PDF'));assert.ok(commands.includes('Talhão PDF'));assert.ok(commands.includes('Meses com carregamentos'));assert.deepEqual(snapshot,before,'PDF generation must not mutate its snapshot');
  const source=await readFile('modules/resumo/components/ResumoPage.tsx','utf8'),operationsSource=await readFile('modules/resumo/components/SummaryOperational.tsx','utf8');assert.match(source,/defaultRange/);assert.match(source,/Exportar PDF completo/);assert.match(source,/365 dias por padrão/);assert.match(operationsSource,/filter\(row=>row\.loadCount>0\|\|Number\(row\.loadedVolume\)>0\)/);
+ const filtered=structuredClone(snapshot);filtered.data.filters={companyId:'company-a',contractId:'contract-a',contractLabel:'TEST-A · Cliente filtro',status:'Ativo'};
+ const filteredBefore=structuredClone(filtered),filteredPdf=await createSummaryPdf(filtered,{company:null,header:{variant:'compact',logoAlignment:'left',showCnpj:true,showContact:true},watermark:{imageUrl:null,opacity:15,size:60},issuer:{id:'user',name:'Teste',email:''},issuedAt:new Date('2026-09-17T12:00:00Z')});
+ assert.equal(filteredPdf.fileName,'resumo-gerencial-2024-09-01-a-2026-09-30-filtrado.pdf');
+ const filteredCommands=filteredPdf.doc.internal.pages.slice(1).flat().join('\n');assert.ok(filteredCommands.includes('Cliente filtro'));assert.ok(filteredCommands.includes('Status atual: Ativo'));assert.deepEqual(filtered,filteredBefore);
+ const noTarget=structuredClone(snapshot);noTarget.data.planning.harvestTargetTons='0';
+ for(const item of [...noTarget.data.planningPerformance.farms,...noTarget.data.planningPerformance.plots])item.targetTons='0';
+ const noTargetPdf=await createSummaryPdf(noTarget,{company:null,header:{variant:'compact',logoAlignment:'left',showCnpj:false,showContact:false},watermark:{imageUrl:null,opacity:15,size:60},issuer:{id:'user',name:'Teste',email:''},issuedAt:new Date('2026-09-17T12:00:00Z')});
+ assert.ok(noTargetPdf.doc.internal.pages.slice(1).flat().join('\n').includes('Sem meta definida'),'Zero denominator must not appear as a meaningful progress percentage');
+ const filtersPath=join(directory,'filters.mjs');await build({entryPoints:['modules/resumo/filters.ts'],outfile:filtersPath,bundle:true,platform:'node',format:'esm'});
+ const {monthRange,validRange,rangeDays}=await import(pathToFileURL(filtersPath).href);
+ const applied={from:'2026-09-10',to:'2026-10-05',contractId:'contract-a',status:'Ativo'};
+ assert.deepEqual(monthRange('2026-09',applied),{...applied,to:'2026-09-30'});assert.deepEqual(monthRange('2026-10',applied),{...applied,from:'2026-10-01'});
+ assert.equal(monthRange('2026-11',applied),null);assert.equal(monthRange('2026-13',applied),null);assert.equal(rangeDays({from:'2026-09-01',to:'2026-09-01'}),1);
+ assert.equal(validRange({from:'2026-10-01',to:'2026-09-01'}),false);assert.equal(validRange({from:'2020-01-01',to:'2026-01-01'}),false);assert.equal(validRange({from:'2026-09-01',to:'2026-09-30'}),true);assert.equal(validRange({from:'2026-02-30',to:'2026-03-02'}),false);
  console.log('PASS: executive summary RPC client, Realtime dependencies, 365-day UI and complete multipage immutable PDF.');
 }finally{
  delete globalThis.__summaryRpc;
