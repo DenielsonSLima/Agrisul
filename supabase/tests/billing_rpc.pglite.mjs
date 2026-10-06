@@ -11,6 +11,7 @@ GRANT USAGE ON SCHEMA auth TO authenticated,anon; GRANT EXECUTE ON FUNCTION auth
 CREATE SCHEMA storage; CREATE TABLE storage.buckets(id text PRIMARY KEY,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
 CREATE TABLE storage.objects(id uuid DEFAULT gen_random_uuid(),bucket_id text,name text); ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 CREATE FUNCTION storage.foldername(text) RETURNS text[] LANGUAGE sql AS $$ SELECT string_to_array($1,'/') $$;
+CREATE FUNCTION storage.extension(text) RETURNS text LANGUAGE sql AS $$ SELECT reverse(split_part(reverse($1),'.',1)) $$;
 GRANT USAGE ON SCHEMA storage TO authenticated; GRANT SELECT,INSERT,UPDATE,DELETE ON storage.objects TO authenticated;`);
 const migrations=[
  '../migrations/20260915022418_billing_settings_and_registrations_rpc.sql',
@@ -446,6 +447,14 @@ try {
  console.log('Quotation discounts: percentage/fixed calculations, history, retries, awards and immutable purchase-order snapshots passed');
  await db.exec(readFileSync(new URL('./material_categories.sql',import.meta.url),'utf8'));
  console.log('Material categories: normalized names, optional links, deletion guard, permissions and isolation passed');
+ // These quotation migrations postdate the older quotation fixtures above.
+ // Load them before the final availability wrapper so import exercises the
+ // current save path, including its PDF-era permission check.
+ for (const migration of [
+  '20260929120027_quotation_pdf_attachment.sql',
+  '20260929120354_quotation_item_quantity_update.sql',
+  '20260929121639_quotation_pdf_attachment_create_flow.sql',
+ ]) await db.exec(readFileSync(new URL('../migrations/'+migration,import.meta.url),'utf8'));
 } catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
 try {
  await db.exec(readFileSync(new URL('../migrations/20260928135925_contract_atr_current_month_fallback.sql',import.meta.url),'utf8'));
@@ -486,5 +495,14 @@ try {
  await db.exec(readFileSync(new URL('../migrations/20261005112606_contract_operational_percentages.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('./contract_operational_percentages.sql',import.meta.url),'utf8'));
  console.log('Contract percentages: individual denominators, decimal text, list/detail parity, load edits, excess, contract edits, deletion and isolation passed');
+} catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
+try {
+ await db.exec(readFileSync(new URL('../migrations/20261005233349_quotation_photo_import.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./quotation_photo_import.sql',import.meta.url),'utf8'));
+ console.log('Photo quotation import: idempotency, provenance, exact catalog matching, atomic rollback and isolation passed');
+} catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
+try {
+ await db.exec(readFileSync(new URL('../../docs/mcp-sql-pending/20261006005606_storage_temporary_password_guard.sql',import.meta.url),'utf8'));
+ console.log('Storage temporary-password guard compiled with the full billing schema');
 } catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
 await db.close();
