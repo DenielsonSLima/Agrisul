@@ -103,6 +103,7 @@ export function AuthGate({children}:{children:ReactNode}){
  const mode=typeof window==='undefined'?null:new URLSearchParams(window.location.search).get('mode');
  if(path.startsWith('/auth/confirm'))return <>{children}</>;
  if(!auth.ready)return <main className="auth-screen"><div className="auth-loading"><Clock3/><span>Carregando sua sessão…</span></div></main>;
+ if(path==='/oauth/consent'&&!auth.user)return <>{children}</>;
  if(auth.user){
   if(mode==='recovery')return <AuthExperience initialMode="recovery"/>;
   if(auth.access==='checking')return <main className="auth-screen"><div className="auth-loading"><Clock3/><span>Validando seu acesso…</span></div></main>;
