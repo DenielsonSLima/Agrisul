@@ -1,0 +1,51 @@
+name: Supabase database health
+
+on:
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/supabase-heartbeat.yml'
+
+permissions: {}
+
+concurrency:
+  group: supabase-database-health
+  cancel-in-progress: false
+
+jobs:
+  database-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      SUPABASE_URL: https://rbuscpwntzpyqsuycqmv.supabase.co
+      # Publishable client key: no administrative credentials are used here.
+      SUPABASE_PUBLISHABLE_KEY: sb_publishable_nhC4KJ6kSp7x7HIEcJ9MbA_HTzSZMLe
+    steps:
+      - name: Check the database through its read-only RPC
+        shell: bash
+        run: |
+          set -euo pipefail
+          response_file="$RUNNER_TEMP/supabase-health.json"
+          curl --fail --silent --show-error \
+            --retry 2 --retry-all-errors --retry-delay 5 \
+            --connect-timeout 10 --max-time 30 \
+            --request POST "$SUPABASE_URL/rest/v1/rpc/billing_healthcheck" \
+            --header "apikey: $SUPABASE_PUBLISHABLE_KEY" \
+            --header 'Content-Type: application/json' \
+            --data '{}' \
+            --output "$response_file"
+          node --input-type=module - "$response_file" <<'JS'
+          import {readFileSync} from 'node:fs';
+          const result = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+          if (result.ok !== true || result.projectRef !== 'rbuscpwntzpyqsuycqmv') {
+            throw new Error('Unexpected database health response');
+          }
+          const checkedAt = Date.parse(result.checkedAt);
+          if (!Number.isFinite(checkedAt) || Math.abs(Date.now() - checkedAt) > 300_000) {
+            throw new Error('Database health response is stale');
+          }
+          console.log('Supabase database is available; checked at ' + result.checkedAt);
+          JS
