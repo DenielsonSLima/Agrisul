@@ -20,9 +20,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     env:
-      SUPABASE_URL: https://rbuscpwntzpyqsuycqmv.supabase.co
+      SUPABASE_URL: https://ykounjabfsrtkzostbbz.supabase.co
       # Publishable client key: no administrative credentials are used here.
-      SUPABASE_PUBLISHABLE_KEY: sb_publishable_nhC4KJ6kSp7x7HIEcJ9MbA_HTzSZMLe
+      SUPABASE_PUBLISHABLE_KEY: sb_publishable_5tUPC9FlXsRC0kARnRXDjA_Lf3c5VcK
     steps:
       - name: Check the database through its read-only RPC
         shell: bash
@@ -40,7 +40,7 @@ jobs:
           node --input-type=module - "$response_file" <<'JS'
           import {readFileSync} from 'node:fs';
           const result = JSON.parse(readFileSync(process.argv[2], 'utf8'));
-          if (result.ok !== true || result.projectRef !== 'rbuscpwntzpyqsuycqmv') {
+          if (result.ok !== true || result.projectRef !== 'ykounjabfsrtkzostbbz') {
             throw new Error('Unexpected database health response');
           }
           const checkedAt = Date.parse(result.checkedAt);
@@ -49,3 +49,4 @@ jobs:
           }
           console.log('Supabase database is available; checked at ' + result.checkedAt);
           JS
+
