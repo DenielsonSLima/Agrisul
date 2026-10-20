@@ -5,6 +5,7 @@ import {ArrowLeft,BarChart3,CheckCircle2,Eye,EyeOff,FileText,Leaf,Loader2,LockKe
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {getSupabaseBrowserClient} from './client';
+import {consentReturnPathFromLocation,safeLoginReturnTo} from './oauthConsent';
 import {RpcError,rpcRequest} from './rpc';
 import {useAuth} from './AuthProvider';
 
@@ -69,9 +70,10 @@ export function AuthExperience({initialMode='login',configurationError=''}:{init
   const needsConfirmation=mode==='signup'||mode==='recovery'||mode==='invite'||mode==='temporary-password';
   const returnTo=useMemo(()=>{
     if(typeof window==='undefined')return'/';
+    const consentReturn=consentReturnPathFromLocation(window.location.pathname,window.location.search);
+    if(consentReturn)return consentReturn;
     const candidate=new URLSearchParams(window.location.search).get('returnTo');
-    if(!candidate)return'/';
-    try{const parsed=new URL(candidate,window.location.origin);return parsed.origin===window.location.origin&&!parsed.pathname.startsWith('/login')?parsed.pathname+parsed.search+parsed.hash:'/';}catch{return'/';}
+    return safeLoginReturnTo(candidate,window.location.origin);
   },[]);
 
   useEffect(()=>{
@@ -114,11 +116,11 @@ export function AuthExperience({initialMode='login',configurationError=''}:{init
       }
       if(mode==='temporary-password'){
         const {error}=await client.auth.updateUser({password});if(error)throw error;
-        await rpcRequest('onboarding','complete-password',{});await refreshAccess();window.location.replace('/');return;
+        await rpcRequest('onboarding','complete-password',{});await refreshAccess();window.location.replace(returnTo);return;
       }
       const cleanName=name.trim();if(cleanName.length<2)throw new RpcError('Informe seu nome com pelo menos 2 caracteres.');
       const {error:updateError}=await client.auth.updateUser({password,data:{display_name:cleanName,onboarding_required:false}});if(updateError)throw updateError;
-      await rpcRequest('onboarding','complete',{name:cleanName});await refreshAccess();window.location.replace('/');
+      await rpcRequest('onboarding','complete',{name:cleanName});await refreshAccess();window.location.replace(returnTo);
     }catch(caught){setMessage({tone:'error',text:authErrorMessage(caught)});}
     finally{setBusy(false);}
   };
