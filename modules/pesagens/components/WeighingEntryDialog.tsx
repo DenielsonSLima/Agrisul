@@ -3,8 +3,10 @@ import {Info, Loader2, Plus, Save, Truck} from 'lucide-react';
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from '@/components/ui/dialog';
 import {Field} from '@/shared/components/Common';
 import {notifications} from '@/shared/feedback';
+import {useFleet} from '@/modules/cadastro/frota/hooks/useFleet';
+import {ModuleLink} from '@/shared/navigation/ModuleNavigation';
 import {useWeighingMutations} from '../hooks/useWeighings';
-import {weightInput} from '../utils/presentation';
+import {weightInput, weightLabel} from '../utils/presentation';
 import type {WeighingControl, WeighingEntry, WeighingComponentInput} from '../types';
 
 function emptyComponents(): WeighingComponentInput[] {
@@ -13,19 +15,24 @@ function emptyComponents(): WeighingComponentInput[] {
 
 export function WeighingEntryDialog({control, entry, lastDate, onClose}: {control: WeighingControl; entry?: WeighingEntry; lastDate: string; onClose: () => void}) {
   const {saveEntry} = useWeighingMutations();
+  const fleet = useFleet({partnerId: control.partnerId});
   const [weighedAt, setWeighedAt] = useState(entry?.weighedAt ?? lastDate);
   const [weighedTime, setWeighedTime] = useState(entry?.weighedTime ?? '');
   const [ticket, setTicket] = useState(entry?.ticket ?? '');
   const [notes, setNotes] = useState(entry?.notes ?? '');
   const [mode, setMode] = useState<'combined' | 'individual'>(entry?.trailerGrossMode ?? 'combined');
   const [combined, setCombined] = useState(weightInput(entry?.combinedTrailerGrossKg));
-  const [components, setComponents] = useState<WeighingComponentInput[]>(() => entry ? entry.components.map(component => ({fleetNumber: component.fleetNumber, plate: component.plate, kind: component.kind, tareKg: weightInput(component.tareKg), grossKg: weightInput(component.grossKg), partnerNetKg: weightInput(component.partnerNetKg)})) : emptyComponents());
+  const [components, setComponents] = useState<WeighingComponentInput[]>(() => entry ? entry.components.map(component => ({vehicleId: component.vehicleId, fleetNumber: component.fleetNumber, plate: component.plate, kind: component.kind, tareKg: weightInput(component.tareKg), grossKg: weightInput(component.grossKg), partnerNetKg: weightInput(component.partnerNetKg)})) : emptyComponents());
   const [error, setError] = useState('');
   const [savedCount, setSavedCount] = useState(0);
   const mounted = useRef(true), inFlight = useRef(false);
   useEffect(() => {mounted.current = true; return () => {mounted.current = false;};}, []);
   const close = () => {if (!inFlight.current) onClose();};
   const changeComponent = (index: number, field: keyof WeighingComponentInput, value: string) => setComponents(current => current.map((component, position) => position === index ? {...component, [field]: value} : component));
+  const selectVehicle = (index: number, vehicleId: string) => {
+    const vehicle = fleet.data?.vehicles.find(item => item.id === vehicleId);
+    setComponents(current => current.map((component, position) => position !== index ? component : vehicle ? {...component, vehicleId, fleetNumber: vehicle.internalCode, plate: vehicle.plate, tareKg: weightInput(vehicle.tareKg)} : {...component, vehicleId: null}));
+  };
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (inFlight.current) return;
     if (!weighedAt) {setError('Informe a data da pesagem.'); return;}
@@ -55,9 +62,12 @@ export function WeighingEntryDialog({control, entry, lastDate, onClose}: {contro
         <div className="weighing-entry-meta"><Field label="Data da pesagem *"><input required type="date" min={control.startDate} max="9998-12-31" value={weighedAt} onChange={event => setWeighedAt(event.target.value)} autoFocus/></Field><Field label="Hora"><input type="time" value={weighedTime} onChange={event => setWeighedTime(event.target.value)}/></Field><Field label="Ticket / comprovante"><input maxLength={100} placeholder="Opcional" value={ticket} onChange={event => setTicket(event.target.value)}/></Field></div>
         <div className="weighing-mode"><span>Peso bruto dos reboques</span><div role="group" aria-label="Forma de pesagem dos reboques"><button type="button" aria-pressed={mode === 'combined'} onClick={() => setMode('combined')}>Pesados juntos</button><button type="button" aria-pressed={mode === 'individual'} onClick={() => setMode('individual')}>Pesados separados</button></div></div>
         {mode === 'combined' && <div className="weighing-combined"><Field label="Bruto conjunto dos dois reboques (kg)"><input inputMode="decimal" maxLength={30} placeholder="Ex.: 55.220" value={combined} onChange={event => setCombined(event.target.value)}/></Field><p><Info size={16}/>O bruto conjunto será dividido igualmente entre os dois reboques, como na planilha.</p></div>}
-        <div className="weighing-entry-components">{components.map((component, index) => <section key={index} className="weighing-component"><h3>{index === 0 ? <><Truck size={17}/>Caminhão</> : <>Reboque {index}</>}</h3><div className="weighing-component-fields">
+        <div className="weighing-fleet-note"><p>Selecione a frota de {control.partnerName} para preencher número, placa e tara. A tara desta viagem pode ser ajustada conforme a ficha.</p><ModuleLink href="/cadastro?secao=frota">Ver cadastro da frota</ModuleLink></div>
+        {fleet.loading && <p className="weighing-help" role="status">Carregando a frota do parceiro…</p>}
+        {fleet.error && <p className="form-error" role="alert">{fleet.error} Você pode preencher os veículos manualmente. <button type="button" className="btn" onClick={() => void fleet.reload()}>Tentar novamente</button></p>}
+        <div className="weighing-entry-components">{components.map((component, index) => <section key={index} className="weighing-component"><h3>{index === 0 ? <><Truck size={17}/>Caminhão</> : <>Reboque {index}</>}</h3><Field label={`Selecionar ${index === 0 ? 'caminhão' : `reboque ${index}`} cadastrado`}><select value={component.vehicleId || ''} disabled={fleet.loading || !!fleet.error} onChange={event => selectVehicle(index, event.target.value)}><option value="">Preenchimento manual / veículo não cadastrado</option>{component.vehicleId && !fleet.data?.vehicles.some(vehicle => vehicle.id === component.vehicleId) && <option value={component.vehicleId}>Veículo do lançamento original</option>}{fleet.data?.vehicles.filter(vehicle => vehicle.kind === component.kind).map(vehicle => <option key={vehicle.id} value={vehicle.id}>Frota {vehicle.internalCode} · {vehicle.plate} · Tara {weightLabel(vehicle.tareKg)} kg</option>)}</select></Field><div className="weighing-component-fields">
           <Field label="Nº da frota"><input maxLength={60} value={component.fleetNumber} onChange={event => changeComponent(index, 'fleetNumber', event.target.value)} placeholder="Ex.: 133"/></Field>
-          <Field label="Placa *"><input required maxLength={12} className="weighing-plate" value={component.plate} onChange={event => changeComponent(index, 'plate', event.target.value.toUpperCase())} placeholder="ABC1D23"/></Field>
+          <Field label="Placa (se conhecida)"><input maxLength={12} className="weighing-plate" value={component.plate} onChange={event => changeComponent(index, 'plate', event.target.value.toUpperCase())} placeholder="ABC1D23"/></Field>
           <Field label="Tara AGRISUL (kg)"><input inputMode="decimal" maxLength={30} value={component.tareKg ?? ''} onChange={event => changeComponent(index, 'tareKg', event.target.value)} placeholder="Ex.: 16.400"/></Field>
           <Field label="Bruto AGRISUL (kg)">{index > 0 && mode === 'combined' ? <div className="weighing-rateio">½ do bruto conjunto</div> : <input inputMode="decimal" maxLength={30} value={component.grossKg ?? ''} onChange={event => changeComponent(index, 'grossKg', event.target.value)} placeholder="Ex.: 38.860"/>}</Field>
           <Field label={`Líquido ${control.partnerName} (kg)`}><input inputMode="decimal" maxLength={30} value={component.partnerNetKg ?? ''} onChange={event => changeComponent(index, 'partnerNetKg', event.target.value)} placeholder="Preencher depois"/></Field>

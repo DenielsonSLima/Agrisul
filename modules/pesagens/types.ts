@@ -2,6 +2,8 @@ export type WeighingSummary = {
   entryCount: number;
   completeCount: number;
   pendingCount: number;
+  tareKg: string | null;
+  grossKg: string | null;
   agrisulNetKg: string | null;
   partnerNetKg: string | null;
   differenceKg: string | null;
@@ -20,6 +22,7 @@ export type WeighingControl = {
 };
 
 export type WeighingComponentInput = {
+  vehicleId?: string | null;
   fleetNumber: string;
   plate: string;
   kind: 'truck' | 'trailer';
@@ -42,6 +45,8 @@ export type WeighingEntry = Omit<WeighingEntryInput, 'components'> & {
   id: string;
   controlId: string;
   components: WeighingComponent[];
+  tareKg: string | null;
+  grossKg: string | null;
   agrisulNetKg: string | null;
   partnerNetKg: string | null;
   partnerComplete: boolean;

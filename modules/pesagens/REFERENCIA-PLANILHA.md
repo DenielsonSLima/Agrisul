@@ -4,7 +4,7 @@
 
 Planilha fornecida: `COMPARATIVO PESAGEM DE CANA AGRISUL X TAQUARI SAFRA 2026-2027 - DIA 19.xlsx`. Possui quatro abas diárias: `16.10.26`, `17.10.26`, `18.10.26` e `19.10.26`.
 
-As nove fotografias fornecidas mostram fichas manuscritas de pesagem. Há fotografias repetidas ou sobrepostas da mesma folha; elas são referências de operação e não representam nove conjuntos independentes de dados. Não haverá transcrição ou importação automática dos manuscritos.
+As onze fotografias fornecidas mostram três fichas manuscritas de pesagem, com fotografias repetidas ou sobrepostas da mesma folha. A conferência manual complementa as identificações e os horários do Excel, sem duplicar viagens pela quantidade de imagens. Pesos divergentes conservam o valor do Excel, com observação da divergência; informações ilegíveis continuam pendentes.
 
 ## Estrutura encontrada
 
@@ -95,6 +95,23 @@ Somando os componentes reais, os totais corretos de 18/10 são os mostrados na t
 6. Consultar os conjuntos, diferenças e totais do período, com estados parciais claramente apresentados.
 
 A passagem da meia-noite não deve alterar a data silenciosamente. As fichas mostram o novo dia escrito no meio da folha; por isso a data efetiva de cada viagem precisa continuar acessível ao operador.
+
+## Importação autorizada de TAQUARI e cadastro da frota
+
+A conferência das onze imagens encontrou uma viagem ausente do Excel: **18/10/2026 às 23:00, caminhão 128**, placa `QMN6796`, reboques 272 (`OEK-4216`) e 273 (`OEK-4146`). As taras são 16.200, 10.420 e 10.420 kg; o bruto do caminhão é 32.820 kg e o bruto conjunto dos reboques é 55.040 kg. O líquido AGRISUL é 50.820 kg. Os líquidos TAQUARI dessa viagem não foram fornecidos e permanecem pendentes. Não confundir com a viagem do mesmo conjunto em **17/10 às 23:00**, com outros pesos.
+
+A importação reúne, portanto, **45 viagens: 44 do Excel e uma exclusiva das fotos**. Em 18/10 passam a ser 16 viagens, totalizando 783.230 kg AGRISUL e 737.700 kg TAQUARI informados em 15 das 16 viagens. A diferença final desse dia permanece pendente até preencher o parceiro da viagem adicional. Os totais anteriores da tabela continuam sendo a referência das 44 viagens do Excel.
+
+O cadastro inicial possui 46 veículos, vinculados ao parceiro TAQUARI: 15 caminhões e 31 reboques. As taras cadastrais são referências de preenchimento; não substituem o valor histórico de uma viagem. A viagem do caminhão 136 em 19/10 mantém as três taras ausentes mesmo havendo referência de tara em outro dia.
+
+- As placas dos caminhões 123, 134, 136, 137, 197 e 198 dependem de confirmação. O cadastro conserva o número da frota e deixa a placa pendente; não transforma uma leitura duvidosa em identidade definitiva.
+- Os reboques `NVG-3281`, `NVK-7315`, `OEK-4286` e `OEK-4256` não possuem número seguro nas fotos. O código provisório `PLACA-...` identifica o cadastro e sua descrição informa a pendência. O número histórico permanece vazio.
+- As variantes do Excel `OEK-4373`, `NVC-3357`, `NVK-7655` e `NVG-3287` ficam nos registros históricos, com observações. Não criam veículos duplicados nem são unificadas silenciosamente com placas semelhantes.
+- As fichas trocam ocasionalmente os números 270/268 entre `OEK-4086` e `OEK-4096`. O cadastro adota as associações recorrentes e conserva a observação; as taras de 10.310 e 10.330 kg continuam nos respectivos registros históricos.
+- A foto de 17/10 do caminhão 197 parece indicar 35.580 kg, enquanto o Excel registra 35.520 kg. O valor do Excel é preservado com a divergência de 60 kg documentada.
+- As horas rasuradas do caminhão 187 em 17/10 e do caminhão 198 na viagem de bruto 31.580 kg em 18/10 permanecem pendentes. Horários das demais viagens de 19/10 sem foto também não são inventados.
+
+O material de importação e auditoria fica em `work/taquari-import/`: `payload.json` contém as 45 viagens e os veículos; `payload-excel.json` conserva apenas as 44 viagens do Excel; `source-audit.json` relaciona células e valores originais, fotografias e hashes SHA-256; `expected-totals.json` registra os totais esperados para conferência. Essa pasta é local e ignorada pelo Git por conter dados operacionais do usuário.
 
 ## Reunião entre os três agentes
 

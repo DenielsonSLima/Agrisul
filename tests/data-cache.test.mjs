@@ -124,6 +124,21 @@ try{
  assert.ok(mutationResources('clients').includes('cane-weighings'));
  assert.ok(mutationResources('companies').includes('cane-weighings'));
 
+ // Registry edits refresh trip vehicle choices, and partner renames refresh
+ // the fleet filter labels. Neither path can invalidate another account.
+ const aFleet=key('owner-a','fleet',{partnerId:'taquari'});
+ const bFleet=key('owner-b','fleet',{partnerId:'other'});
+ for(const table of ['billing_fleet_vehicles','billing_clients','billing_memberships','billing_access_profiles']){
+  for(const queryKey of [aFleet,bFleet,aWeighingDetail,bWeighingList])client.setQueryData(queryKey,{saved:true});
+  for(const resource of realtimeResources[table])await client.invalidateQueries({queryKey:billingKeys.resource('owner-a',resource),refetchType:'none'});
+  assert.equal(client.getQueryState(aFleet).isInvalidated,true,table+' refreshes fleet');
+  assert.equal(client.getQueryState(aWeighingDetail).isInvalidated,true,table+' refreshes vehicle choices');
+  assert.equal(client.getQueryState(bFleet).isInvalidated,false);
+  assert.equal(client.getQueryState(bWeighingList).isInvalidated,false);
+ }
+ assert.ok(mutationResources('clients').includes('fleet'));
+ assert.ok(mutationResources('fleet').includes('cane-weighings'));
+
  // Provider contacts refresh both the provider detail and purchase-order contact choices.
  const aProviders=key('owner-a','service-providers',{view:'detail',id:'provider-a'});
  client.setQueryData(aProviders,{saved:true});client.setQueryData(aOrders,{saved:true});

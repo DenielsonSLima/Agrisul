@@ -10,7 +10,7 @@ test('Cane weighing RPC: actual migration chain, workbook arithmetic, partial da
   const {control}=await rpc('save',{companyId:ids.company,partnerId:ids.partner,startDate:'2026-10-16'});
   assert.equal(control.season,'2026/2027');
   assert.equal(control.partnerName,'TAQUARI');
-  assert.deepEqual(control.summary,{entryCount:0,completeCount:0,pendingCount:0,agrisulNetKg:'0',partnerNetKg:'0',differenceKg:null,differencePercent:null});
+  assert.deepEqual(control.summary,{entryCount:0,completeCount:0,pendingCount:0,agrisulNetKg:'0',partnerNetKg:'0',differenceKg:null,differencePercent:null,tareKg:'0',grossKg:'0'});
   await denied(()=>rpc('save',{companyId:ids.company,partnerId:ids.partner,startDate:'2026-10-16'}),'23505');
   const base={companyId:ids.company,controlId:control.id,weighedAt:'2026-10-16',weighedTime:'18:07',ticket:'TRIP-133',notes:'',
    trailerGrossMode:'combined',combinedTrailerGrossKg:'55.220',components:[
@@ -152,7 +152,7 @@ test('18/10 workbook: all 15 actual trips count, including the trip omitted by t
   let detail=await rpc('get',{companyId:ids.company,id:control.id});
   assert.equal(detail.entries.length,15);
   assert.deepEqual(detail.summary,{entryCount:15,completeCount:15,pendingCount:0,
-   agrisulNetKg:'732410',partnerNetKg:'737700',differenceKg:'5290',differencePercent:'0.722273'});
+   agrisulNetKg:'732410',partnerNetKg:'737700',differenceKg:'5290',differencePercent:'0.722273',tareKg:'525180',grossKg:'1257590'});
   assert.deepEqual(detail.daily,[{date:'2026-10-18',...detail.summary}]);
   const omitted=saved[13];
   assert.equal(omitted.agrisulNetKg,'48460');
