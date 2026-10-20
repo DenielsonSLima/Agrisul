@@ -3,7 +3,7 @@ import {randomBytes} from 'node:crypto';
 import {createClient} from '@supabase/supabase-js';
 import {PROJECT_REF,callMcp,getMcpCredentials} from './supabase-mcp.mjs';
 
-const EXPECTED_PROJECT='rbuscpwntzpyqsuycqmv';
+const EXPECTED_PROJECT='ykounjabfsrtkzostbbz';
 const args=Object.fromEntries(process.argv.slice(2).map((value,index,all)=>value.startsWith('--')?[value.slice(2),all[index+1]??'']:null).filter(Boolean));
 const sourceOwner=args.source??'';
 const targetEmail=(args.email??'').trim().toLowerCase();

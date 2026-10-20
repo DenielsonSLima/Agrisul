@@ -11,6 +11,7 @@ GRANT USAGE ON SCHEMA auth TO authenticated,anon; GRANT EXECUTE ON FUNCTION auth
 CREATE SCHEMA storage; CREATE TABLE storage.buckets(id text PRIMARY KEY,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
 CREATE TABLE storage.objects(id uuid DEFAULT gen_random_uuid(),bucket_id text,name text); ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 CREATE FUNCTION storage.foldername(text) RETURNS text[] LANGUAGE sql AS $$ SELECT string_to_array($1,'/') $$;
+CREATE FUNCTION storage.extension(text) RETURNS text LANGUAGE sql AS $$ SELECT reverse(split_part(reverse($1),'.',1)) $$;
 GRANT USAGE ON SCHEMA storage TO authenticated; GRANT SELECT,INSERT,UPDATE,DELETE ON storage.objects TO authenticated;`);
 const migrations=[
  '../migrations/20260915022418_billing_settings_and_registrations_rpc.sql',
@@ -290,6 +291,9 @@ try {
  await db.exec(readFileSync(new URL('../migrations/20260928112852_quotation_gross_and_net_totals.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('../migrations/20260928121100_quotation_item_unaward.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('../migrations/20260928124449_quotation_item_removal_with_history.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260929120027_quotation_pdf_attachment.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260929120354_quotation_item_quantity_update.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../migrations/20260929121639_quotation_pdf_attachment_create_flow.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('../migrations/20260929130228_purchase_order_optional_contact.sql',import.meta.url),'utf8'));
  await db.exec(`DO $$
   DECLARE v_projection jsonb;
@@ -349,8 +353,8 @@ try {
   v_authorize text:=pg_get_functiondef('billing_private.authorize_resource(text,text)'::regprocedure);
   v_negotiation_dispatch text:=pg_get_functiondef('billing_private.quotations_dispatch_before_item_awards(text,text,jsonb)'::regprocedure);
   v_unaward_dispatch text:=pg_get_functiondef('billing_private.quotations_dispatch_before_item_removal(text,text,jsonb)'::regprocedure);
-  v_removal_dispatch text:=pg_get_functiondef('billing_private.quotations_dispatch(text,text,jsonb)'::regprocedure);
-  v_removal_projection text:=pg_get_functiondef('billing_private.quotation_json(public.billing_quotations)'::regprocedure);
+  v_removal_dispatch text:=pg_get_functiondef('billing_private.quotations_dispatch_before_pdf_attachment(text,text,jsonb)'::regprocedure);
+  v_removal_projection text:=pg_get_functiondef('billing_private.quotation_json_before_pdf_attachment(public.billing_quotations)'::regprocedure);
   v_route text;v_is_definer boolean;v_config text[];v_rls boolean;v_replica "char";
  BEGIN
   FOREACH v_route IN ARRAY ARRAY[
@@ -471,8 +475,14 @@ try {
 try {
  await db.exec(readFileSync(new URL('../migrations/20260929142433_quotation_available_quantity.sql',import.meta.url),'utf8'));
  console.log('Quotation availability: migration, projections, history and purchase-order quantity compiled successfully');
+ await db.exec(readFileSync(new URL('../migrations/20261005143226_quotation_registration_permissions.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./quotation_registration_permissions.sql',import.meta.url),'utf8'));
+ console.log('Quotation registration permissions: non-owner writers, private PDF storage, readers, anonymous access, direct DML and workspace isolation passed');
 } catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
 try {
+ await db.exec(readFileSync(new URL('../migrations/20261005185918_quotation_provider_removal_with_history.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./quotation_provider_removal.sql',import.meta.url),'utf8'));
+ console.log('Quotation supplier removal: priced and awarded suppliers, revisions, discounts, availability, retries, other suppliers/quotations, registry data, generated orders and workspace permissions passed');
  await db.exec(readFileSync(new URL('../migrations/20260929142847_clone_workspace_snapshot.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('./workspace_clone.sql',import.meta.url),'utf8'));
  console.log('Workspace clone: fresh identifiers, remapped relationships, empty transactions and first-access gate passed');
@@ -486,5 +496,10 @@ try {
  await db.exec(readFileSync(new URL('../migrations/20261005112606_contract_operational_percentages.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('./contract_operational_percentages.sql',import.meta.url),'utf8'));
  console.log('Contract percentages: individual denominators, decimal text, list/detail parity, load edits, excess, contract edits, deletion and isolation passed');
+} catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
+try {
+ await db.exec(readFileSync(new URL('../migrations/20261006191034_quotation_purchase_order_return.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./quotation_order_return.sql',import.meta.url),'utf8'));
+ console.log('Quotation order return: multiple suppliers, commercial archives, negotiation preservation, retries, reapproval, completed-order protection and account isolation passed');
 } catch(e) {console.error(e.message,e.where,e.position);process.exit(1);}
 await db.close();

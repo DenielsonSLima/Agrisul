@@ -5,7 +5,7 @@ import {inflateSync} from 'node:zlib';
 import {resolve} from 'node:path';
 
 export async function verifyProviders({owner,member,other,rpc,projectRef,cdpUrl}){
- assert.equal(projectRef,'rbuscpwntzpyqsuycqmv');assert.ok(cdpUrl);
+ assert.equal(projectRef,'ykounjabfsrtkzostbbz');assert.ok(cdpUrl);
  const initial={documentType:'CPF',document:'52998224725',legalName:'Prestador CPF de teste',tradeName:'',street:'Rua do prestador',number:'10',complement:'',district:'Centro',city:'Japoata',state:'SE',zipCode:'49950000',phone:'79999999999',email:'prestador@example.invalid'};
  assert.equal((await rpc(member.client,'service-providers','list')).canManage,false);
  await assert.rejects(rpc(member.client,'service-providers','save',initial),error=>error.code==='42501');

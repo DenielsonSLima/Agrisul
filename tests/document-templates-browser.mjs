@@ -3,7 +3,7 @@ import {mkdirSync, writeFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 
 export async function verifyDocumentTemplatesBrowser({managerSession, operatorSession, otherSession, projectRef, cdpUrl = 'http://localhost:9235', baseUrl = 'http://localhost:5173'}) {
-  assert.equal(projectRef, 'rbuscpwntzpyqsuycqmv');
+  assert.equal(projectRef, 'ykounjabfsrtkzostbbz');
   const output = resolve('.sites-runtime/requests-validation'); mkdirSync(output, {recursive: true});
   const tab = await (await fetch(`${cdpUrl}/json/new?about:blank`, {method: 'PUT'})).json();
   const socket = new WebSocket(tab.webSocketDebuggerUrl), jobs = new Map(), errors = []; let sequence = 0, initScript;

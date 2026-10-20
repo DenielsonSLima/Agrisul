@@ -109,6 +109,21 @@ try{
  assert.equal(client.getQueryState(bPaymentMethods).isInvalidated,false);
  assert.equal(client.getQueryState(bOrders).isInvalidated,false);
 
+ // Weighing projections embed partner/company labels. Refresh list, detail
+ // and options together while keeping the other account's cache isolated.
+ const aWeighingList=key('owner-a','cane-weighings',{companyId:'one',view:'list'});
+ const aWeighingDetail=key('owner-a','cane-weighings',{companyId:'one',id:'control-a'});
+ const bWeighingList=key('owner-b','cane-weighings',{companyId:'two',view:'list'});
+ for(const table of ['billing_cane_weighing_controls','billing_cane_weighing_entries','billing_cane_weighing_components','billing_clients','billing_companies','billing_memberships','billing_access_profiles']){
+  for(const queryKey of [aWeighingList,aWeighingDetail,bWeighingList])client.setQueryData(queryKey,{saved:true});
+  for(const resource of realtimeResources[table])await client.invalidateQueries({queryKey:billingKeys.resource('owner-a',resource),refetchType:'none'});
+  assert.equal(client.getQueryState(aWeighingList).isInvalidated,true,table+' refreshes weighing list');
+  assert.equal(client.getQueryState(aWeighingDetail).isInvalidated,true,table+' refreshes weighing detail');
+  assert.equal(client.getQueryState(bWeighingList).isInvalidated,false);
+ }
+ assert.ok(mutationResources('clients').includes('cane-weighings'));
+ assert.ok(mutationResources('companies').includes('cane-weighings'));
+
  // Provider contacts refresh both the provider detail and purchase-order contact choices.
  const aProviders=key('owner-a','service-providers',{view:'detail',id:'provider-a'});
  client.setQueryData(aProviders,{saved:true});client.setQueryData(aOrders,{saved:true});

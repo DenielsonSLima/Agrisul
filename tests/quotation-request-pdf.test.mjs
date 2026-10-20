@@ -172,7 +172,7 @@ test('quotation request PDF is a roomy supplier form with photo, prices, discoun
       number: 'COT-001',
       requestDate: '2026-09-23',
       requester: 'REQUESTER_MUST_NOT_APPEAR',
-      notes: '',
+      notes: 'Itens transcritos da solicitação de compra nº 397, de 05/10/2026. Aplicação: TRATORES BM100 Nº 221/220/100/103. Fornecedores serão adicionados posteriormente.',
       provider: {
         id: 'quotation-provider',
         providerId: 'provider',
@@ -190,12 +190,12 @@ test('quotation request PDF is a roomy supplier form with photo, prices, discoun
           materialVariantId: '',
           materialName: 'FILTRO COM FOTO',
           materialCode: 'MAT-001',
-          materialApplication: 'Aplicação do primeiro produto',
+          materialApplication: 'TRATORES BM100 Nº\n221/220/100/103',
           materialReferences: [{brand: 'MANN', code: 'H12111'}],
           materialImageUrl: 'mock://signed-material-photo',
           quantity: '5',
           unit: 'PC',
-          notes: '',
+          notes: 'Solicitação de compra nº 397; referência conforme documento: H12111',
         },
         {
           id: 'item-without-photo',
@@ -208,7 +208,7 @@ test('quotation request PDF is a roomy supplier form with photo, prices, discoun
           materialImageUrl: null,
           quantity: '12',
           unit: 'UN',
-          notes: '',
+          notes: 'Enviar na embalagem original.',
         },
       ],
     };
@@ -227,10 +227,14 @@ test('quotation request PDF is a roomy supplier form with photo, prices, discoun
     const searchableText = allText.replace(/\s+/g, ' ');
 
     assert.equal(JSON.stringify(snapshot), before, 'PDF generation must not mutate its snapshot');
+    assert.doesNotMatch(searchableText, /Solicitação de compra nº|referência conforme documento|TRATORES BM100|221\/220\/100\/103/i, 'internal provenance and fleet identifiers must stay out of the supplier PDF');
+    assert.ok(searchableText.includes('H12111'), 'manufacturer references must remain available to the supplier');
+    assert.ok(searchableText.includes('Enviar na embalagem original.'), 'commercial instructions must remain available to the supplier');
     assert.equal(
       fileName,
-      'cotacao-ana-cristina-alves-de-oliveira-cotacao-de-23-09-2026-cot-001.pdf',
+      'ANA CRISTINA ALVES DE OLIVEIRA - COT-001.pdf',
     );
+    assert.ok(doc.output().includes('/Title (ANA CRISTINA ALVES DE OLIVEIRA - COT-001)'), 'PDF metadata must identify the supplier and quotation');
     assert.equal(
       new TextDecoder().decode(new Uint8Array(doc.output('arraybuffer')).slice(0, 4)),
       '%PDF',

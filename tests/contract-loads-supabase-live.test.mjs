@@ -4,7 +4,7 @@ import {mkdirSync,writeFileSync,unlinkSync} from 'node:fs';
 import {createClient} from '@supabase/supabase-js';
 import {getMcpCredentials,PROJECT_REF} from '../scripts/supabase-mcp.mjs';
 if(process.env.BILLING_RUN_LIVE_TESTS!=='1')throw new Error('Enable isolated live tests explicitly.');
-assert.equal(PROJECT_REF,'rbuscpwntzpyqsuycqmv');
+assert.equal(PROJECT_REF,'ykounjabfsrtkzostbbz');
 const {authorization}=getMcpCredentials();
 const response=await fetch(`https://api.supabase.com/v1/projects/${PROJECT_REF}/api-keys?reveal=true`,{headers:{Authorization:authorization}});assert.equal(response.status,200);
 const keys=await response.json(),publicKey=keys.find(k=>k.type==='publishable')?.api_key,adminKey=keys.find(k=>k.type==='secret')?.api_key??keys.find(k=>k.name==='service_role')?.api_key;

@@ -256,7 +256,7 @@ function QuoteDetailContent({quote}: {quote: Quote}) {
     if (quote.status !== 'open' || mutations.scopeSaving) return;
     const accepted = await confirm({
       title: 'Remover fornecedor da cotação?',
-      description: `${provider.providerName} deixará de participar desta cotação. O cadastro do fornecedor será mantido.`,
+      description: `${provider.providerName} deixará de participar desta cotação. Seus preços, histórico de negociação e aprovações nesta cotação serão excluídos. O cadastro do fornecedor será mantido.`,
       confirmLabel: 'Remover fornecedor',
       tone: 'destructive',
     });

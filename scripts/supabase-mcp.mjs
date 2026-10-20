@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-export const PROJECT_REF = 'rbuscpwntzpyqsuycqmv';
+export const PROJECT_REF = 'ykounjabfsrtkzostbbz';
 export function getMcpCredentials() {
  const userRoot=process.env.HOME||process.env.USERPROFILE;
  const configPath=process.env.BILLING_MCP_CONFIG||(userRoot?`${userRoot}/.gemini/antigravity/mcp_config.json`:'');

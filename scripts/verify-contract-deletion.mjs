@@ -1,6 +1,6 @@
 import {PROJECT_REF,callMcp} from './supabase-mcp.mjs';
 
-if(PROJECT_REF!=='rbuscpwntzpyqsuycqmv')throw new Error(`Projeto Supabase incorreto: ${PROJECT_REF}`);
+if(PROJECT_REF!=='ykounjabfsrtkzostbbz')throw new Error(`Projeto Supabase incorreto: ${PROJECT_REF}`);
 
 const query=`
 select

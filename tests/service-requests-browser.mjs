@@ -20,7 +20,7 @@ function pdfText(path) {
 }
 
 export async function verifyRequestsBrowser({operatorSession, managerSession, otherSession, operatorName = 'Operador de teste', projectRef, png, requesterName = 'Edmilson Navegador', baseUrl = 'http://localhost:5173', cdpUrl = 'http://localhost:9235'}) {
-  assert.equal(projectRef, 'rbuscpwntzpyqsuycqmv');
+  assert.equal(projectRef, 'ykounjabfsrtkzostbbz');
   assert.ok(png?.length, 'A valid PNG fixture is required');
   assert.notEqual(operatorSession.user.id, managerSession.user.id, 'Operator and manager must use independent logins');
   const output = resolve('.sites-runtime/requests-validation'); mkdirSync(output, {recursive: true});
