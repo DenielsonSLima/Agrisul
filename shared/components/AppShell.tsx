@@ -1,5 +1,5 @@
 "use client";
-import {lazy,Suspense,useEffect,useRef,useState} from "react";import {ModuleLink as Link,ModuleNavigationProvider,useModuleNavigation} from "@/shared/navigation/ModuleNavigation";import {sidebarGroupHasActiveChild,sidebarGroupIsExpanded} from "@/shared/navigation/sidebarExpansion";import {Home,Users,FileText,ChartNoAxesCombined,CalendarDays,CalendarRange,Settings,Search,ChevronRight,ReceiptText,FileChartColumn,ClipboardCheck,Wrench,Loader2,ShoppingCart,Scale} from "lucide-react";
+import {lazy,Suspense,useEffect,useState} from "react";import {ModuleLink as Link,ModuleNavigationProvider,useModuleNavigation} from "@/shared/navigation/ModuleNavigation";import {Home,Users,FileText,ChartNoAxesCombined,CalendarDays,CalendarRange,Settings,Search,ChevronRight,ReceiptText,FileChartColumn,ClipboardCheck,Wrench,Loader2,ShoppingCart,Scale} from "lucide-react";
 import {SidebarProvider,Sidebar,SidebarHeader,SidebarContent,SidebarFooter,SidebarMenu,SidebarMenuItem,SidebarMenuButton,SidebarMenuSub,SidebarMenuSubItem,SidebarMenuSubButton,SidebarTrigger,useSidebar} from "@/components/ui/sidebar";
 import {Dialog,DialogContent,DialogTitle,DialogDescription} from "@/components/ui/dialog";import {Command,CommandInput,CommandList,CommandEmpty,CommandGroup,CommandItem} from "@/components/ui/command";
 import {useApp} from "@/shared/state/AppProvider";import {initials} from "@/shared/utils/format";
@@ -29,9 +29,7 @@ function Navigation(){
  const cadastroActive=path==="/cadastro";
  const solicitacoesActive=path==="/solicitacoes"||path==="/cotacao";
  const [expanded,setExpanded]=useState<Record<string,boolean>>({});
- const collapseTimers=useRef<Record<string,number>>({});
- const m=useApp();const {setOpenMobile,isMobile}=useSidebar();
- useEffect(()=>()=>{for(const timer of Object.values(collapseTimers.current))window.clearTimeout(timer);},[]);
+ const m=useApp();const {setOpenMobile}=useSidebar();
  return <Sidebar className="app-sidebar">
   <SidebarHeader className="brand-header"><Link href="/" className="brand"><span className="brand-mark" aria-hidden="true"><ReceiptText size={23} strokeWidth={1.7}/></span><span className="system-brand">Controle de<br/>Faturamento</span></Link><span className="brand-caption"/></SidebarHeader>
   <SidebarContent><div className="nav-label">PRINCIPAL</div><SidebarMenu className="main-nav">
@@ -39,20 +37,14 @@ function Navigation(){
     const grouped=x.path==="/cadastro"||x.path==="/solicitacoes";
     const sections=x.path==="/cadastro"?cadastroSections:solicitacoesSections;
     const groupActive=x.path==="/cadastro"?cadastroActive:x.path==="/solicitacoes"?solicitacoesActive:path===x.path;
-    const activeChild=grouped&&sidebarGroupHasActiveChild(x.path,path,section);
-    const groupExpanded=grouped&&sidebarGroupIsExpanded(activeChild,!!expanded[x.path]);
-    const cancelCollapse=()=>{const timer=collapseTimers.current[x.path];if(timer!==undefined){window.clearTimeout(timer);delete collapseTimers.current[x.path];}};
-    const updateExpanded=(value:boolean)=>setExpanded(current=>current[x.path]===value?current:{...current,[x.path]:value});
-    const expandGroup=()=>{cancelCollapse();updateExpanded(true);};
-    const collapseGroup=()=>{cancelCollapse();updateExpanded(false);};
-    const scheduleCollapse=(item:HTMLElement)=>{cancelCollapse();collapseTimers.current[x.path]=window.setTimeout(()=>{delete collapseTimers.current[x.path];if(!item.matches(":hover")&&!item.matches(":focus-within"))updateExpanded(false);},120);};
+    const groupExpanded=grouped&&!!expanded[x.path];
     const subnavId=`sidebar-subnav-${x.path.slice(1)}`;
-    return <SidebarMenuItem key={x.path} onMouseEnter={!isMobile&&grouped?expandGroup:undefined} onMouseLeave={!isMobile&&grouped?event=>scheduleCollapse(event.currentTarget):undefined} onFocusCapture={grouped?expandGroup:undefined} onBlurCapture={grouped?event=>{if(!event.currentTarget.contains(event.relatedTarget as Node|null))scheduleCollapse(event.currentTarget)}:undefined}>
-     <SidebarMenuButton asChild={!grouped} type={grouped?"button":undefined} isActive={groupActive} className="nav-item" aria-expanded={grouped?groupExpanded:undefined} aria-controls={grouped?subnavId:undefined} onClick={grouped?()=>{if(activeChild)return;if(isMobile)setExpanded(current=>({...current,[x.path]:!current[x.path]}));else expandGroup();}:undefined}>
+    return <SidebarMenuItem key={x.path}>
+     <SidebarMenuButton asChild={!grouped} type={grouped?"button":undefined} isActive={groupActive} className="nav-item" aria-expanded={grouped?groupExpanded:undefined} aria-controls={grouped?subnavId:undefined} onClick={grouped?()=>setExpanded(current=>({...current,[x.path]:!current[x.path]})):undefined}>
       {grouped?<><x.icon/><span>{x.name}</span><ChevronRight className={"cadastro-toggle-chevron "+(groupExpanded?"expanded":"")} aria-hidden="true"/></>:<Link href={x.path} aria-current={path===x.path?"page":undefined} onClick={()=>setOpenMobile(false)}><x.icon/><span>{x.name}</span></Link>}
      </SidebarMenuButton>
      {grouped&&<div id={subnavId} className="sidebar-subnav-motion" data-open={groupExpanded?"true":"false"} aria-hidden={!groupExpanded} inert={!groupExpanded}><div className="sidebar-subnav-clip"><SidebarMenuSub className="cadastro-subnav" aria-label={"Submódulos de "+x.name}>
-      {sections.map(item=>{const active=x.path==="/cadastro"?cadastroActive&&selectedCadastro?.id===item.id:item.id==="cotacao"?path==="/cotacao":path==="/solicitacoes"&&section===item.id;return <SidebarMenuSubItem key={item.id}><SidebarMenuSubButton asChild isActive={active} className="cadastro-subnav-link"><Link href={item.href} aria-current={active?"page":undefined} onClick={()=>{collapseGroup();setOpenMobile(false)}}><item.icon/><span>{item.name}</span></Link></SidebarMenuSubButton></SidebarMenuSubItem>;})}
+      {sections.map(item=>{const active=x.path==="/cadastro"?cadastroActive&&selectedCadastro?.id===item.id:item.id==="cotacao"?path==="/cotacao":path==="/solicitacoes"&&section===item.id;return <SidebarMenuSubItem key={item.id}><SidebarMenuSubButton asChild isActive={active} className="cadastro-subnav-link"><Link href={item.href} aria-current={active?"page":undefined} onClick={()=>setOpenMobile(false)}><item.icon/><span>{item.name}</span></Link></SidebarMenuSubButton></SidebarMenuSubItem>;})}
      </SidebarMenuSub></div></div>}
     </SidebarMenuItem>;
    })}

@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import { createModuleNavigation } from '../shared/navigation/navigationStore.ts';
-import {sidebarGroupHasActiveChild,sidebarGroupIsExpanded} from '../shared/navigation/sidebarExpansion.ts';
 
 function hostAt(path='/') {
   const events=new Map();
@@ -124,27 +123,15 @@ test('external URLs do not mutate module state or browser history',()=>{
   assert.equal(nav.getSnapshot(),'/cadastro');assert.equal(host.location.pathname,'/cadastro');
 });
 
-test('sidebar expansion follows interaction and only locks with an active child',()=>{
-  assert.equal(sidebarGroupHasActiveChild('/cadastro','/cadastro',null),true);
-  assert.equal(sidebarGroupHasActiveChild('/cadastro','/',null),false);
-  assert.equal(sidebarGroupHasActiveChild('/solicitacoes','/solicitacoes',null),false);
-  assert.equal(sidebarGroupHasActiveChild('/solicitacoes','/solicitacoes','servico'),true);
-  assert.equal(sidebarGroupHasActiveChild('/solicitacoes','/cotacao',null),true);
-  assert.equal(sidebarGroupIsExpanded(false,false),false);
-  assert.equal(sidebarGroupIsExpanded(false,true),true);
-  assert.equal(sidebarGroupIsExpanded(true,false),true);
-});
-
-test('sidebar nests quotation and gives both grouped modules smooth hover and focus behavior',async()=>{
+test('sidebar groups toggle only on click and preserve accessible submenu transitions',async()=>{
   const shell=await readFile(new URL('../shared/components/AppShell.tsx',import.meta.url),'utf8');
   const styles=await readFile(new URL('../app/globals.css',import.meta.url),'utf8');
   const requests=await readFile(new URL('../modules/solicitacoes/components/SolicitacoesPage.tsx',import.meta.url),'utf8');
   assert.match(shell,/solicitacoesSections=.*name:"Cotação",href:"\/cotacao"/);
   assert.match(shell,/filter\(x=>x\.path!=="\/configuracoes"&&x\.path!=="\/cotacao"\)/);
-  assert.match(shell,/onMouseEnter=\{!isMobile&&grouped\?expandGroup:undefined\}/);
-  assert.match(shell,/onMouseLeave=\{!isMobile&&grouped\?event=>scheduleCollapse\(event\.currentTarget\):undefined\}/);
-  assert.match(shell,/onFocusCapture=\{grouped\?expandGroup:undefined\}/);
-  assert.match(shell,/const groupExpanded=grouped&&sidebarGroupIsExpanded\(activeChild,!!expanded\[x\.path\]\)/);
+  assert.doesNotMatch(shell,/onMouseEnter|onMouseLeave|onFocusCapture|onBlurCapture|collapseTimers|activeChild/);
+  assert.match(shell,/const groupExpanded=grouped&&!!expanded\[x\.path\]/);
+  assert.match(shell,/onClick=\{grouped\?\(\)=>setExpanded\(current=>\(\{\.\.\.current,\[x\.path\]:!current\[x\.path\]\}\)\):undefined\}/);
   assert.match(shell,/className="sidebar-subnav-motion" data-open=\{groupExpanded\?"true":"false"\}/);
   assert.match(shell,/aria-hidden=\{!groupExpanded\} inert=\{!groupExpanded\}/);
   assert.match(shell,/const cadastroActive=path==="\/cadastro"/);
