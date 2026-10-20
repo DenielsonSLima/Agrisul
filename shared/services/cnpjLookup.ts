@@ -19,32 +19,41 @@ function fromCnpjWs(data:Json,cnpj:string):CompanyDetails {
  if(!text(data,'razao_social')||normalizeCnpj(text(establishment,'cnpj'))!==cnpj)throw new LookupError('A consulta retornou dados incompletos. Tente novamente ou preencha manualmente.',502);
  return {cnpj,legalName:text(data,'razao_social'),tradeName:text(establishment,'nome_fantasia'),street:[text(establishment,'tipo_logradouro'),text(establishment,'logradouro')].filter(Boolean).join(' '),number:text(establishment,'numero'),complement:text(establishment,'complemento'),district:text(establishment,'bairro'),city:text(object(establishment.cidade),'nome'),state:text(object(establishment.estado),'sigla'),zipCode:text(establishment,'cep'),phone:[text(establishment,'ddd1'),text(establishment,'telefone1')].join('')||[text(establishment,'ddd2'),text(establishment,'telefone2')].join(''),email:text(establishment,'email')};
 }
+function fromOpenCnpj(data:Json,cnpj:string):CompanyDetails {
+ if(!text(data,'razao_social')||normalizeCnpj(text(data,'cnpj'))!==cnpj)throw new LookupError('A consulta retornou dados incompletos. Tente novamente ou preencha manualmente.',502);
+ const phones=Array.isArray(data.telefones)?data.telefones.map(object):[];
+ const phone=phones.find(value=>value.is_fax!==true&&text(value,'numero'));
+ return {cnpj,legalName:text(data,'razao_social'),tradeName:text(data,'nome_fantasia'),street:[text(data,'tipo_logradouro'),text(data,'logradouro')].filter(Boolean).join(' '),number:text(data,'numero'),complement:text(data,'complemento'),district:text(data,'bairro'),city:text(data,'municipio'),state:text(data,'uf'),zipCode:text(data,'cep'),phone:phone?[text(phone,'ddd'),text(phone,'numero')].join(''):'',email:text(data,'email')};
+}
 
 // Only public registration fields are cached. No credentials or user payloads.
-// The fallback has a separate public API; Minha Receita is already BrasilAPI's
+// Fallbacks use independent public APIs; Minha Receita is already BrasilAPI's
 // upstream and must not be retried directly to get around its limits.
 // https://github.com/BrasilAPI/BrasilAPI/blob/main/pages/docs/doc/cnpj.json
+// https://opencnpj.org/ — independent public Receita Federal dataset.
 // https://docs.cnpj.ws/referencia-de-api/api-publica/consultando-cnpj
 export function createCnpjLookup(dependencies:{fetch?:typeof fetch;now?:()=>number}={}){
  const request=dependencies.fetch??((...args:Parameters<typeof fetch>)=>fetch(...args));
  const now=dependencies.now??Date.now;
  const cache=new Map<string,{value:CompanyDetails;expires:number}>();
  const inFlight=new Map<string,Promise<CompanyDetails>>();
- const cooldown=[0,0];
- const fallbackRequests:number[]=[];
  const providers=[
-  {name:'brasilapi',url:'https://brasilapi.com.br/api/cnpj/v1/',map:fromBrasilApi},
-  {name:'cnpj-ws',url:'https://publica.cnpj.ws/cnpj/',map:fromCnpjWs},
+  {name:'brasilapi',url:'https://brasilapi.com.br/api/cnpj/v1/',map:fromBrasilApi,timeout:6000,perMinuteLimit:Infinity},
+  {name:'opencnpj',url:'https://api.opencnpj.org/',map:fromOpenCnpj,timeout:6000,perMinuteLimit:30},
+  {name:'cnpj-ws',url:'https://publica.cnpj.ws/cnpj/',map:fromCnpjWs,timeout:12000,perMinuteLimit:3},
  ];
+ const cooldown=providers.map(()=>0);
+ const providerRequests=providers.map(()=>[] as number[]);
  async function consult(cnpj:string,index:number):Promise<CompanyDetails>{
   if(now()<cooldown[index])throw limited();
-  if(index===1){
-   while(fallbackRequests.length&&fallbackRequests[0]<=now()-60000)fallbackRequests.shift();
-   if(fallbackRequests.length>=3)throw limited();
-   fallbackRequests.push(now());
+  if(Number.isFinite(providers[index].perMinuteLimit)){
+   const requests=providerRequests[index];
+   while(requests.length&&requests[0]<=now()-60000)requests.shift();
+   if(requests.length>=providers[index].perMinuteLimit)throw limited();
+   requests.push(now());
   }
   let response:Response;
-  try{response=await request(providers[index].url+encodeURIComponent(cnpj),{headers:{Accept:'application/json'},signal:AbortSignal.timeout(6000),redirect:'manual'});}
+  try{response=await request(providers[index].url+encodeURIComponent(cnpj),{headers:{Accept:'application/json'},signal:AbortSignal.timeout(providers[index].timeout),redirect:'manual'});}
   catch(error){
    console.warn('cnpj_lookup_provider_network_error',{
     provider:providers[index].name,
@@ -76,18 +85,16 @@ export function createCnpjLookup(dependencies:{fetch?:typeof fetch;now?:()=>numb
   return providers[index].map(object(data),cnpj);
  }
  async function load(cnpj:string):Promise<CompanyDetails>{
-  let firstError:LookupError;
-  try{return await consult(cnpj,0);}catch(error){
-   if(!(error instanceof LookupError)||error.status===400||error.status===404)throw error;
-   firstError=error;
+  const failures:LookupError[]=[];
+  for(let index=0;index<providers.length;index++){
+   try{return await consult(cnpj,index);}catch(error){
+    if(!(error instanceof LookupError)||error.status===400||error.status===404)throw error;
+    failures.push(error);
+   }
   }
-  try{return await consult(cnpj,1);}catch(error){
-   if(!(error instanceof LookupError)||error.status===400||error.status===404)throw error;
-   if(firstError.status===429&&error.status===429)throw limited();
-   if(firstError.status===504&&error.status===504)throw firstError;
-   if(firstError.status===502&&error.status===502)throw firstError;
-   throw unavailable();
-  }
+  if(failures.every(error=>error.status===429))throw limited();
+  if(failures.every(error=>error.status===504)||failures.every(error=>error.status===502))throw failures[0];
+  throw unavailable();
  }
  return async(cnpjInput:string):Promise<CompanyDetails>=>{
   const cnpj=normalizeCnpj(cnpjInput);
