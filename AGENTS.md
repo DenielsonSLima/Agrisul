@@ -2,7 +2,7 @@
 
 ## Escopo e projeto remoto
 
-- Este checkout pertence ao Supabase `rbuscpwntzpyqsuycqmv`. Confirme esse identificador antes de qualquer operação remota.
+- Este checkout pertence ao Supabase `ykounjabfsrtkzostbbz`. Confirme esse identificador antes de qualquer operação remota.
 - O MCP do Antigravity é `supabase-controle-faturamento`. Preserve as outras conexões e projetos. `scripts/supabase-mcp.mjs` lê a credencial fora do repositório e verifica o destino.
 - Configurações, Cadastros e seus contratos operacionais usam Supabase. Os repositories D1 e testes antigos documentam a implementação anterior; não reintroduza D1/R2 nessas telas.
 

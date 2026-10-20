@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Calendar and reports are projections of authoritative business records.
 -- Dates on the calendar are business dates; creation uses Sao Paulo time.
 CREATE FUNCTION billing_private.overview_scope(p_payload jsonb, p_allowed text[])
@@ -199,3 +201,5 @@ REVOKE ALL ON FUNCTION billing_private.planning_dispatch(text,jsonb),billing_pri
  billing_private.planning_executions_dispatch(text,jsonb) FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON public.billing_planning_entries,public.billing_planning_goals,public.billing_planning_goal_entries,
  public.billing_planning_goal_revisions,public.billing_planning_executions FROM anon,authenticated;
+
+COMMIT;

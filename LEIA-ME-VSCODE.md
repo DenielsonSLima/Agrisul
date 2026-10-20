@@ -12,7 +12,7 @@ Abra http://localhost:5173. As dependências já foram instaladas neste computad
 
 ## Conta e dados
 
-Configurações, Cadastros e os contratos que usam esses cadastros estão ligados ao Supabase `rbuscpwntzpyqsuycqmv`. Entre com a conta do aplicativo; a senha do dashboard Supabase não é automaticamente uma conta do aplicativo. Você também pode criar uma conta na tela inicial e confirmar seu e-mail.
+Configurações, Cadastros e os contratos que usam esses cadastros estão ligados ao Supabase `ykounjabfsrtkzostbbz`. Entre com a conta do aplicativo; a senha do dashboard Supabase não é automaticamente uma conta do aplicativo. Você também pode criar uma conta na tela inicial e confirmar seu e-mail.
 
 O `.env.local` deste computador contém somente a URL e a chave pública do projeto. Para outra instalação, copie `.env.example` para `.env.local` e preencha a chave pública. Nunca use token MCP, chave secreta ou service_role em variável VITE_.
 

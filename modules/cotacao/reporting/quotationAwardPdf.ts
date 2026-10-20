@@ -7,6 +7,7 @@ import {
   type ReportPdfImage,
 } from '@/shared/reporting';
 import {loadReportImage} from '@/shared/reporting/loadReportImage';
+import {supplierNotes, supplierQuotationFileName, supplierQuotationTitle} from '@/shared/reporting/supplierText';
 import {dateLabel, moneyLabel} from '@/shared/utils/presentation';
 import type {jsPDF as JsPdf} from 'jspdf';
 import type {Quote, QuoteItem, QuoteProvider} from '../types';
@@ -41,13 +42,6 @@ const COLUMNS = [
 ] as const;
 const HEADER_HEIGHT = 10;
 const ROW_HEIGHT = 25;
-
-const safeFilePart = (value: string) => value
-  .normalize('NFD')
-  .replace(/[\u0300-\u036f]/g, '')
-  .replace(/[^a-zA-Z0-9]+/g, '-')
-  .replace(/^-|-$/g, '')
-  .toLowerCase() || 'fornecedor';
 
 function providerDocumentLabel(provider: QuoteProvider) {
   const value = provider.providerDocument?.trim() ?? '';
@@ -136,10 +130,14 @@ export async function createQuotationAwardPdf(
 ) {
   const {jsPDF} = await import('@/shared/reporting/jsPdfRuntime');
   const doc = new jsPDF({orientation: 'portrait', unit: 'mm', format: 'a4', compress: true});
+  const fileName = supplierQuotationFileName(snapshot.provider.providerName, snapshot.number);
+  doc.setProperties({title: fileName.replace(/\.pdf$/, '')});
   const width = doc.internal.pageSize.getWidth();
   const height = doc.internal.pageSize.getHeight();
   const margin = REPORT_MARGIN_MM;
   const content = width - margin * 2;
+  const supplierTitle = supplierQuotationTitle(snapshot.title);
+  const notes = supplierNotes(snapshot.notes);
   const bottom = height - margin - 9;
   const [logo, watermark, itemImages] = await Promise.all([
     loadReportImage(brand.company?.logoUrl ?? null),
@@ -168,7 +166,7 @@ export async function createQuotationAwardPdf(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(72, 91, 78);
-    doc.text(limitedLines(doc, snapshot.title, content * .5, 1)[0] ?? '', margin, y);
+    doc.text(limitedLines(doc, supplierTitle, content * .5, 1)[0] ?? '', margin, y);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.2);
     doc.setTextColor(121, 137, 126);
@@ -292,7 +290,7 @@ export async function createQuotationAwardPdf(
     const details = [
       item.materialCode && `Cód.: ${item.materialCode}`,
       references && `Ref.: ${references}`,
-      item.notes,
+      supplierNotes(item.notes),
     ].filter(Boolean).join(' · ');
     if (details) {
       doc.setFont('helvetica', 'normal');
@@ -366,7 +364,7 @@ export async function createQuotationAwardPdf(
   if (y + 19 > bottom) newPage();
   drawTotal();
 
-  if (snapshot.notes.trim() && y + 18 <= bottom) {
+  if (notes && y + 18 <= bottom) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(6.2);
     doc.setTextColor(107, 127, 113);
@@ -374,7 +372,7 @@ export async function createQuotationAwardPdf(
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(70, 89, 77);
-    doc.text(limitedLines(doc, snapshot.notes.trim(), content, 3), margin, y + 4, {lineHeightFactor: 1.15});
+    doc.text(limitedLines(doc, notes, content, 3), margin, y + 4, {lineHeightFactor: 1.15});
   }
 
   const pages = doc.getNumberOfPages();
@@ -392,6 +390,6 @@ export async function createQuotationAwardPdf(
 
   return {
     doc,
-    fileName: `cotacao-aprovada-${safeFilePart(snapshot.provider.providerName)}-${safeFilePart(snapshot.title)}-${safeFilePart(snapshot.number)}.pdf`,
+    fileName,
   };
 }

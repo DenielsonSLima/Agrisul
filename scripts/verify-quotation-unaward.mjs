@@ -1,6 +1,6 @@
 import {callMcp, PROJECT_REF} from './supabase-mcp.mjs';
 
-if (PROJECT_REF !== 'rbuscpwntzpyqsuycqmv') {
+if (PROJECT_REF !== 'ykounjabfsrtkzostbbz') {
   throw new Error(`Projeto Supabase incorreto: ${PROJECT_REF}`);
 }
 

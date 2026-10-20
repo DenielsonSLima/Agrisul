@@ -7,7 +7,7 @@ import {fixturePng,fixturePortraitPng} from './document-watermark-live.mjs';
 import {captureRequestPdfPages,readRequestPreviewPdf} from './request-pdf-browser.mjs';
 
 export async function verifyDocumentHeader({owner,member,other,company,profile,rpc,projectRef,trackFile,cdpUrl}){
- assert.equal(projectRef,'rbuscpwntzpyqsuycqmv');assert.ok(cdpUrl);
+ assert.equal(projectRef,'ykounjabfsrtkzostbbz');assert.ok(cdpUrl);
  await rpc(owner.client,'access-profiles','save',{id:profile.id,name:profile.name,description:'Request-only reader',permissions:['requests.read','requests.write','signatures.manage']});
  const logoPath=`${owner.id}/companies/${randomUUID()}.png`,watermarkPath=`${owner.id}/portrait/${randomUUID()}.png`;
  for(const [bucket,path] of [['billing-company-logos',logoPath],['billing-watermarks',watermarkPath]]){

@@ -68,8 +68,9 @@ test('approved export snapshot contains only items awarded to its supplier and t
     });
     assert.equal(
       result.fileName,
-      'cotacao-aprovada-fornecedor-a-cotacao-de-filtros-cot-010.pdf',
+      'Fornecedor A - COT-010.pdf',
     );
+    assert.ok(result.doc.output().includes('/Title (Fornecedor A - COT-010)'), 'approved PDF metadata must identify the supplier and quotation');
     assert.equal(
       new TextDecoder().decode(new Uint8Array(result.doc.output('arraybuffer')).slice(0, 4)),
       '%PDF',

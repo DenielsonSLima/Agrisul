@@ -7,7 +7,7 @@ import {jsPDF} from 'jspdf';
 import {readRequestPreviewPdf} from './request-pdf-browser.mjs';
 
 export async function verifyRequestComplements({owner, member, other, profile, rpc, upload, projectRef, cdpUrl}) {
-  assert.equal(projectRef, 'rbuscpwntzpyqsuycqmv');
+  assert.equal(projectRef, 'ykounjabfsrtkzostbbz');
   const person = (await rpc(member.client, 'signatures', 'save', {name: 'Solicitante sem orçamento', role: 'requester'})).signature;
   const signature = await upload(owner.client, 'signatures');
   await rpc(owner.client, 'signatures', 'save', {name: 'Diretor de teste', role: 'manager', userId: owner.id, fileId: signature.id});

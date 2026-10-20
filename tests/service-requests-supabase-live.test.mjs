@@ -5,7 +5,7 @@ import {createClient} from '@supabase/supabase-js';
 import {getMcpCredentials,PROJECT_REF} from '../scripts/supabase-mcp.mjs';
 
 if(process.env.BILLING_RUN_LIVE_TESTS!=='1')throw Error('Set BILLING_RUN_LIVE_TESTS=1 for isolated live verification.');
-assert.equal(PROJECT_REF,'rbuscpwntzpyqsuycqmv');
+assert.equal(PROJECT_REF,'ykounjabfsrtkzostbbz');
 const {authorization}=getMcpCredentials();
 const response=await fetch(`https://api.supabase.com/v1/projects/${PROJECT_REF}/api-keys?reveal=true`,{headers:{Authorization:authorization}});
 assert.equal(response.status,200);

@@ -1,7 +1,7 @@
 # Verificação periódica do banco
 
 O workflow `.github/workflows/supabase-heartbeat.yml` consulta o Postgres do projeto
-`rbuscpwntzpyqsuycqmv` a cada 6 horas, às 00:23, 06:23, 12:23 e 18:23 UTC.
+`ykounjabfsrtkzostbbz` a cada 6 horas, às 00:23, 06:23, 12:23 e 18:23 UTC.
 Ele funciona no GitHub, mesmo com o computador desligado. Também executa ao
 publicar alterações no próprio workflow e permite execução manual em Actions.
 

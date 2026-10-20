@@ -25,7 +25,7 @@ export function fixturePortraitPng(){
 }
 
 export async function verifyDocumentWatermark({owner,member,other,rpc,projectRef,trackFile,cdpUrl}){
- assert.equal(projectRef,'rbuscpwntzpyqsuycqmv');
+ assert.equal(projectRef,'ykounjabfsrtkzostbbz');
  const path=`${owner.id}/portrait/${randomUUID()}.png`,bucket='billing-watermarks';
  trackFile({bucket,path});
  assert.ifError((await owner.client.storage.from(bucket).upload(path,fixturePng(),{contentType:'image/png'})).error);

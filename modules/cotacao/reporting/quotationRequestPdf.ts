@@ -6,6 +6,7 @@ import {
 } from '@/shared/reporting/pdfHeader';
 import {drawReportPdfWatermark} from '@/shared/reporting/pdfWatermark';
 import {REPORT_MARGIN_MM} from '@/shared/reporting/reportLayout';
+import {supplierApplication, supplierNotes, supplierQuotationFileName, supplierQuotationTitle} from '@/shared/reporting/supplierText';
 import type {ReportPdfBrand} from '@/shared/reporting/types';
 import {dateLabel} from '@/shared/utils/presentation';
 import type {jsPDF as JsPdf} from 'jspdf';
@@ -38,13 +39,6 @@ const TABLE_COLUMNS = [
 const TABLE_HEADER_HEIGHT = 11;
 const ITEM_ROW_HEIGHT = 27;
 const TOTALS_HEIGHT = 29;
-
-const safeFilePart = (value: string) => value
-  .normalize('NFD')
-  .replace(/[\u0300-\u036f]/g, '')
-  .replace(/[^a-zA-Z0-9]+/g, '-')
-  .replace(/^-|-$/g, '')
-  .toLowerCase() || 'prestador';
 
 function providerDocumentLabel(provider: QuoteProvider) {
   const value = provider.providerDocument?.trim() ?? '';
@@ -104,10 +98,14 @@ export async function createQuotationRequestPdf(
 ) {
   const {jsPDF} = await import('@/shared/reporting/jsPdfRuntime');
   const doc = new jsPDF({orientation: 'portrait', unit: 'mm', format: 'a4', compress: true});
+  const fileName = supplierQuotationFileName(snapshot.provider.providerName, snapshot.number);
+  doc.setProperties({title: fileName.replace(/\.pdf$/, '')});
   const width = doc.internal.pageSize.getWidth();
   const height = doc.internal.pageSize.getHeight();
   const margin = REPORT_MARGIN_MM;
   const content = width - margin * 2;
+  const supplierTitle = supplierQuotationTitle(snapshot.title);
+  const notes = supplierNotes(snapshot.notes);
   const bottom = height - margin - 9;
   const [logo, watermark, itemImages] = await Promise.all([
     loadReportImage(brand.company?.logoUrl ?? null),
@@ -136,7 +134,7 @@ export async function createQuotationRequestPdf(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(72, 91, 78);
-    doc.text(limitedLines(doc, snapshot.title, content * .46, 1)[0] ?? '', margin, y);
+    doc.text(limitedLines(doc, supplierTitle, content * .46, 1)[0] ?? '', margin, y);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.2);
@@ -200,10 +198,10 @@ export async function createQuotationRequestPdf(
   };
 
   const drawNotes = () => {
-    if (!snapshot.notes.trim()) return;
+    if (!notes) return;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.2);
-    const noteLines = limitedLines(doc, snapshot.notes.trim(), content - 6, 4);
+    const noteLines = limitedLines(doc, notes, content - 6, 4);
     const noteHeight = Math.max(10, noteLines.length * 3 + 6);
     doc.setDrawColor(221, 229, 223);
     doc.setFillColor(250, 251, 250);
@@ -299,8 +297,8 @@ export async function createQuotationRequestPdf(
     const details = [
       item.materialCode && `Cód.: ${item.materialCode}`,
       references && `Ref.: ${references}`,
-      item.materialApplication,
-      item.notes,
+      supplierApplication(item.materialApplication),
+      supplierNotes(item.notes),
     ].filter(Boolean).join(' · ');
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.2);
@@ -476,6 +474,6 @@ export async function createQuotationRequestPdf(
 
   return {
     doc,
-    fileName: `cotacao-${safeFilePart(snapshot.provider.providerName)}-${safeFilePart(snapshot.title)}-${safeFilePart(snapshot.number)}.pdf`,
+    fileName,
   };
 }

@@ -6,6 +6,7 @@ const db = new PGlite();
 try {
   await db.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;');
   await db.exec(readFileSync(new URL('../migrations/20261014104222_billing_healthcheck.sql', import.meta.url), 'utf8'));
+  await db.exec(readFileSync(new URL('../migrations/20261019185421_rebuilt_project_healthcheck.sql', import.meta.url), 'utf8'));
   await db.exec('CREATE TABLE public.private_health_test(secret text); REVOKE ALL ON public.private_health_test FROM PUBLIC;');
 
   const {rows: [definition]} = await db.query(`
@@ -22,7 +23,7 @@ try {
     const {rows: [{result}]} = await db.query('SELECT public.billing_healthcheck() AS result');
     assert.deepEqual(Object.keys(result).sort(), ['checkedAt', 'ok', 'projectRef']);
     assert.equal(result.ok, true);
-    assert.equal(result.projectRef, 'rbuscpwntzpyqsuycqmv');
+    assert.equal(result.projectRef, 'ykounjabfsrtkzostbbz');
     assert.ok(Math.abs(Date.now() - Date.parse(result.checkedAt)) < 5000);
     await assert.rejects(db.query('SELECT * FROM public.private_health_test'), /permission denied/);
     await db.exec('RESET ROLE');

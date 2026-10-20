@@ -9,7 +9,7 @@ import {getMcpCredentials, PROJECT_REF} from '../scripts/supabase-mcp.mjs';
 if (process.env.BILLING_RUN_LIVE_TESTS !== '1') {
   throw new Error('Set BILLING_RUN_LIVE_TESTS=1 for isolated remote tests.');
 }
-if (PROJECT_REF !== 'rbuscpwntzpyqsuycqmv') throw new Error('Unexpected Supabase project.');
+if (PROJECT_REF !== 'ykounjabfsrtkzostbbz') throw new Error('Unexpected Supabase project.');
 
 const {authorization} = getMcpCredentials();
 const keyResponse = await fetch(

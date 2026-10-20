@@ -44,6 +44,9 @@
   "exclude": [
     "node_modules",
     "examples",
+    "outputs",
+    "work",
+    ".sites-runtime",
     "supabase/functions"
   ]
 }
