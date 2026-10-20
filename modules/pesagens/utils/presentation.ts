@@ -1,4 +1,15 @@
-import type {WeighingDetail} from '../types';
+import type {WeighingDetail, WeighingFilters} from '../types';
+
+export function weighingFilterLabel(filters?: WeighingFilters) {
+  if (!filters) return '';
+  const parts: string[] = [], date = (value: string) => value.split('-').reverse().join('/');
+  if (filters.dateFrom && filters.dateTo) parts.push(`Período: ${date(filters.dateFrom)} a ${date(filters.dateTo)}`);
+  else if (filters.dateFrom) parts.push(`A partir de ${date(filters.dateFrom)}`);
+  else if (filters.dateTo) parts.push(`Até ${date(filters.dateTo)}`);
+  if (filters.search) parts.push(`Busca: ${filters.search}`);
+  if (filters.pendingOnly) parts.push('Somente pendentes');
+  return parts.join(' | ');
+}
 
 export function weightLabel(value: string | null | undefined) {
   return value == null || value === '' ? 'Pendente' : new Intl.NumberFormat('pt-BR', {maximumFractionDigits: 7}).format(Number(value));

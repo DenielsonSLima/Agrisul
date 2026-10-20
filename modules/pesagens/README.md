@@ -14,6 +14,8 @@ Em **Cadastros → Frota**, filtre por parceiro e cadastre número, placa, tipo 
 
 ## Verificação
 
+A busca e o período estão disponíveis na lista e dentro do controle. Na lista, o período filtra a data de início; nas viagens, filtra a data efetiva da pesagem, incluindo os dois limites. É possível buscar parceiro/safra/observações nos controles e número de frota, placa, ticket ou observações nas viagens. A RPC refaz os totais, os agrupamentos diários e as pendências somente para os resultados selecionados. PDF e Excel usam esse mesmo recorte e identificam os filtros. **Limpar filtros** restaura a consulta completa.
+
 `npm test` inclui os testes de RPC com a cadeia real de migrations em PGlite e os testes de precisão/exportação. A fixture original de 18/10 valida as 15 viagens da planilha e impede a repetição do subtotal perdido no Excel. Consulte [REFERENCIA-PLANILHA.md](./REFERENCIA-PLANILHA.md) para os exemplos e as decisões da reunião dos três agentes.
 
 O teste remoto é optativo: `tests/cane-weighings-supabase-live.mjs`. Ele exige `BILLING_RUN_LIVE_TESTS=1`, CLI autenticado e vínculo com `ykounjabfsrtkzostbbz`. `BILLING_SUPABASE_CLI` pode indicar o executável. Com `BILLING_CDP_URL` e servidor local iniciado por `npm run dev`, também verifica o fluxo no Chrome. Cria contas efêmeras, mantém as credenciais administrativas apenas em memória e remove somente os dados criados pelo próprio teste.

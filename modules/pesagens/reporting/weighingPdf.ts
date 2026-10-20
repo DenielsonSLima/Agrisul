@@ -1,11 +1,11 @@
-﻿import type {jsPDF as JsPdf} from 'jspdf';
+import type {jsPDF as JsPdf} from 'jspdf';
 import {drawReportPdfHeader} from '@/shared/reporting/pdfHeader';
 import {drawReportPdfWatermark} from '@/shared/reporting/pdfWatermark';
 import {REPORT_MARGIN_MM} from '@/shared/reporting/reportLayout';
 import {loadReportImage} from '@/shared/reporting/loadReportImage';
 import type {ReportPdfBrand} from '@/shared/reporting/types';
 import {dateLabel} from '@/shared/utils/presentation';
-import {percentLabel, weightLabel} from '../utils/presentation';
+import {percentLabel, weightLabel, weighingFilterLabel} from '../utils/presentation';
 import type {WeighingDetail, WeighingSummary} from '../types';
 
 const clipped = (doc: JsPdf, value: string, width: number) => String(doc.splitTextToSize(value, Math.max(width, 1))[0] ?? '');
@@ -27,7 +27,12 @@ export async function createWeighingPdf(detail: WeighingDetail, brand: ReportPdf
     doc.setFontSize(8); doc.text(day, width - margin, top + 6, {align: 'right'});
     doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor('#647c6d');
     doc.text(`Safra ${detail.control.season} | Início: ${dateLabel(detail.control.startDate)} | Pesos em quilogramas (kg)`, margin, top + 11);
-    return top + 16;
+    const scope = weighingFilterLabel(detail.appliedFilters);
+    if (!scope) return top + 16;
+    doc.setFontSize(6.5);
+    const lines = doc.splitTextToSize(scope, contentWidth) as string[];
+    doc.text(lines, margin, top + 15);
+    return top + 20 + (lines.length - 1) * 3;
   }
   function tableHeader() {
     doc.setFillColor('#eaf4ed'); doc.rect(margin, y, contentWidth, 7, 'F');

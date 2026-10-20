@@ -1,13 +1,13 @@
 import {useCadastroMutation, useCadastroQuery} from '@/modules/cadastro/hooks/useCadastroQuery';
 import {useWorkspaceCompany} from '@/shared/state/WorkspaceCompanyProvider';
 import {deleteWeighing, deleteWeighingEntry, fetchWeighing, fetchWeighings, saveWeighing, saveWeighingEntry, weighingResource} from '../services/weighingApi';
-import type {WeighingControlInput, WeighingEntryInput} from '../types';
+import type {WeighingControlInput, WeighingEntryInput, WeighingFilters} from '../types';
 
-export function useWeighings(id?: string) {
+export function useWeighings(id?: string, filters: WeighingFilters = {}) {
   const workspace = useWorkspaceCompany();
   const companyId = workspace.activeCompanyId;
-  const list = useCadastroQuery(weighingResource, {companyId, view: 'list'}, signal => fetchWeighings(companyId, signal), !!companyId && !id);
-  const detail = useCadastroQuery(weighingResource, {companyId, view: 'detail', id}, signal => fetchWeighing(companyId, id!, signal), !!companyId && !!id);
+  const list = useCadastroQuery(weighingResource, {companyId, view: 'list', ...filters}, signal => fetchWeighings(companyId, signal, filters), !!companyId && !id);
+  const detail = useCadastroQuery(weighingResource, {companyId, view: 'detail', id, ...filters}, signal => fetchWeighing(companyId, id!, signal, filters), !!companyId && !!id);
   const selected = id ? detail : list;
   return {...selected, loading: workspace.loading || selected.loading, error: workspace.error || selected.error,
     noCompany: !workspace.loading && !workspace.error && !companyId, company: workspace.activeCompany,

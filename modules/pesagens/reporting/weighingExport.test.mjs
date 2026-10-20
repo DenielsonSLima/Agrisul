@@ -17,12 +17,14 @@ const entries = Array.from({length: 45}, (_, index) => ({id: `entry-${index}`, c
 ]}));
 const detail = {control: {id: 'control', companyId: 'company', partnerId: 'partner', partnerName: 'TAQUARI & TESTE', season: '2026/2027', startDate: '2026-10-16', notes: 'FONTE_45_VIAGENS_11_FOTOS', summary}, entries, daily: [{date: '2026-10-18', ...summary}], summary, canManage: true};
 try {
+  detail.appliedFilters = {dateFrom: '2026-10-17', dateTo: '2026-10-18', search: 'BUSCA_FROTA', pendingOnly: true};
   const before = JSON.stringify(detail), bytes = createWeighingXlsx(detail);
   assert.equal(JSON.stringify(detail), before);
   assert.equal(Buffer.from(bytes).readUInt32LE(0), 0x04034b50);
   const xlsx = join(directory, 'weighing.xlsx'); await writeFile(xlsx, bytes);
   // Use .NET's independent ZIP/XML readers to verify actual XLSX package integrity.
   const verification = String.raw`
+$ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $archive = [IO.Compression.ZipFile]::OpenRead($args[0])
 try {
@@ -35,6 +37,7 @@ try {
   $sheet = ReadXml 'xl/worksheets/sheet2.xml'
   $data = $sheet.worksheet.sheetData.row
   if ($data.Count -ne 186) { throw "Missing vehicle or subtotal rows: $($data.Count)" }
+  if (-not @($data[3].c)[0].is.t.InnerText.Contains('BUSCA_FROTA')) { throw 'Applied search is missing from workbook scope' }
   if ($data[5].c[2].t -ne 'inlineStr') { throw 'Ticket is not stored as text' }
   if ($data[5].c[6].v -ne '16400.123456') { throw 'Decimal precision changed' }
   if ($data[8].c[6].v -ne '37040.123456') { throw 'Trip tare subtotal missing' }
@@ -56,6 +59,8 @@ try {
   assert.ok(Math.abs(doc.internal.pageSize.getWidth() - 297) < .1);
   assert.ok(doc.getNumberOfPages() >= 10, 'All 45 complete trips must paginate without clipping');
   for (const sentinel of ['FONTE_45_VIAGENS_11_FOTOS', 'parcial', 'R44A', 'R44B', 'ULTIMA_VIAGEM_PENDENTE', 'Pendente', '783.230', '737.700', 'TESTE_RELATORIO']) assert.ok(text.includes(sentinel), `Missing PDF content: ${sentinel}`);
+  assert.ok(text.includes('BUSCA_FROTA'), 'PDF identifies the applied search');
+  assert.ok(text.includes('17/10/2026'), 'PDF identifies the selected period');
   assert.equal(fileName, 'pesagem-cana-2026-10-16.pdf');
   assert.ok(doc.output().startsWith('%PDF-'));
   console.log('PASS: complete A4 landscape PDF, last trip, fleet IDs, missing plates, official partial totals and multi-page rendering');

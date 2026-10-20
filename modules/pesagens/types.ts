@@ -55,10 +55,13 @@ export type WeighingEntry = Omit<WeighingEntryInput, 'components'> & {
 };
 export type WeighingControlInput = {partnerId: string; startDate: string; season: string; notes: string};
 export type WeighingList = {controls: WeighingControl[]; canManage: boolean};
+export type WeighingFilters = {search?: string; dateFrom?: string; dateTo?: string; pendingOnly?: boolean};
 export type WeighingDetail = {
   control: WeighingControl;
   entries: WeighingEntry[];
   daily: (WeighingSummary & {date: string})[];
   summary: WeighingSummary;
   canManage: boolean;
+  totalEntryCount?: number;
+  appliedFilters?: WeighingFilters;
 };

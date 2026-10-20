@@ -2,6 +2,40 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createCaneWeighingDb} from '../supabase/tests/helpers/cane-weighing-db.mjs';
 
+test('search and inclusive periods filter authorized controls/trips and recalculate all export totals in SQL',async()=>{
+ const {db,ids,rpc,setActor}=await createCaneWeighingDb();
+ try{
+  const {control}=await rpc('save',{companyId:ids.company,partnerId:ids.partner,startDate:'2026-10-16',season:'2026/2027'});
+  const later=(await rpc('save',{companyId:ids.company,partnerId:ids.partner,startDate:'2026-10-20'})).control;
+  const base={companyId:ids.company,controlId:control.id,trailerGrossMode:'individual',components:[
+   {kind:'truck',fleetNumber:'133',plate:'ABC1D23',tareKg:'10000',grossKg:'20000',partnerNetKg:'10000'},
+   {kind:'trailer',fleetNumber:'277',plate:'OEK4136',tareKg:'10000',grossKg:'20000',partnerNetKg:'10000'},
+   {kind:'trailer',fleetNumber:'267',plate:'OEK4276',tareKg:'10000',grossKg:'20000',partnerNetKg:'10000'},
+  ]};
+  await rpc('save-entry',{...base,weighedAt:'2026-10-16',ticket:'ABC16'});
+  await rpc('save-entry',{...base,weighedAt:'2026-10-17',ticket:'ÉXPORTAR'});
+  await rpc('save-entry',{...base,weighedAt:'2026-10-19',components:base.components.map(c=>({...c,tareKg:null,grossKg:null,partnerNetKg:null}))});
+  assert.deepEqual((await rpc('list',{companyId:ids.company,dateFrom:'2026-10-17',dateTo:'2026-10-20',search:'  taquari  '})).controls.map(c=>c.id),[later.id]);
+  assert.equal((await rpc('list',{companyId:ids.company,dateFrom:'2026-10-16',dateTo:'2026-10-16',search:'2026/2027'})).controls[0].id,control.id);
+  const get=filters=>rpc('get',{companyId:ids.company,id:control.id,...filters});
+  const scoped=await get({dateFrom:'2026-10-17',dateTo:'2026-10-17',search:'exportar'});
+  assert.equal(scoped.totalEntryCount,3);assert.equal(scoped.entries.length,1);assert.equal(scoped.entries[0].ticket,'ÉXPORTAR');
+  assert.equal(scoped.summary.agrisulNetKg,'30000');assert.equal(scoped.summary.partnerNetKg,'30000');assert.equal(scoped.summary.differenceKg,'0');
+  assert.equal(scoped.summary.tareKg,'30000');assert.equal(scoped.summary.grossKg,'60000');
+  assert.deepEqual(scoped.control.summary,scoped.summary);assert.deepEqual(scoped.daily,[{date:'2026-10-17',...scoped.summary}]);
+  assert.deepEqual(scoped.appliedFilters,{search:'exportar',dateFrom:'2026-10-17',dateTo:'2026-10-17',pendingOnly:false});
+  assert.equal((await get({search:'oek-41.36',dateTo:'2026-10-17'})).entries.length,2,'Plate punctuation is ignored');
+  assert.equal((await get({search:'277',dateFrom:'2026-10-17'})).entries.length,2,'Trailer fleet number participates in the search');
+  const pending=await get({pendingOnly:true});assert.equal(pending.entries.length,1);assert.equal(pending.summary.partnerNetKg,null);assert.equal(pending.summary.agrisulNetKg,null);
+  const none=await get({search:'%_'});assert.equal(none.entries.length,0);assert.equal(none.totalEntryCount,3);assert.deepEqual(none.daily,[]);
+  assert.equal((await get({})).entries.length,3,'Clearing filters restores every source trip');
+  for(const filters of [{dateFrom:'2026-10-20',dateTo:'2026-10-16'},{dateFrom:'2026-02-30'},{dateTo:'bad'},{search:'x'.repeat(161)},{pendingOnly:'true'},{ownerId:ids.otherOwner}])await assert.rejects(get(filters),e=>e.code==='22023');
+  await setActor(ids.reader);assert.equal((await get({search:'exportar'})).entries.length,1);
+  await setActor(ids.otherOwner);await assert.rejects(get({search:'exportar'}),e=>e.code==='22023');
+  await setActor(null);await assert.rejects(get({}),e=>e.code==='28000');
+ }finally{await db.close();}
+});
+
 test('partner fleet, measurement snapshots, pending plates and atomic idempotent import obey RPC ownership',async()=>{
  const {db,ids,setActor,rpc}=await createCaneWeighingDb();
  const fleet=async(action,payload={})=>(await db.query(`SELECT public.billing_rpc('fleet',$1,$2::jsonb) result`,[action,JSON.stringify(payload)])).rows[0].result;
