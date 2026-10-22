@@ -1,6 +1,7 @@
 'use client';
 
 import {useState} from 'react';
+import {DocumentationPanel} from '@/modules/documentacao/components/DocumentationPanel';
 import {ClipboardList, DollarSign, Loader2, Pencil, RefreshCw, Scale, ShoppingCart, Trash2, Users} from 'lucide-react';
 import {Tabs, TabsList, TabsTrigger, TabsContent} from '@/components/ui/tabs';
 import {useProviders} from '@/modules/cadastro/prestadores/hooks/useProviders';
@@ -23,7 +24,7 @@ import {QuoteSummaryTab} from './QuoteSummaryTab';
 import {QuoteComparisonTab} from './QuoteComparisonTab';
 import {QuoteItemQuantityDialog} from './QuoteItemQuantityDialog';
 
-type QuoteDetailTab = 'summary' | 'negotiation' | 'providers' | 'comparison';
+type QuoteDetailTab = 'summary' | 'negotiation' | 'providers' | 'comparison' | 'documentation';
 
 export function QuoteDetailPage({id}: {id: string}) {
   const query = useQuoteDetail(id);
@@ -328,6 +329,7 @@ function QuoteDetailContent({quote}: {quote: Quote}) {
           <TabsTrigger value="comparison" disabled={mutations.saving}>
             <Scale size={16}/>Comparativo final
           </TabsTrigger>
+          <TabsTrigger value="documentation">Documentação</TabsTrigger>
         </TabsList>
 
         <TabsContent value="summary" className="quote-detail-tab-content">
@@ -375,6 +377,7 @@ function QuoteDetailContent({quote}: {quote: Quote}) {
             onGoToNegotiation={() => setTab('negotiation')}
           />
         </TabsContent>
+        <TabsContent value="documentation"><DocumentationPanel source={{type:'quotation',id:quote.id}}/></TabsContent>
       </Tabs>
 
       <QuoteAddMaterialDialog

@@ -21,7 +21,7 @@ test('migration publishes fleet and material variants idempotently', async () =>
 });
 
 test('frontend invalidates fleet and material projections for those tables', () => {
-  assert.deepEqual(realtimeResources.billing_fleet_vehicles, ['fleet']);
+  assert.deepEqual(realtimeResources.billing_fleet_vehicles, ['fleet','cane-weighings']);
   assert.ok(realtimeResources.billing_material_variants.includes('materials'));
   assert.ok(realtimeResources.billing_material_variants.includes('quotations'));
 });

@@ -88,12 +88,17 @@ try{
  const aOrders=key('owner-a','purchase-orders',{view:'list'});
  const bOrders=key('owner-b','purchase-orders',{view:'list'});
  for(const queryKey of [aQuotes,aOrders,bOrders])client.setQueryData(queryKey,{saved:true});
- assert.deepEqual(mutationResources('quotations'),['quotations','purchase-orders']);
+ assert.deepEqual(mutationResources('quotations'),['quotations','purchase-orders','documentation']);
+ const aDocuments=key('owner-a','documentation',{view:'list'});
+ const bDocuments=key('owner-b','documentation',{view:'list'});
+ client.setQueryData(aDocuments,{saved:true});client.setQueryData(bDocuments,{saved:true});
  for(const resource of realtimeResources.billing_quotations){
   await client.invalidateQueries({queryKey:billingKeys.resource('owner-a',resource),refetchType:'none'});
  }
  assert.equal(client.getQueryState(aQuotes).isInvalidated,true);
  assert.equal(client.getQueryState(aOrders).isInvalidated,true);
+ assert.equal(client.getQueryState(aDocuments).isInvalidated,true);
+ assert.equal(client.getQueryState(bDocuments).isInvalidated,false);
 
  // Payment methods are selected by orders, so registry mutations and
  // Realtime changes refresh both projections for the active workspace.

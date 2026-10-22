@@ -14,6 +14,7 @@ import {useProvider} from '@/modules/cadastro/prestadores/hooks/useProviders';
 import {usePurchaseOrder,usePurchaseOrderMutations,usePurchaseOrders} from '../hooks/usePurchaseOrders';
 import type {PurchaseOrder,PurchaseOrderFilters,PurchaseOrderInput,PurchaseOrderStatus} from '../types';
 import {PurchaseOrderExportDialog} from './PurchaseOrderExportDialog';
+import {DocumentationPanel} from '@/modules/documentacao/components/DocumentationPanel';
 import '../styles.css';
 
 const baseHref='/pedidos';
@@ -74,7 +75,11 @@ function PurchaseOrderScreen({id,filters}:{id:string;filters:PurchaseOrderFilter
   const {navigate}=useModuleNavigation();
   const query=usePurchaseOrder(id);
   const listHref=purchaseOrdersHref(filters);
-  return <><nav className="client-breadcrumb purchase-order-breadcrumb" aria-label="Caminho de navegação"><ModuleLink href={baseHref}>Pedidos</ModuleLink><ChevronRight size={13}/><ModuleLink href={listHref}>{filters.status==='open'?'Em aberto':'Finalizados'}</ModuleLink><ChevronRight size={13}/><span aria-current="page">{query.order?.number||'Detalhes'}</span></nav>{query.loading?<LoadState text="Carregando pedido…"/>:query.error||!query.order?<><button className="purchase-order-back" type="button" onClick={()=>navigate(listHref)}><ArrowLeft size={16}/>Voltar para pedidos</button><div className="company-empty" role="alert"><h3>Não foi possível carregar o pedido</h3><p>{query.error||'Pedido não encontrado.'}</p><button className="btn" type="button" onClick={()=>void query.reload()}><RefreshCw size={16}/>Tentar novamente</button></div></>:<PurchaseOrderDetail key={`${query.order.id}:${query.order.updatedAt}`} order={query.order} reload={query.reload} onBack={()=>navigate(listHref)}/>}</>;
+  return <><nav className="client-breadcrumb purchase-order-breadcrumb" aria-label="Caminho de navegação"><ModuleLink href={baseHref}>Pedidos</ModuleLink><ChevronRight size={13}/><ModuleLink href={listHref}>{filters.status==='open'?'Em aberto':'Finalizados'}</ModuleLink><ChevronRight size={13}/><span aria-current="page">{query.order?.number||'Detalhes'}</span></nav>{query.loading?<LoadState text="Carregando pedido…"/>:query.error||!query.order?<><button className="purchase-order-back" type="button" onClick={()=>navigate(listHref)}><ArrowLeft size={16}/>Voltar para pedidos</button><div className="company-empty" role="alert"><h3>Não foi possível carregar o pedido</h3><p>{query.error||'Pedido não encontrado.'}</p><button className="btn" type="button" onClick={()=>void query.reload()}><RefreshCw size={16}/>Tentar novamente</button></div></>:<PurchaseOrderWorkspaceDetail key={`${query.order.id}:${query.order.updatedAt}`} order={query.order} reload={query.reload} onBack={()=>navigate(listHref)}/>}</>;
+}
+
+function PurchaseOrderWorkspaceDetail(props:Parameters<typeof PurchaseOrderDetail>[0]){
+  return <Tabs defaultValue="order"><TabsList variant="line" aria-label="Áreas do pedido"><TabsTrigger value="order">Pedido</TabsTrigger><TabsTrigger value="documentation">Documentação</TabsTrigger></TabsList><TabsContent value="order"><PurchaseOrderDetail {...props}/></TabsContent><TabsContent value="documentation"><DocumentationPanel source={{type:'order',id:props.order.id}}/></TabsContent></Tabs>;
 }
 
 function PurchaseOrderDetail({order,reload,onBack}:{order:PurchaseOrder;reload:()=>Promise<void>;onBack:()=>void}){

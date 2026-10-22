@@ -1,4 +1,6 @@
 'use client';
+import {Tabs,TabsList,TabsTrigger,TabsContent} from '@/components/ui/tabs';
+import {DocumentationPanel} from '@/modules/documentacao/components/DocumentationPanel';
 /* eslint-disable @next/next/no-img-element -- Private signed originals must bypass the public image optimizer. */
 import {useEffect, useRef, useState} from 'react';
 import {ArrowLeft, Building2, CalendarDays, Check, CheckCircle2, Clock3, ExternalLink, FileDown, FileText, History, Loader2, MapPin, Paperclip, PenLine, ShieldCheck, Users, Wallet, Wrench, X, XCircle} from 'lucide-react';
@@ -39,7 +41,7 @@ function RequestAttachment({file}: {file: RequestFile}) {
   return <li><span className="request-file-icon"><FileText size={22}/></span><div><strong>{file.fileName}</strong><small>{file.contentType === 'application/pdf' ? 'PDF' : 'Imagem'} · {new Intl.NumberFormat('pt-BR', {maximumFractionDigits: 1}).format(file.size / 1024)} KB</small></div>{url.data ? <a className="btn" href={url.data} target="_blank" rel="noopener noreferrer" aria-label={`Abrir ${file.fileName}`}><ExternalLink size={15}/><span>Abrir</span></a> : url.isError ? <button className="btn" onClick={() => void url.refetch()}>Tentar novamente</button> : <Loader2 size={18} className="animate-spin" aria-label="Preparando arquivo"/>}</li>;
 }
 
-export function ServiceRequestDetail({request, options, onBack, onDecide, deciding}: {
+function ServiceRequestContent({request, options, onBack, onDecide, deciding}: {
   request: ServiceRequest;
   options: RequestOptions;
   onBack: () => void;
@@ -132,3 +134,7 @@ export function ServiceRequestDetail({request, options, onBack, onDecide, decidi
   </div>;
 }
 
+
+export function ServiceRequestDetail(props:Parameters<typeof ServiceRequestContent>[0]) {
+ return <Tabs defaultValue="service"><TabsList variant="line" aria-label="Áreas da solicitação"><TabsTrigger value="service">Solicitação de serviço</TabsTrigger><TabsTrigger value="documentation">Documentação</TabsTrigger></TabsList><TabsContent value="service"><ServiceRequestContent {...props}/></TabsContent><TabsContent value="documentation"><DocumentationPanel source={{type:'service',id:props.request.id}}/></TabsContent></Tabs>;
+}

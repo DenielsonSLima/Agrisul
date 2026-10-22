@@ -10,7 +10,7 @@ SET search_path = ''
 AS $$
   SELECT pg_catalog.jsonb_build_object(
     'ok', true,
-    'projectRef', 'rbuscpwntzpyqsuycqmv',
+    'projectRef', 'ykounjabfsrtkzostbbz',
     'checkedAt', pg_catalog.clock_timestamp()
   );
 $$;

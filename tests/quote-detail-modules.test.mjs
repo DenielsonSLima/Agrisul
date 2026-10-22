@@ -59,13 +59,13 @@ test('quotation detail is split into accessible Summary, Negotiation, Suppliers 
   assert.match(list, /aria-label=/, 'the tab list needs an accessible name');
   assert.equal(
     list.match(/<TabsTrigger\b/g)?.length,
-    4,
-    'quotation detail must expose exactly four primary tabs',
+    5,
+    'quotation detail includes its operational tabs and Documentation',
   );
-  appearsInOrder(list, ['Resumo', 'Negociação', 'Fornecedores', 'Comparativo final']);
+  appearsInOrder(list, ['Resumo', 'Negociação', 'Fornecedores', 'Comparativo final', 'Documentação']);
   assert.equal(
     detail.match(/<TabsContent\b/g)?.length,
-    4,
+    5,
     'each trigger needs a corresponding tab panel',
   );
 

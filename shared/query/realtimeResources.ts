@@ -52,6 +52,11 @@ const baseResources: Record<string, readonly string[]> = {
   billing_purchase_order_items: ['purchase-orders'],
   billing_payment_methods: ['payment-methods', 'purchase-orders'],
   billing_document_templates: ['document-templates', 'service-requests'],
+  billing_documents: ['documentation'],
+  billing_document_links: ['documentation'],
+  billing_document_files: ['documentation'],
+  billing_document_events: ['documentation'],
+  billing_document_expectations: ['documentation'],
 };
 
 export const realtimeResources: Record<string, readonly string[]> = Object.fromEntries(

@@ -41,5 +41,5 @@ O cache `['billing', userId, 'contracts', ...]` é cancelado antes das mutations
 ## Verificação
 
 - `npm test`: inclui `supabase/tests/contract_finance.sql` e `supabase/tests/contract_closure_refunds.sql`, executados em Postgres local via PGlite.
-- `tests/contract-finance-supabase-live.test.mjs`: requer `BILLING_RUN_LIVE_TESTS=1` e a configuração MCP do projeto `rbuscpwntzpyqsuycqmv`; usa e remove duas contas temporárias.
+- `tests/contract-finance-supabase-live.test.mjs`: requer `BILLING_RUN_LIVE_TESTS=1` e a configuração MCP do projeto `ykounjabfsrtkzostbbz`; usa e remove duas contas temporárias.
 - Com `BILLING_BROWSER_CDP`, a mesma verificação testa os formulários no servidor local e salva capturas em `.sites-runtime/finance`.

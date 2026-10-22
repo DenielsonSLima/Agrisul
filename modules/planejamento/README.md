@@ -12,4 +12,4 @@ O período não depende de rótulos fixos como “verão”, “inverno” ou �
 
 Todos os cálculos e bloqueios usam `public.billing_rpc('planning', ...)`. O frontend apenas coleta e apresenta dados. Gravações diretas nas tabelas `billing_planning_*` são revogadas, há RLS por proprietário, revisão otimista para edições concorrentes e histórico imutável das alterações. As consultas usam TanStack Query e as tabelas participam do Realtime centralizado.
 
-Validação local: `npm test`, `node node_modules/typescript/bin/tsc --noEmit` e `npm run build`. O teste remoto isolado `tests/planning-supabase-live.test.mjs` exige `BILLING_RUN_LIVE_TESTS=1`, confirma o projeto `rbuscpwntzpyqsuycqmv`, cria duas contas temporárias e remove somente essas contas ao finalizar.
+Validação local: `npm test`, `node node_modules/typescript/bin/tsc --noEmit` e `npm run build`. O teste remoto isolado `tests/planning-supabase-live.test.mjs` exige `BILLING_RUN_LIVE_TESTS=1`, confirma o projeto `ykounjabfsrtkzostbbz`, cria duas contas temporárias e remove somente essas contas ao finalizar.

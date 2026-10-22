@@ -1,10 +1,10 @@
 // Mutations refresh projections even when Realtime is unavailable.
 export const derivedResources: Record<string, readonly string[]> = {
   signatures: ['service-requests'],
-  'service-providers': ['service-requests', 'home'],
+  'service-providers': ['service-requests', 'home', 'documentation'],
   'document-templates': ['service-requests'],
   contracts: ['agenda', 'summary', 'reports', 'planning', 'home'],
-  companies: ['agenda', 'summary', 'reports', 'service-requests', 'home', 'cane-weighings'],
+  companies: ['agenda', 'summary', 'reports', 'service-requests', 'home', 'cane-weighings', 'documentation'],
   'report-headers': ['service-requests'],
   clients: ['agenda', 'summary', 'reports', 'home', 'cane-weighings', 'fleet'],
   fleet: ['cane-weighings'],
@@ -17,10 +17,11 @@ export const derivedResources: Record<string, readonly string[]> = {
   'contract-types': ['summary', 'reports', 'home'],
   'material-categories': ['materials'],
   'payment-methods': ['purchase-orders'],
-  'service-requests': ['home'],
+  'service-requests': ['home', 'documentation'],
   'access-profiles': ['home'],
   users: ['home'],
-  quotations: ['purchase-orders'],
+  quotations: ['purchase-orders', 'documentation'],
+  'purchase-orders': ['documentation'],
 };
 export function mutationResources(resource: string, related: readonly string[] = []) {
   return [...new Set([resource, ...related].flatMap(key => [key, ...(derivedResources[key] ?? [])]))];
