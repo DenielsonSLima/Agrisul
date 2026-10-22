@@ -62,8 +62,8 @@ test('Documentation: real migrations, private files, links, optional boletos, re
   await denied(()=>docs('save',{...base,expectedRevision:4,fileIds:[]}),'23514');
   await denied(()=>docs('save',{...base,id:randomUUID(),sources:[{type:'service',id:randomUUID()}]}),'P0002');
   await denied(()=>docs('save',{...base,id:randomUUID(),companyId:ids.otherCompany}),'23514');
-  const makeChild=async(kind,title)=>{
-   const input={...base,id:randomUUID(),expectedRevision:0,kind,title,providerId:provider.id,parentId:base.id,documentNumber:'',amount:'75.12',dueOn:'2026-11-10'};
+  const makeChild=async(kind,title,reference=source)=>{
+   const input={...base,id:randomUUID(),expectedRevision:0,kind,title,providerId:provider.id,parentId:base.id,documentNumber:'',amount:'75.12',dueOn:'2026-11-10',sources:[reference]};
    const f=(await docs('prepare-upload',{documentId:input.id,fileName:'boleto.png',contentType:'image/png',size:40})).file;
    await db.query("INSERT INTO storage.objects(bucket_id,name) VALUES('billing-documentation',$1)",[f.path]);
    await db.exec('RESET ROLE');await db.query('UPDATE storage.objects SET metadata=$1 WHERE name=$2',[JSON.stringify({size:40,mimetype:'image/png'}),f.path]);await setActor();
@@ -79,6 +79,20 @@ test('Documentation: real migrations, private files, links, optional boletos, re
   await docs('review',{id:boleto1.id,expectedRevision:2,status:'replaced',note:'Nova parcela recebida',replacementId:boleto2.id});
   assert.equal((await docs('get',{id:boleto1.id})).document.replacementId,boleto2.id);
   await denied(()=>docs('review',{id:boleto1.id,expectedRevision:3,status:'verified',note:'',replacementId:''}),'23514');
+  const requestDocuments=[];
+  for(const [kind,title,reference] of [['service_request','Solicitação de serviço',source],['purchase_request','Solicitação de compras',{type:'order',id:order.id}]]){
+   await docs('expectation',{source:reference,kind,required:true,dueOn:'',notes:''});
+   assert.ok((await docs('list')).pending.some(p=>p.kind===kind&&p.reason==='missing'));
+   const saved=await makeChild(kind,title,reference);requestDocuments.push(saved.id);
+   assert.equal((await docs('get',{id:saved.id})).document.kind,kind);
+   assert.equal((await docs('list',{kind})).total,1,'New request kinds support server-side filtering');
+   assert.ok((await docs('context',reference)).documents.some(d=>d.id===saved.id));
+   assert.ok((await docs('list')).pending.some(p=>p.kind===kind&&p.reason==='review'));
+   await docs('review',{id:saved.id,expectedRevision:1,status:'verified',note:'Conferido',replacementId:''});
+   assert.ok(!(await docs('list')).pending.some(p=>p.kind===kind),'Conferred request satisfies its document expectation');
+  }
+  await denied(()=>docs('expectation',{source,kind:'unsupported',required:true,dueOn:'',notes:''}),'22023');
+  await denied(()=>docs('save',{...base,id:randomUUID(),kind:'unsupported'}),'22023');
   await setActor(ids.reader);await denied(()=>docs('list'),'42501');
   await db.exec('RESET ROLE');
   await db.query("UPDATE public.billing_access_profiles SET permissions=ARRAY['documentation.read'] WHERE id=$1",[ids.readerProfile]);
@@ -87,6 +101,7 @@ test('Documentation: real migrations, private files, links, optional boletos, re
   await denied(()=>docs('prepare-upload',{documentId:randomUUID(),fileName:'reader.pdf',contentType:'application/pdf',size:100}),'42501');
   await setActor(ids.otherOwner);assert.equal((await docs('list')).total,0);
   await denied(()=>docs('get',{id:base.id}),'P0002');await denied(()=>docs('context',source),'P0002');
+  for(const id of requestDocuments)await denied(()=>docs('get',{id}),'P0002');
   assert.equal((await db.query('SELECT * FROM public.billing_documents')).rows.length,0);
   assert.equal((await db.query('SELECT * FROM storage.objects WHERE name=$1',[prepared.path])).rows.length,0);
   await setActor(null);await denied(()=>docs('list'),'28000');

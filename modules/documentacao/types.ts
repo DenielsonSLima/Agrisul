@@ -1,4 +1,5 @@
 export const documentKinds = {
+  service_request: 'Solicitação de serviço', purchase_request: 'Solicitação de compras',
   invoice: 'Nota fiscal', budget: 'Orçamento', boleto: 'Boleto', payment: 'Comprovante de pagamento',
   delivery: 'Comprovante de entrega', photo: 'Foto', other: 'Outro documento',
 } as const;

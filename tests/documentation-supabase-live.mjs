@@ -72,6 +72,19 @@ try{
  const order=(await rpc(owner.client,'quotations','finalize',{id:quote.id})).purchaseOrders[0];
  assert.ok((await rpc(owner.client,'documentation','context',{type:'order',id:order.id})).source.label.includes(order.number));
  assert.equal((await rpc(owner.client,'documentation','sources')).sources.length,3);
+ for(const [kind,title,reference] of [['service_request','Solicitação de serviço',source],['purchase_request','Solicitação de compras',{type:'order',id:order.id}]]){
+  await rpc(owner.client,'documentation','expectation',{source:reference,kind,required:true,dueOn:'',notes:''});
+  assert.ok((await rpc(owner.client,'documentation','list')).pending.some(p=>p.kind===kind&&p.reason==='missing'));
+  const requestId=randomUUID(),requestFile=await upload(owner.client,'documentation','prepare-upload',{documentId:requestId});
+  const saved=(await rpc(owner.client,'documentation','save',{...input,id:requestId,kind,title,sources:[reference],fileIds:[requestFile.id]})).document;
+  assert.equal(saved.kind,kind);assert.equal((await rpc(owner.client,'documentation','list',{kind})).total,1);
+  assert.ok((await rpc(owner.client,'documentation','context',reference)).documents.some(d=>d.id===requestId));
+  assert.ok((await rpc(owner.client,'documentation','list')).pending.some(p=>p.kind===kind&&p.reason==='review'));
+  await rpc(owner.client,'documentation','review',{id:requestId,expectedRevision:1,status:'verified',note:'Conferido',replacementId:''});
+  assert.ok(!(await rpc(owner.client,'documentation','list')).pending.some(p=>p.kind===kind));
+  await assert.rejects(rpc(other.client,'documentation','get',{id:requestId}),e=>e.code==='P0002');
+ }
+ console.log('PASS live request document kinds: upload, service/order links, filtering, required documents, review and two-account isolation.');
  console.log('PASS live RPC and Storage: all source types, legacy budget reuse, invoice without boleto, multiple installments, exact retries, private downloads, direct DML denied and two-account isolation.');
 
  const cdp=process.env.BILLING_CDP_URL;
@@ -93,6 +106,7 @@ try{
   await send('Page.navigate',{url:`${base}/documentacao`});
   await wait("document.querySelector('.documentation-table') && document.body.innerText.includes('Nota fiscal do conserto')",'documentation list');await shot('01-list');
   await clickText('Adicionar documento');await wait("!!document.querySelector('.documentation-form-dialog input[type=file]')",'document form');
+  assert.deepEqual(await evaluate("[...document.querySelector('.documentation-form-dialog select').options].filter(o=>['service_request','purchase_request'].includes(o.value)).map(o=>[o.value,o.textContent])"),[['service_request','Solicitação de serviço'],['purchase_request','Solicitação de compras']]);
   await setLabel('Título','Arquivo enviado pelo navegador');await setLabel('Empresa destinatária',company.id);
   await wait("document.querySelectorAll('.documentation-source-option').length>0",'source options');
   assert.ok(await evaluate(`(()=>{const button=[...document.querySelectorAll('.documentation-source-option')].find(button=>button.textContent.includes('Serviço nº ${service.number}'));if(!button)return false;button.click();return true;})()`));

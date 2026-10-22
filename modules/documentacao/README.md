@@ -3,7 +3,7 @@
 Central `/documentacao`, com abas Documentos e Pendências. Os mesmos registros aparecem na aba Documentação de Serviços, Cotações, Pedidos e Prestadores. A pasta de uma referência é uma consulta dos vínculos, sem cópia de arquivos.
 
 - Cada documento reúne até 30 arquivos de até 10 MiB: PDF, JPEG, PNG, WebP e XML. Imagens/PDF têm prévia privada; XML é disponibilizado para download.
-- Tipos: nota fiscal, orçamento, boleto, comprovante de pagamento, comprovante de entrega, foto e outro.
+- Tipos: solicitação de serviço, solicitação de compras, nota fiscal, orçamento, boleto, comprovante de pagamento, comprovante de entrega, foto e outro.
 - Dados opcionais: número, emissão, vencimento, valor decimal, prestador, empresa destinatária e observação. As referências de serviço/pedido resolvem o prestador no servidor. Referências de fornecedores diferentes são recusadas.
 - Um documento admite várias referências. Sem vínculo, aparece aguardando identificação. Boletos/comprovantes podem ser relacionados a um documento principal do mesmo fornecedor/empresa, permitindo várias parcelas. Esses vínculos não registram quitação ou entrega física.
 - Situações: a conferir, conferido, divergente, cancelado e substituído. Edição de dados ou adição de arquivos reinicia a conferência. Arquivos consumidos, documentos cancelados/substituídos e eventos anteriores são preservados.
