@@ -28,7 +28,7 @@ test('each menu destination updates the same snapshot consumed by screen and act
   let selected='/',screen='/';
   nav.subscribe(()=>{selected=new URL(nav.getSnapshot(),host.location.origin).pathname});
   nav.subscribe(()=>{screen=new URL(nav.getSnapshot(),host.location.origin).pathname});
-  for(const path of ['/cadastro','/solicitacoes','/cotacao','/pedidos','/contratos','/pesagens','/planejamento','/resumo','/agenda','/relatorios','/configuracoes','/']) {
+  for(const path of ['/cadastro','/solicitacoes','/cotacao','/pedidos','/contratos','/pesagens','/documentacao','/resumo','/agenda','/relatorios','/configuracoes','/']) {
     nav.navigate(path);
     assert.equal(screen,path);assert.equal(selected,path);assert.equal(host.location.pathname,path);
   }
@@ -128,7 +128,7 @@ test('sidebar groups toggle only on click and preserve accessible submenu transi
   const styles=await readFile(new URL('../app/globals.css',import.meta.url),'utf8');
   const requests=await readFile(new URL('../modules/solicitacoes/components/SolicitacoesPage.tsx',import.meta.url),'utf8');
   assert.match(shell,/solicitacoesSections=.*name:"Cotação",href:"\/cotacao"/);
-  assert.match(shell,/filter\(x=>x\.path!=="\/configuracoes"&&x\.path!=="\/cotacao"\)/);
+  assert.match(shell,/filter\(x=>x\.path!=="\/configuracoes"&&x\.path!=="\/cotacao"&&x\.path!=="\/pedidos"\)/);
   assert.doesNotMatch(shell,/onMouseEnter|onMouseLeave|onFocusCapture|onBlurCapture|collapseTimers|activeChild/);
   assert.match(shell,/const groupExpanded=grouped&&!!expanded\[x\.path\]/);
   assert.match(shell,/onClick=\{grouped\?\(\)=>setExpanded\(current=>\(\{\.\.\.current,\[x\.path\]:!current\[x\.path\]\}\)\):undefined\}/);

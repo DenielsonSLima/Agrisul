@@ -47,9 +47,16 @@ test('Documentation: real migrations, private files, links, optional boletos, re
   const list=await docs('list',{search:'Trator 10'});
   assert.equal(list.total,1);assert.equal(list.documents[0].id,base.id);
   assert.equal((await docs('list',{search:'nota.pdf'})).total,1);
+  assert.equal((await docs('list',{sourceCategory:'service'})).total,1);
+  assert.equal((await docs('list',{sourceCategory:'purchase'})).total,0);
+  assert.equal((await docs('list',{sourceCategory:'service'})).pendingTotal,1);
+  assert.equal((await docs('list',{sourceCategory:'purchase'})).pendingTotal,0);
+  await denied(()=>docs('list',{sourceCategory:'unsupported'}),'22023');
   assert.equal((await docs('context',source)).documents.length,1);
   const quoteDocument={...base,expectedRevision:1,kind:'budget',sources:[{type:'quotation',id:quote.id}],providerId:provider.id};
   await docs('save',quoteDocument);
+  assert.equal((await docs('list',{sourceCategory:'service'})).total,0);
+  assert.equal((await docs('list',{sourceCategory:'purchase'})).documents[0].id,base.id,'Purchase includes quotation links');
   assert.equal((await docs('context',{type:'order',id:order.id})).documents[0].id,base.id,'Order reuses quotation documents without duplicating them');
   await docs('save',{...base,expectedRevision:2});
   assert.equal((await docs('save',{...base,expectedRevision:2})).document.id,base.id,'Identical retry does not create a duplicate');
@@ -86,6 +93,9 @@ test('Documentation: real migrations, private files, links, optional boletos, re
    const saved=await makeChild(kind,title,reference);requestDocuments.push(saved.id);
    assert.equal((await docs('get',{id:saved.id})).document.kind,kind);
    assert.equal((await docs('list',{kind})).total,1,'New request kinds support server-side filtering');
+   const category=reference.type==='service'?'service':'purchase';
+   assert.equal((await docs('list',{kind,sourceCategory:category})).total,1,'Categories include service and purchase-order links');
+   assert.equal((await docs('list',{kind,sourceCategory:category==='service'?'purchase':'service'})).total,0);
    assert.ok((await docs('context',reference)).documents.some(d=>d.id===saved.id));
    assert.ok((await docs('list')).pending.some(p=>p.kind===kind&&p.reason==='review'));
    await docs('review',{id:saved.id,expectedRevision:1,status:'verified',note:'Conferido',replacementId:''});
@@ -100,6 +110,9 @@ test('Documentation: real migrations, private files, links, optional boletos, re
   assert.equal((await docs('options')).canManage,false);
   await denied(()=>docs('prepare-upload',{documentId:randomUUID(),fileName:'reader.pdf',contentType:'application/pdf',size:100}),'42501');
   await setActor(ids.otherOwner);assert.equal((await docs('list')).total,0);
+  for(const sourceCategory of ['service','purchase']){
+   const isolated=await docs('list',{sourceCategory});assert.equal(isolated.total,0);assert.equal(isolated.pendingTotal,0);
+  }
   await denied(()=>docs('get',{id:base.id}),'P0002');await denied(()=>docs('context',source),'P0002');
   for(const id of requestDocuments)await denied(()=>docs('get',{id}),'P0002');
   assert.equal((await db.query('SELECT * FROM public.billing_documents')).rows.length,0);

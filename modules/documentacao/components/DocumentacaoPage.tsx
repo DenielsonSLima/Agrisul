@@ -14,6 +14,9 @@ import {DocumentDetail} from './DocumentDetail';
 import {DocumentationPanel, ExpectationForm, sourceDocumentationHref} from './DocumentationPanel';
 import '../styles.css';
 
+const documentationTabs = {todos: 'Todos', servico: 'Serviço', compra: 'Compra', pendentes: 'Pendentes'} as const;
+type DocumentationTab = keyof typeof documentationTabs;
+
 export function DocumentacaoPage() {
   const {user} = useAuth();
   return <DocumentationWorkspace key={user?.id ?? 'anonymous'}/>;
@@ -29,30 +32,31 @@ function DocumentationWorkspace() {
 }
 function DocumentationList() {
   const {searchParams, navigate} = useModuleNavigation();
+  const requestedTab = searchParams.get('aba');
+  const tab: DocumentationTab = requestedTab === 'pendencias' || requestedTab === 'pendentes' ? 'pendentes' : requestedTab === 'servico' || requestedTab === 'compra' ? requestedTab : 'todos';
   const rawPage = searchParams.get('pagina') ?? '1';
-  const filters: DocumentFilters = {search: searchParams.get('busca') ?? '', kind: searchParams.get('tipoDocumento') ?? '', status: searchParams.get('situacao') ?? '', providerId: searchParams.get('fornecedor') ?? '', dateFrom: searchParams.get('de') ?? '', dateTo: searchParams.get('ate') ?? '', page: /^[1-9]\d{0,4}$/.test(rawPage) ? Number(rawPage) : 1};
-  const tab = searchParams.get('aba') === 'pendencias' ? 'pending' : 'documents';
+  const filters: DocumentFilters = {sourceCategory: tab === 'servico' ? 'service' : tab === 'compra' ? 'purchase' : '', search: searchParams.get('busca') ?? '', kind: searchParams.get('tipoDocumento') ?? '', status: searchParams.get('situacao') ?? '', providerId: searchParams.get('fornecedor') ?? '', dateFrom: searchParams.get('de') ?? '', dateTo: searchParams.get('ate') ?? '', page: /^[1-9]\d{0,4}$/.test(rawPage) ? Number(rawPage) : 1};
   const query = useDocuments(filters);
   const options = useDocumentOptions();
   const [adding, setAdding] = useState(false);
   const [expectation, setExpectation] = useState(false);
   const [choosingSource, setChoosingSource] = useState(false);
   const [selectedSources, setSelectedSources] = useState<DocumentSource[]>([]);
-  const change = (patch: Partial<DocumentFilters>, nextTab = tab) => {
+  const change = (patch: Partial<DocumentFilters>, nextTab: DocumentationTab = tab) => {
     const next = {...filters, ...patch};const params = new URLSearchParams();
-    if (nextTab === 'pending') params.set('aba', 'pendencias');
+    if (nextTab !== 'todos') params.set('aba', nextTab);
     for (const [key, value] of Object.entries({busca: next.search, tipoDocumento: next.kind, situacao: next.status, fornecedor: next.providerId, de: next.dateFrom, ate: next.dateTo, pagina: next.page > 1 ? String(next.page) : ''})) if (value) params.set(key, value);
     navigate(`/documentacao${params.size ? `?${params}` : ''}`);
   };
   const canManage = query.data?.canManage ?? options.data?.canManage;
   return <section className="documentation-page">
     <div className="documentation-heading"><div><span className="eyebrow">ARQUIVOS E PENDÊNCIAS</span><h2><FolderOpen size={27}/>Documentação</h2><p>Encontre notas, boletos e comprovantes junto das suas compras e serviços.</p></div><div className="documentation-actions"><button className="btn" type="button" onClick={() => setChoosingSource(true)}>Abrir pasta de referência</button>{canManage && <><button className="btn" type="button" onClick={() => setExpectation(true)}>Registrar pendência</button><button className="btn company-primary" type="button" onClick={() => setAdding(true)}><FilePlus2 size={17}/>Adicionar documento</button></>}</div></div>
-    <Tabs value={tab} onValueChange={value => change({page: 1}, value === 'pending' ? 'pending' : 'documents')}><TabsList variant="line" aria-label="Áreas de Documentação"><TabsTrigger value="documents">Documentos {query.data && <span>{query.data.total}</span>}</TabsTrigger><TabsTrigger value="pending">Pendências {query.data && <span>{query.data.pendingTotal}</span>}</TabsTrigger></TabsList>
+    <Tabs value={tab} onValueChange={value => change({page: 1}, value as DocumentationTab)}><TabsList variant="line" aria-label="Áreas de Documentação">{Object.entries(documentationTabs).map(([value, label]) => <TabsTrigger key={value} value={value}>{label}{query.data && value === tab && <span>{tab === 'pendentes' ? query.data.pendingTotal : query.data.total}</span>}</TabsTrigger>)}</TabsList>
       <DocumentFiltersBar key={JSON.stringify(filters)} filters={filters} providers={options.data?.providers ?? []} onApply={patch => change({...patch, page: 1})}/>
       <DocumentState loading={query.loading} error={query.error} retry={() => void query.reload()}/>
-      <TabsContent value="documents">{query.data && <><DocumentTable documents={query.data.documents}/><div className="documentation-pagination"><span>{query.data.total} documento(s) · Página {filters.page}</span><button className="btn" disabled={filters.page <= 1} type="button" onClick={() => change({page: filters.page - 1})}><ArrowLeft size={15}/>Anterior</button><button className="btn" disabled={filters.page * query.data.pageSize >= query.data.total} type="button" onClick={() => change({page: filters.page + 1})}>Próxima<ArrowRight size={15}/></button></div></>}</TabsContent>
-      <TabsContent value="pending">{query.data && <><p className="documentation-help">Pendências documentais. O vencimento de um boleto não é usado para presumir falta de pagamento.</p>{query.data.pending.length ? <div className="documentation-pending-list">{query.data.pending.map(item => <article key={`${item.reason}:${item.id}`} className={`documentation-pending ${item.overdue ? 'is-overdue' : ''}`}><div><span className="documentation-badge">{{missing: 'Falta documento', review: 'A conferir', divergent: 'Com divergência', unlinked: 'Aguardando identificação'}[item.reason]}</span><h3>{item.title}</h3><p>{documentKinds[item.kind]}{item.source?.description ? ` · ${item.source.description}` : ''}</p>{item.notes && <p>{item.notes}</p>}{item.dueOn && <small>{item.overdue ? 'Prazo vencido' : 'Prazo'}: {dateLabel(item.dueOn)}</small>}</div><ModuleLink className="btn" href={item.documentId ? documentationHref(item.documentId) : item.source ? sourceDocumentationHref(item.source) : '/documentacao'}>Resolver<ArrowRight size={15}/></ModuleLink></article>)}</div> : <div className="documentation-empty"><FolderOpen size={30}/><h3>Nenhuma pendência encontrada</h3><p>Registre os documentos esperados para acompanhar o que ainda falta receber.</p></div>}</>}</TabsContent>
-      {tab === 'pending' && query.data && <div className="documentation-pagination"><span>{query.data.pendingTotal} pendência(s) · Página {filters.page}</span><button className="btn" type="button" disabled={filters.page <= 1} onClick={() => change({page: filters.page - 1})}>Anterior</button><button className="btn" type="button" disabled={filters.page * 30 >= query.data.pendingTotal} onClick={() => change({page: filters.page + 1})}>Próxima</button></div>}
+      {tab !== 'pendentes' && <TabsContent value={tab}>{query.data && <><DocumentTable documents={query.data.documents}/><div className="documentation-pagination"><span>{query.data.total} documento(s) · Página {filters.page}</span><button className="btn" disabled={filters.page <= 1} type="button" onClick={() => change({page: filters.page - 1})}><ArrowLeft size={15}/>Anterior</button><button className="btn" disabled={filters.page * query.data.pageSize >= query.data.total} type="button" onClick={() => change({page: filters.page + 1})}>Próxima<ArrowRight size={15}/></button></div></>}</TabsContent>}
+      <TabsContent value="pendentes">{query.data && <><p className="documentation-help">Pendências documentais. O vencimento de um boleto não é usado para presumir falta de pagamento.</p>{query.data.pending.length ? <div className="documentation-pending-list">{query.data.pending.map(item => <article key={`${item.reason}:${item.id}`} className={`documentation-pending ${item.overdue ? 'is-overdue' : ''}`}><div><span className="documentation-badge">{{missing: 'Falta documento', review: 'A conferir', divergent: 'Com divergência', unlinked: 'Aguardando identificação'}[item.reason]}</span><h3>{item.title}</h3><p>{documentKinds[item.kind]}{item.source?.description ? ` · ${item.source.description}` : ''}</p>{item.notes && <p>{item.notes}</p>}{item.dueOn && <small>{item.overdue ? 'Prazo vencido' : 'Prazo'}: {dateLabel(item.dueOn)}</small>}</div><ModuleLink className="btn" href={item.documentId ? documentationHref(item.documentId) : item.source ? sourceDocumentationHref(item.source) : '/documentacao'}>Resolver<ArrowRight size={15}/></ModuleLink></article>)}</div> : <div className="documentation-empty"><FolderOpen size={30}/><h3>Nenhuma pendência encontrada</h3><p>Registre os documentos esperados para acompanhar o que ainda falta receber.</p></div>}</>}</TabsContent>
+      {tab === 'pendentes' && query.data && <div className="documentation-pagination"><span>{query.data.pendingTotal} pendência(s) · Página {filters.page}</span><button className="btn" type="button" disabled={filters.page <= 1} onClick={() => change({page: filters.page - 1})}>Anterior</button><button className="btn" type="button" disabled={filters.page * 30 >= query.data.pendingTotal} onClick={() => change({page: filters.page + 1})}>Próxima</button></div>}
     </Tabs>
     {adding && <DocumentForm onClose={() => setAdding(false)} onSaved={id => {setAdding(false);navigate(documentationHref(id));}}/>}
     {expectation && <ExpectationForm onClose={() => setExpectation(false)}/>}
