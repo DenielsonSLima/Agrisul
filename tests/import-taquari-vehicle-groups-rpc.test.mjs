@@ -38,12 +38,27 @@ test('Taquari RPC derives vehicle counts and the sequence-one equipment from ori
    assert.equal(entry.source.equipamento,entries.find(x=>x.source.entrada===entry.source.entrada&&x.source.sequencia===entry.source.sequencia&&x.date===entry.date).source.equipamento,'Raw equipment evidence is preserved');
   }
   const retry=await saveImport('valid-groups',entries,profile.id);assert.equal(retry.created,false);assert.equal(retry.document.id,document.id);
+  const detail=await documents('get',{id:document.id});
+  assert.equal(detail.summary.groupCount,4,'Original dates distinguish trips with the same source entry');
+  assert.equal(detail.daySummaries.find(day=>day.date==='2026-10-22').summary.groupCount,3);
+  assert.equal(detail.daySummaries.find(day=>day.date==='2026-10-23').summary.groupCount,1);
+  await saveImport('overlapping-report',entries.filter(entry=>entry.date==='2026-10-22'&&entry.source.entrada==='2874'),profile.id);
+  const collection=await documents('list',{clientId:ids.partner});
+  assert.equal(collection.clients[0].summary.groupCount,4,'The same original group in two PDFs counts once for the company');
+  assert.equal(collection.clients[0].days.find(day=>day.date==='2026-10-22').summary.groupCount,3);
+  assert.equal(collection.clients[0].days.find(day=>day.date==='2026-10-22').documents.find(item=>item.id===document.id).dayGroupCount,3);
+  assert.deepEqual((await documents('list',{search:'overlapping-report'})).clients[0].summary.groupCount,1);
   const first=document.entries[0];
   document=(await documents('save-entry',{id:document.id,entryId:first.id,date:first.date,values:{...first.values,COD_TIPOCARGA:'8',COD_EQUIPAMENTO_TRANSPORTE:'CORREÇÃO'},reviewed:false,expectedUpdatedAt:document.updatedAt})).document;
   assert.equal(document.entries.find(e=>e.id===first.id).values.COD_TIPOCARGA,'8','Explicit later manual corrections remain available');
   document=(await documents('save-bulk',{id:document.id,entryIds:[first.id],fieldKey:'COD_TIPOCARGA',value:'9',expectedUpdatedAt:document.updatedAt})).document;
   assert.equal(document.entries.find(e=>e.id===first.id).values.COD_TIPOCARGA,'9','Bulk corrections remain available');
   assert.equal(document.entries.find(e=>e.id===first.id).source.quantidadeVeiculosConjunto,'2','Corrections do not alter original computed evidence');
+  assert.equal((await documents('get',{id:document.id})).summary.groupCount,4,'Edited load types and equipment do not change the original group identity');
+  document=(await documents('save-entry',{id:document.id,date:'2026-10-22',values:first.values,reviewed:false,expectedUpdatedAt:document.updatedAt})).document;
+  assert.equal(document.entryCount,11);
+  assert.equal((await documents('get',{id:document.id})).summary.groupCount,4,'A manual ERP entry number does not invent an original PDF group');
+  await assert.rejects(()=>db.query('select billing_private.import_source_group_key($1::jsonb)',['{}']),e=>e.code==='42501');
 
   const before=(await documents('list',{status:'all'})).total;
   await denied(()=>saveImport('missing-first',[row('9000',2,'2')],profile.id),/incompleto/);

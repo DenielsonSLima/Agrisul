@@ -2,11 +2,11 @@ import {useCadastroMutation,useCadastroQuery} from '@/modules/cadastro/hooks/use
 import {rpcRequest} from '@/shared/supabase/rpc';
 import {useAuth} from '@/shared/supabase/AuthProvider';
 import {getSupabaseBrowserClient} from '@/shared/supabase/client';
-import type {ImportBulkInput,ImportColumnTypeInput,ImportCollection,ImportDocument,ImportDocumentInput,ImportEntryInput,ImportExport,ImportProfile,ImportProfileInput,ImportProfileRevisionInput,ImportProfileCloneInput,ImportProfileActiveInput,ImportRevisionInput,ImportStatus} from '../types';
+import type {ImportBulkInput,ImportColumnTypeInput,ImportCollection,ImportDocument,ImportDocumentInput,ImportEntryInput,ImportExport,ImportProfile,ImportProfileInput,ImportProfileRevisionInput,ImportProfileCloneInput,ImportProfileActiveInput,ImportRevisionInput,ImportStatus,ImportOperationalSummary} from '../types';
 
 export function useImportProfiles(){return useCadastroQuery('import-profiles',{},signal=>rpcRequest<{profiles:ImportProfile[];canManage:boolean}>('import-profiles','list',{},signal));}
 export function useImportDocuments(status:ImportStatus|'all'='open',search='',clientId?:string){return useCadastroQuery('import-documents',{status,search,clientId},signal=>rpcRequest<ImportCollection>('import-documents','list',{status,search,...(clientId?{clientId}:{})},signal));}
-export function useImportDocument(id:string|null){return useCadastroQuery('import-documents',{id},signal=>rpcRequest<{document:ImportDocument}>('import-documents','get',{id},signal),!!id);}
+export function useImportDocument(id:string|null){return useCadastroQuery('import-documents',{id},signal=>rpcRequest<{document:ImportDocument;summary:ImportOperationalSummary;daySummaries:Array<{date:string;summary:ImportOperationalSummary}>}>('import-documents','get',{id},signal),!!id);}
 export function useImportMutations(){
  const {user}=useAuth();
  const assertActor=async()=>{const {data:{session},error}=await getSupabaseBrowserClient().auth.getSession();if(error||!user||session?.user.id!==user.id)throw new DOMException('A conta foi alterada. Reabra o formulário.','AbortError');};

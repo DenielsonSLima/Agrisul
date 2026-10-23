@@ -17,7 +17,7 @@ test('Client/day summaries count distinct PDFs and entries, preserve typed detai
  const review=async(document,index)=>{
   const e=document.entries[index];return (await docs('save-entry',{id:document.id,entryId:e.id,date:e.date,values:e.values,reviewed:true,expectedUpdatedAt:document.updatedAt})).document;
  };
- const summary=(days,documents,entries,pending,from,to)=>({dayCount:days,documentCount:documents,entryCount:entries,pendingCount:pending,reviewedCount:entries-pending,dateFrom:from,dateTo:to});
+ const summary=(days,documents,entries,pending,from,to)=>({dayCount:days,documentCount:documents,entryCount:entries,groupCount:0,pendingCount:pending,reviewedCount:entries-pending,dateFrom:from,dateTo:to});
  try{
   const clientB=(await rpc('clients','save',{legalName:'Segunda empresa LTDA',tradeName:'CLIENTE B',cnpj:'11222333000181',street:'',number:'',complement:'',district:'',city:'',state:'',zipCode:'',phone:'',email:''})).client;
   const numeric=(await profiles('save',profileInput)).profile;
@@ -57,6 +57,7 @@ test('Client/day summaries count distinct PDFs and entries, preserve typed detai
   assert.deepEqual(firstDetail.daySummaries.find(d=>d.date==='2026-10-22').summary,summary(1,1,2,1,'2026-10-22','2026-10-22'));
   assert.equal(firstDetail.document.entries[0].values.PESOBRUTO,'12.1256');assert.equal(typeof firstDetail.document.entries[0].values.PESOBRUTO,'string');
   assert.equal(firstDetail.document.profileSnapshot.templateBase64,template);
+  assert.equal(firstDetail.summary.groupCount,0,'Rows without original PDF identifiers do not invent vehicle groups');
   const textDetail=(await docs('get',{id:second.id})).document;
   assert.equal(textDetail.entries[0].values.PESOBRUTO,'0006,500');assert.equal(textDetail.profileSnapshot.fields[0].type,'text');
   assert.equal(firstDetail.document.profileSnapshot.fields[0].type,'decimal','Different models on the same day retain their own column types');

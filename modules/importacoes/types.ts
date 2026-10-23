@@ -31,8 +31,8 @@ export interface ImportEntryInput {
 export interface ImportRevisionInput { id: string; expectedUpdatedAt: string }
 export interface ImportBulkInput extends ImportRevisionInput { entryIds: string[]; fieldKey?: string; fieldKeys?: string[]; value: string }
 export interface ImportColumnTypeInput extends ImportRevisionInput { fieldKey?: string; fieldKeys?: string[]; type: ImportField['type'] }
-export interface ImportOperationalSummary {dayCount:number;documentCount:number;entryCount:number;pendingCount:number;reviewedCount:number;dateFrom:string|null;dateTo:string|null}
-export interface ImportDocumentSummary {id:string;sourceName:string;status:ImportStatus;entryCount:number;pendingCount:number;profileId?:string;profileName?:string;updatedAt?:string;dayEntryCount?:number;dayPendingCount?:number}
+export interface ImportOperationalSummary {dayCount:number;documentCount:number;entryCount:number;groupCount:number;pendingCount:number;reviewedCount:number;dateFrom:string|null;dateTo:string|null}
+export interface ImportDocumentSummary {id:string;sourceName:string;status:ImportStatus;entryCount:number;pendingCount:number;profileId?:string;profileName?:string;updatedAt?:string;dayEntryCount?:number;dayPendingCount?:number;groupCount?:number;dayGroupCount?:number}
 export interface ImportClientDay {date:string;summary:ImportOperationalSummary;documents:ImportDocumentSummary[]}
 export interface ImportClientGroup {clientId:string;clientName:string;summary:ImportOperationalSummary;days:ImportClientDay[]}
 export interface ImportCollection {
