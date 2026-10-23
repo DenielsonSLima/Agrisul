@@ -5,7 +5,7 @@ import ts from 'typescript';
 import {createModuleNavigation} from '../shared/navigation/navigationStore.ts';
 
 const source=ts.transpileModule(readFileSync(new URL('../modules/importacoes/navigation.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
-const {importTabFromSearch,importTabHref}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+const {importDocumentHref,importTabFromSearch,importTabHref,importUploadHref}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 
 test('three import tabs use shareable URLs and unknown tabs default to open',()=>{
  for(const tab of ['open','finished','settings']){const url=new URL(importTabHref(tab),'https://billing.example');assert.equal(url.pathname,'/importacoes');assert.equal(importTabFromSearch(url.searchParams),tab);}
@@ -30,4 +30,25 @@ test('legacy configuration link redirects without advertising a global settings 
  assert.match(page,/searchParams\.get\("secao"\)===\"importacoes\"/);
  assert.match(page,/navigate\('\/importacoes\?aba=configuracoes',\{replace:true\}\)/);
  assert.doesNotMatch(sections,/id:"importacoes"/);
+});
+
+test('document and entry screens retain the selected day and list tab in deep links',()=>{
+ const document=new URL(importDocumentHref('pdf/one',{tab:'finished',date:'2026-10-22'}),'https://billing.example');
+ assert.equal(document.searchParams.get('documento'),'pdf/one');assert.equal(document.searchParams.get('dia'),'2026-10-22');assert.equal(importTabFromSearch(document.searchParams),'finished');
+ const entry=new URL(importDocumentHref('pdf/one',{tab:'finished',date:'2026-10-22',entryId:'entry two'}),'https://billing.example');
+ assert.equal(entry.searchParams.get('lancamento'),'entry two');assert.equal(entry.searchParams.get('novo'),null);assert.equal(importTabFromSearch(entry.searchParams),'finished');
+ const manual=new URL(importDocumentHref('pdf/one',{date:'2026-10-22',newEntry:true}),'https://billing.example');
+ assert.equal(manual.searchParams.get('novo'),'1');assert.equal(manual.searchParams.get('dia'),'2026-10-22');assert.equal(manual.searchParams.get('lancamento'),null);
+ assert.equal(importUploadHref(),'/importacoes?importar=1');
+});
+
+test('browser history returns from entry screen to document and then to its list',()=>{
+ const entries=[new URL('https://billing.example/importacoes?aba=finalizados')];let position=0;const listeners=new Map();
+ const host={get location(){return entries[position]},history:{state:null,pushState(state,unused,path){entries.splice(position+1);entries.push(new URL(path,entries[position]));position++;this.state=state;},replaceState(state,unused,path){entries[position]=new URL(path,entries[position]);this.state=state;}},addEventListener(name,listener){listeners.set(name,listener);},removeEventListener(name){listeners.delete(name);}};
+ const navigation=createModuleNavigation('/importacoes?aba=finalizados',host);navigation.connect();
+ const documentHref=importDocumentHref('pdf-one',{tab:'finished',date:'2026-10-22'});const entryHref=importDocumentHref('pdf-one',{tab:'finished',date:'2026-10-22',entryId:'entry-one'});
+ navigation.navigate(documentHref);navigation.navigate(entryHref);assert.equal(navigation.getSnapshot(),entryHref);
+ position--;listeners.get('popstate')();assert.equal(navigation.getSnapshot(),documentHref);
+ position--;listeners.get('popstate')();assert.equal(navigation.getSnapshot(),'/importacoes?aba=finalizados');
+ position++;listeners.get('popstate')();assert.equal(navigation.getSnapshot(),documentHref);
 });

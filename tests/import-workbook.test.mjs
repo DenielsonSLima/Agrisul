@@ -150,3 +150,28 @@ test('does not let incompatible old number formats override an explicitly config
   assert.equal(actual.getCell('B2').type,ExcelJS.ValueType.Number);assert.notEqual(actual.getCell('B2').numFmt,'@');
   assert.ok(actual.getCell('C2').value instanceof Date);assert.equal(actual.getCell('C2').numFmt,'dd/mm/yyyy');
 });
+
+test('preserves native numeric General format in the template and additional rows without changing text IDs or dates',async()=>{
+  const template=new ExcelJS.Workbook();const sheet=template.addWorksheet('Plan1');
+  sheet.addRow(['NUMERO','ID_TEXTO','DATA','PESO']);
+  sheet.addRow([6269,'0006269',new Date('2026-10-22T00:00:00Z'),61.31]);
+  sheet.getCell('A2').numFmt='General';sheet.getCell('B2').numFmt='@';sheet.getCell('C2').numFmt='dd/mm/yyyy';sheet.getCell('D2').numFmt='#,##0.000';
+  const templateBase64=Buffer.from(await template.xlsx.writeBuffer()).toString('base64');
+  const values={A:'6269',B:'0006269',C:'2026-10-22',D:'61.310'};
+  const bytes=await createImportWorkbook({document:{profileSnapshot:{templateBase64}},sheetName:'Plan1',startRow:2,
+    columns:[{key:'NUMERO',column:'A',type:'decimal'},{key:'ID_TEXTO',column:'B',type:'text'},{key:'DATA',column:'C',type:'date'},{key:'PESO',column:'D',type:'decimal'}],
+    rows:[{entryId:'one',values},{entryId:'two',values}]});
+  const workbook=new ExcelJS.Workbook();await workbook.xlsx.load(bytes.buffer);const actual=workbook.getWorksheet('Plan1');
+  for(const row of [2,3]){
+    assert.equal(actual.getCell(`A${row}`).type,ExcelJS.ValueType.Number);
+    assert.equal(actual.getCell(`A${row}`).value,6269);
+    assert.equal(actual.getCell(`A${row}`).numFmt||'General','General');
+    assert.equal(actual.getCell(`B${row}`).type,ExcelJS.ValueType.String);
+    assert.equal(actual.getCell(`B${row}`).value,'0006269');
+    assert.equal(actual.getCell(`B${row}`).numFmt,'@');
+    assert.ok(actual.getCell(`C${row}`).value instanceof Date);
+    assert.equal(actual.getCell(`C${row}`).numFmt,'dd/mm/yyyy');
+    assert.equal(actual.getCell(`D${row}`).type,ExcelJS.ValueType.Number);
+    assert.equal(actual.getCell(`D${row}`).numFmt,'#,##0.000');
+  }
+});

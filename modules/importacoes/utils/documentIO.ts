@@ -173,6 +173,7 @@ export async function inspectWorkbookTemplate(file:File):Promise<WorkbookTemplat
 export async function createImportWorkbook(payload:ImportExport, templateFile?:File):Promise<Uint8Array> {
   const workbook = await newWorkbook();
   const templateBase64 = payload.document.profileSnapshot.templateBase64;
+  const usesTemplate = Boolean(templateFile || templateBase64);
   if (templateFile) await workbook.xlsx.load(await templateFile.arrayBuffer());
   else if (templateBase64) {
     const bytes = Uint8Array.from(atob(templateBase64), char => char.charCodeAt(0));
@@ -182,6 +183,7 @@ export async function createImportWorkbook(payload:ImportExport, templateFile?:F
   if (!sheet) sheet = workbook.addWorksheet(payload.sheetName);
   const formatFallbacks = new Map<string,string>();
   const templateRows = existingRowNumbers(sheet).filter(number=>number>=payload.startRow);
+  const templateRowSet = new Set(templateRows);
   for (const field of payload.columns) {
     const columnFormat = sheet.getColumn(field.column).numFmt;
     if (columnFormat && numberFormatType(columnFormat) !== 'general' && isCompatibleFormat(columnFormat,field.type)) formatFallbacks.set(field.column,columnFormat);
@@ -190,6 +192,8 @@ export async function createImportWorkbook(payload:ImportExport, templateFile?:F
       const format = sheet.getCell(`${field.column}${number}`).numFmt;
       if (format && numberFormatType(format) !== 'general' && isCompatibleFormat(format,field.type)) formatFallbacks.set(field.column,format);
     }
+    // General is a valid numeric template format, including for output beyond its existing rows.
+    if (!formatFallbacks.has(field.column) && usesTemplate && field.type === 'decimal') formatFallbacks.set(field.column,'General');
   }
   // Erase historical operational rows from the template while retaining its layout and other tabs.
   sheet.eachRow({includeEmpty:false}, row => {
@@ -208,8 +212,10 @@ export async function createImportWorkbook(payload:ImportExport, templateFile?:F
       cell.style = {...cell.style};
       const currentFormat = cell.numFmt;
       const fallback = formatFallbacks.get(field.column);
+      const preserveNumericGeneral = usesTemplate && field.type === 'decimal'
+        && templateRowSet.has(payload.startRow+index) && numberFormatType(currentFormat) === 'general';
       const chosenFormat = numberFormatType(currentFormat) !== 'general' && isCompatibleFormat(currentFormat,field.type) ? currentFormat
-        : fallback || (field.type === 'date' ? 'dd/mm/yyyy' : field.type === 'decimal' ? '0.###############' : '@');
+        : preserveNumericGeneral ? 'General' : fallback || (field.type === 'date' ? 'dd/mm/yyyy' : field.type === 'decimal' ? '0.###############' : '@');
       if (field.type === 'date') {
         cell.value = new Date(`${isoDate(value)}T00:00:00Z`);
       } else if (field.type === 'decimal') {
