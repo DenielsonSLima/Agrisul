@@ -10,8 +10,16 @@ test('PDF imports: revisions, duplicate retries, review gate, canonical decimals
  const denied=(fn,code)=>assert.rejects(fn,e=>e.code===code);
  const fields=[{key:'COD',label:'Código manual',source:'manual',type:'text',required:true,column:'A',defaultValue:''},{key:'PESO',label:'Peso bruto',source:'pdf',sourceKey:'pesoBruto',type:'decimal',required:true,column:'B',defaultValue:''},{key:'DATA',label:'Data',source:'pdf',sourceKey:'dataChegada',type:'date',required:true,column:'C',defaultValue:''},{key:'CHECK',label:'Conferência',source:'manual',type:'text',required:false,column:'',defaultValue:''}];
  try{
+  await db.exec('RESET ROLE');
+  await db.query('UPDATE public.billing_clients SET legal_name=$1,trade_name=$2 WHERE owner_id=$3 AND id=$4',['Agro Industrial Capela LTDA','Destilaria Taquari',ids.owner,ids.partner]);
+  await setActor(ids.owner);
   const input={name:'Taquari',clientId:ids.partner,parser:'taquari-equipment-v1',sheetName:'Plan1',startRow:2,fields};
   const p=(await profile('save',input)).profile;
+  await denied(()=>profile('save',input),'23505');
+  assert.equal((await profile('list')).profiles.length,1,'Seed retries must resolve the existing profile before saving');
+  const extracted=await profile('save',{...input,name:'Taquari fontes auxiliares',fields:[{...fields[0],source:'pdf',sourceKey:'equipamentoPrincipal'},{...fields[1],sourceKey:'fazendaZonaTalhao'}]});
+  assert.equal(extracted.profile.fields[0].sourceKey,'equipamentoPrincipal');assert.equal(extracted.profile.fields[1].sourceKey,'fazendaZonaTalhao');
+  await denied(()=>profile('save',{...input,name:'Fonte desconhecida',fields:[{...fields[0],source:'pdf',sourceKey:'equipamentoDesconhecido'}]}),'22023');
   await denied(()=>profile('save',{...input,name:'Outro',ownerId:ids.otherOwner}),'22023');
   await denied(()=>profile('save',{...input,id:p.id,name:'Mudou'}),'PT409');
   await denied(()=>profile('save',{...input,name:'Duplicado',fields:[fields[0],fields[0]]}),'23505');
@@ -19,9 +27,13 @@ test('PDF imports: revisions, duplicate retries, review gate, canonical decimals
   await denied(()=>profile('save',{...input,name:'Extrator fictício',parser:'generic-table-v1'}),'22023');
   const imported={profileId:p.id,clientId:ids.partner,sourceName:'moagem.pdf',sourceHash:'a'.repeat(64),entries:[{date:'2026-10-22',values:{COD:'',PESO:'1234,125600',DATA:'2026-10-22'},source:{entrada:'71209',pesoBruto:'1234,125600'},sourcePage:1,sourceLine:'71209 1234,125600'}]};
   let d=(await docs('import',imported)).document;
+  assert.equal(d.clientName,'Destilaria Taquari');
   assert.equal(d.entries[0].values.PESO,'1234.1256');assert.equal(d.pendingCount,1);
   const retried=await docs('import',imported);assert.equal(retried.created,false);assert.equal(retried.document.id,d.id);
   assert.equal((await docs('list',{status:'open'})).clients[0].days[0].date,'2026-10-22');
+  assert.equal((await docs('list',{search:'Taquari'})).clients[0].clientName,'Destilaria Taquari');
+  assert.equal((await docs('list',{search:'Capela'})).total,1,'Legal names remain searchable');
+  assert.equal((await docs('list',{search:'moagem.pdf'})).total,1,'Source names remain searchable');
   await denied(()=>docs('finalize',{id:d.id,expectedUpdatedAt:d.updatedAt}),'23514');
   await denied(()=>docs('export',{id:d.id}),'23514');
   const entryPayload={id:d.id,entryId:d.entries[0].id,date:'2026-10-22',values:d.entries[0].values,reviewed:true,expectedUpdatedAt:d.updatedAt};
@@ -63,6 +75,21 @@ test('PDF imports: revisions, duplicate retries, review gate, canonical decimals
   await denied(()=>profile('save',{...input,name:'Foreign',clientId:ids.partner}),'22023');
   assert.equal((await db.query('select count(*)::integer n from public.billing_import_documents')).rows[0].n,0,'RLS hides another account');
   await setActor(ids.reader);await denied(()=>docs('list',{}),'42501');await denied(()=>profile('save',input),'42501');
+  await db.exec('RESET ROLE');
+  await db.query("UPDATE public.billing_access_profiles SET permissions=array_append(permissions,'registrations.read') WHERE owner_id=$1 AND id=$2",[ids.owner,ids.readerProfile]);
+  await setActor(ids.reader);
+  const readonlyProfiles=await profile('list');assert.equal(readonlyProfiles.canManage,false);assert.equal(readonlyProfiles.profiles[0].id,p.id);
+  const readonlyDocs=await docs('list',{status:'all'});assert.equal(readonlyDocs.canManage,false);assert.equal(readonlyDocs.total,2);
+  assert.equal((await docs('get',{id:d.id})).document.id,d.id);
+  assert.equal((await docs('export',{id:other.id})).rows.length,1,'Readers may export an already finalized document');
+  await denied(()=>profile('save',input),'42501');
+  await denied(()=>docs('save-bulk',{id:d.id,entryIds:[d.entries[0].id],fieldKey:'COD',value:'1',expectedUpdatedAt:d.updatedAt}),'42501');
+  await denied(()=>docs('change-column-type',{id:d.id,fieldKey:'COD',type:'text',expectedUpdatedAt:d.updatedAt}),'42501');
+  await db.exec('RESET ROLE');
+  await db.query("UPDATE public.billing_clients SET trade_name='' WHERE owner_id=$1 AND id=$2",[ids.owner,ids.partner]);
+  await setActor(ids.reader);
+  assert.equal((await docs('get',{id:d.id})).document.clientName,'Agro Industrial Capela LTDA');
+  assert.equal((await docs('list',{status:'all'})).clients[0].clientName,'Agro Industrial Capela LTDA','A missing trade name falls back to the legal name');
   await setActor(null);await denied(()=>docs('list',{}),'28000');
  }finally{await db.close();}
 });

@@ -75,12 +75,12 @@ export function parseTaquariPages(pages:ExtractedPage[], profile:Pick<ImportProf
         dataMovimento:isoDate(movimento), fazendaOrigem, fazendaNome:farmCode === fazendaOrigem ? farmName : '',
         zona, talhao, itens, ordemCorte, numeroAnalise, bituca, enc, equipamento, notaFiscal:notaFiscal || '',
         pesoBruto:documentDecimal(bruto), tara:documentDecimal(tara), pesoLiquido:documentDecimal(liquido),
+        fazendaZonaTalhao:`${fazendaOrigem}-${zona}-${talhao}`, equipamentoPrincipal:'',
       };
       const signature = `${source.dataMovimento}|${entrada}|${sequencia}|${numeroAnalise}`;
       if (signatures.has(signature)) throw new Error(`Linha repetida no PDF: entrada ${entrada}, sequência ${sequencia}, análise ${numeroAnalise}. Confira o arquivo.`);
       signatures.add(signature);
-      const values:Record<string,string> = Object.fromEntries(profile.fields.map(field => [field.key, extractValue(field,source,line)]));
-      entries.push({date:source.dataMovimento, values, source, sourcePage:page.number, sourceLine:line});
+      entries.push({date:source.dataMovimento, values:{}, source, sourcePage:page.number, sourceLine:line});
     }
   }
   if (unrecognized.length) {
@@ -88,6 +88,21 @@ export function parseTaquariPages(pages:ExtractedPage[], profile:Pick<ImportProf
     throw new Error(`${unrecognized.length} lançamento(s) não puderam ser lidos. Primeiro na página ${first.page}: ${first.line.slice(0,100)}. Importe um PDF no layout Taquari por equipamento.`);
   }
   if (!entries.length) throw new Error('Nenhum lançamento Taquari foi encontrado. Use o relatório analítico por equipamento com texto selecionável; PDFs digitalizados precisam de OCR.');
+  // This is a reference to an actual source row, never a generated transport/equipment code.
+  const principalKey = (entry:ParsedImportEntry)=>`${entry.date}|${entry.source.entrada}|${entry.source.fazendaOrigem}`;
+  const principals = new Map<string,Set<string>>();
+  for (const entry of entries) {
+    if (entry.source.sequencia !== '1') continue;
+    const key = principalKey(entry);
+    const candidates = principals.get(key) || new Set<string>();
+    candidates.add(entry.source.equipamento); principals.set(key,candidates);
+  }
+  for (const entry of entries) {
+    const candidates = principals.get(principalKey(entry));
+    entry.source.equipamentoPrincipal = candidates?.size === 1 ? [...candidates][0] : '';
+    entry.values = Object.fromEntries(profile.fields.map(field=>[field.key,extractValue(field,entry.source,entry.sourceLine)]));
+  }
+  if (entries.some(entry=>!entry.source.equipamentoPrincipal)) warnings.push('Há entradas sem uma sequência 1 inequívoca no PDF. O equipamento principal dessas entradas ficou vazio para conferência.');
   if (profile.fields.some(field => field.source === 'manual' && field.required && !field.defaultValue)) {
     warnings.push('Códigos de destino e informações manuais devem ser preenchidos e conferidos antes de finalizar.');
   }

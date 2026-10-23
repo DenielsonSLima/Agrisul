@@ -10,6 +10,7 @@ export const TAQUARI_SOURCE_FIELDS = [
   ['bituca', 'Bituca'], ['enc', 'Encerramento'], ['equipamento', 'Equipamento da linha'],
   ['notaFiscal', 'Nota fiscal'], ['pesoBruto', 'Peso bruto (t)'], ['tara', 'Tara (t)'],
   ['pesoLiquido', 'Peso líquido informado (t)'],
+  ['equipamentoPrincipal', 'Equipamento da sequência 1 da entrada'], ['fazendaZonaTalhao', 'Fundo, zona e talhão (código composto)'],
 ] as const;
 
 const headings = [
@@ -31,7 +32,16 @@ const fixedExamples: Record<string, string> = {
 const sourceKeys: Record<string, string> = {
   COD_FAZENDA:'fazendaOrigem', ZONA:'zona', COD_TALHAO:'talhao', DATACHEGADA:'dataChegada', HORACHEGADA:'horaChegada',
   DATASAIDA:'dataSaida', HORASAIDA:'horaSaida', DATAMOVIMENTO:'dataMovimento',
-  NUMERO_ANALISE:'numeroAnalise', PESOBRUTO:'pesoBruto', TARA:'tara',
+  NUMERO_ANALISE:'numeroAnalise', PESOBRUTO:'pesoBruto', TARA:'tara', AREA:'fazendaZonaTalhao',
+  COD_TIPOCOLHEITA:'fazendaOrigem', COD_TIPOCARGA:'fazendaOrigem',
+  COD_EQUIPAMENTO_TRANSPORTE:'equipamentoPrincipal', COD_EQUIPAMENTO_COMPARTIMENTO:'equipamentoPrincipal',
+  NR_ORDEM_COLHEITA:'ordemCorte',
+};
+const explicitMappings:Record<string,Record<string,string>> = {
+  COD_FAZENDA:{'1582':'5010','1591':'5011'},
+  AREA:{'1582-1-54':'18.07','1591-1-19':'11.1'},
+  COD_TIPOCOLHEITA:{'1582':'2','1591':'1'}, COD_TIPOCARGA:{'1582':'2','1591':'3'},
+  NR_ORDEM_COLHEITA:{'552':'134','550':'135'},
 };
 const mandatory = new Set([
   'COD_GRUPOEMPRESA','COD_EMPRESA','COD_FILIAL','COD_SAFRA','COD_FRENTE','COD_FAZENDA','ZONA','COD_TALHAO',
@@ -54,7 +64,7 @@ export function createTaquariProfile(): ImportProfileInput {
   const fields: ImportField[] = headings.map((key, index):ImportField => ({
     key, label:key.replaceAll('_', ' '), column:excelColumn(index),
     source:sourceKeys[key] ? 'pdf' : key in fixedExamples ? 'fixed' : 'manual',
-    sourceKey:sourceKeys[key] || '', pattern:'', mappings:key === 'COD_FAZENDA' ? {'1582':'5010','1591':'5011'} : {},
+    sourceKey:sourceKeys[key] || '', pattern:'', mappings:{...explicitMappings[key]},
     type:decimal.has(key) ? 'decimal' : dates.has(key) ? 'date' : 'text',
     required:mandatory.has(key), defaultValue:fixedExamples[key] || '',
   }));

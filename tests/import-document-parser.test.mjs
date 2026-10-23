@@ -31,8 +31,15 @@ test('extracts individual compartments, carries farm context across pages, prese
   assert.equal(entries[0].values.PESOBRUTO,'61.310');
   assert.equal(entries[0].values.TARA,'23.520');
   assert.equal(entries[0].values.HORACHEGADA,'06:18');
-  // Destination IDs were manually changed in the supplied workbook and must never be guessed.
-  for (const key of ['COD_ENTRADA','NR_ORDEM_COLHEITA','COD_EQUIPAMENTO_TRANSPORTE','COD_EQUIPAMENTO_COMPARTIMENTO']) assert.equal(entries[0].values[key],'');
+  // Transaction entry IDs are not generated from template preparation rows.
+  assert.equal(entries[0].values.COD_ENTRADA,'');
+  assert.equal(entries[0].values.NR_ORDEM_COLHEITA,'134');
+  assert.equal(entries[0].values.COD_EQUIPAMENTO_TRANSPORTE,'6269');
+  assert.equal(entries[1].values.COD_EQUIPAMENTO_COMPARTIMENTO,'6269');
+  assert.equal(entries[1].source.equipamento,'6270');
+  assert.equal(entries[2].values.COD_EQUIPAMENTO_TRANSPORTE,'');
+  assert.equal(entries[0].values.AREA,'18.07');
+  assert.equal(entries[2].values.AREA,'11.1');
   assert.equal(entries[0].values.COD_FAZENDA,'5010');
   assert.equal(entries[2].values.COD_FAZENDA,'5011');
   assert.ok(warnings.length);
@@ -77,4 +84,33 @@ test('decimal conversion is lexical and the template keeps all 46 ERP columns in
   assert.equal(profile.sheetName,'Plan1');
   assert.equal(profile.startRow,2);
   assert.equal(excelColumn(26),'AA');
+});
+
+test('uses actual sequence-one equipment across pages and leaves unknown plot/order/transaction codes empty',()=>{
+  const profile=createTaquariProfile();
+  const {entries}=parseTaquariPages([{number:1,lines:[line1]},{number:2,lines:[line2]}],profile);
+  assert.equal(entries[1].source.equipamentoPrincipal,'6269');
+  assert.equal(entries[1].values.COD_EQUIPAMENTO_TRANSPORTE,'6269');
+  assert.equal(entries[1].values.COD_EQUIPAMENTO_COMPARTIMENTO,'6269');
+  assert.equal(entries[1].source.fazendaZonaTalhao,'1582-1-54');
+  const unknownLine='2920 1 22/10/2026 17:48 22/10/2026 17:50 22/10/2026 1591-1-3 656 559 7339 N N 128 41,400 15,070 26,330';
+  const unknown=parseTaquariPages([{number:1,lines:[unknownLine]}],profile).entries[0];
+  assert.equal(unknown.values.AREA,'');
+  assert.equal(unknown.values.NR_ORDEM_COLHEITA,'');
+  assert.equal(unknown.values.COD_ENTRADA,'');
+  assert.equal(unknown.values.COD_TIPOCOLHEITA,'1');
+  assert.equal(unknown.values.COD_TIPOCARGA,'3');
+});
+
+test('does not borrow principal equipment from another movement date or agricultural fund',()=>{
+  const profile=createTaquariProfile();
+  const nextDay=line2.replaceAll('22/10/2026','23/10/2026');
+  const otherFund=line2.replace('1582-1-54','1591-1-19').replace('7230','7231');
+  const {entries,warnings}=parseTaquariPages([{number:1,lines:[line1,nextDay,otherFund]}],profile);
+  assert.equal(entries[0].source.equipamentoPrincipal,'6269');
+  assert.equal(entries[1].source.equipamentoPrincipal,'');
+  assert.equal(entries[2].source.equipamentoPrincipal,'');
+  assert.equal(entries[1].values.COD_EQUIPAMENTO_TRANSPORTE,'');
+  assert.equal(entries[2].values.COD_EQUIPAMENTO_COMPARTIMENTO,'');
+  assert.ok(warnings.some(warning=>warning.includes('sequência 1 inequívoca')));
 });
