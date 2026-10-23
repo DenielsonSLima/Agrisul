@@ -1,13 +1,15 @@
 import {lazy} from "react";
-import {Building2,FileType2,ShieldCheck,Stamp,UserRound,Users} from "lucide-react";
+import {Building2,FileSpreadsheet,FileType2,ShieldCheck,Stamp,UserRound,Users} from "lucide-react";
 const EmpresasPage=lazy(()=>import("./empresas/components/EmpresasPage").then(module=>({default:module.EmpresasPage})));
 const PerfilPage=lazy(()=>import("./perfil/components/PerfilPage").then(module=>({default:module.PerfilPage})));
 const UsuariosPage=lazy(()=>import("./usuarios/components/UsuariosPage").then(module=>({default:module.UsuariosPage})));
 const PerfisAcessoPage=lazy(()=>import("./perfis-acesso").then(module=>({default:module.PerfisAcessoPage})));
 const MarcaDaguaPage=lazy(()=>import("./marca-dagua/components/MarcaDaguaPage").then(module=>({default:module.MarcaDaguaPage})));
 const CabecalhoRelatoriosPage=lazy(()=>import("./cabecalho-relatorios").then(module=>({default:module.CabecalhoRelatoriosPage})));
+const ImportProfilesPage=lazy(()=>import("@/modules/importacoes/components/ImportProfilesPage").then(module=>({default:module.ImportProfilesPage})));
 
 export const configuracoesSections=[
+ {id:"importacoes",title:"Importação PDF e Excel",description:"Extração de PDF, campos manuais e colunas do Excel.",icon:FileSpreadsheet,component:ImportProfilesPage},
  {id:"empresas",title:"Empresas",description:"Empresa principal e unidades.",icon:Building2,component:EmpresasPage},
  {id:"perfil",title:"Meu perfil",description:"Dados da conta e preferências.",icon:UserRound,component:PerfilPage},
  {id:"usuarios",title:"Usuários",description:"Equipe e acessos ao espaço.",icon:Users,component:UsuariosPage},

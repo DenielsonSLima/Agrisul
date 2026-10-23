@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/public/pdf.worker.min.mjs
 /.pnp
 .pnp.*
 .yarn/*

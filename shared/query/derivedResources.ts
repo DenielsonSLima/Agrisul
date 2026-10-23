@@ -6,7 +6,7 @@ export const derivedResources: Record<string, readonly string[]> = {
   contracts: ['agenda', 'summary', 'reports', 'planning', 'home'],
   companies: ['agenda', 'summary', 'reports', 'service-requests', 'home', 'cane-weighings', 'documentation'],
   'report-headers': ['service-requests'],
-  clients: ['agenda', 'summary', 'reports', 'home', 'cane-weighings', 'fleet'],
+  clients: ['agenda', 'summary', 'reports', 'home', 'cane-weighings', 'fleet', 'import-profiles', 'import-documents'],
   fleet: ['cane-weighings', 'purchase-requests'],
   atr: ['summary', 'reports', 'home'],
   farms: ['agenda', 'summary', 'reports', 'planning', 'home'],
@@ -21,6 +21,7 @@ export const derivedResources: Record<string, readonly string[]> = {
   'service-requests': ['home', 'documentation'],
   'access-profiles': ['home'],
   users: ['home'],
+  'import-profiles': ['import-documents'],
   quotations: ['purchase-orders', 'documentation'],
   'purchase-orders': ['documentation'],
 };
