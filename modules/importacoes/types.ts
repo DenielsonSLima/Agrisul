@@ -7,7 +7,10 @@ export interface ImportProfileInput {
   id?: string; name: string; clientId: string | null; parser: string; sheetName: string; startRow: number;
   fields: ImportField[]; templateBase64?: string; templateName?: string; expectedUpdatedAt?: string;
 }
-export interface ImportProfile extends Omit<ImportProfileInput,'id'|'expectedUpdatedAt'> { id: string; updatedAt: string; createdAt: string }
+export interface ImportProfile extends Omit<ImportProfileInput,'id'|'expectedUpdatedAt'> { id: string; updatedAt: string; createdAt: string; active: boolean; isDefault: boolean; clonedFromId: string | null }
+export interface ImportProfileRevisionInput {id:string;expectedUpdatedAt:string}
+export interface ImportProfileCloneInput extends ImportProfileRevisionInput {name?:string;clientId?:string|null}
+export interface ImportProfileActiveInput extends ImportProfileRevisionInput {active:boolean}
 export interface ImportEntry {
   id: string; date: string; values: Record<string,string>; source: Record<string,string>; sourcePage: number;
   sourceLine: string; reviewed: boolean;

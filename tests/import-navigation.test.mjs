@@ -5,7 +5,7 @@ import ts from 'typescript';
 import {createModuleNavigation} from '../shared/navigation/navigationStore.ts';
 
 const source=ts.transpileModule(readFileSync(new URL('../modules/importacoes/navigation.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
-const {importDocumentHref,importTabFromSearch,importTabHref,importUploadHref}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+const {importDocumentHref,importTabFromSearch,importTabHref,importUploadHref,importProfileHref,importCloneProfileHref}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 
 test('three import tabs use shareable URLs and unknown tabs default to open',()=>{
  for(const tab of ['open','finished','settings']){const url=new URL(importTabHref(tab),'https://billing.example');assert.equal(url.pathname,'/importacoes');assert.equal(importTabFromSearch(url.searchParams),tab);}
@@ -40,6 +40,12 @@ test('document and entry screens retain the selected day and list tab in deep li
  const manual=new URL(importDocumentHref('pdf/one',{date:'2026-10-22',newEntry:true}),'https://billing.example');
  assert.equal(manual.searchParams.get('novo'),'1');assert.equal(manual.searchParams.get('dia'),'2026-10-22');assert.equal(manual.searchParams.get('lancamento'),null);
  assert.equal(importUploadHref(),'/importacoes?importar=1');
+});
+
+test('a cloned model opens in its own configuration editor route',()=>{
+ const edit=new URL(importProfileHref('clone one'),'https://billing.example');assert.equal(importTabFromSearch(edit.searchParams),'settings');assert.equal(edit.searchParams.get('modelo'),'clone one');
+ const create=new URL(importProfileHref(),'https://billing.example');assert.equal(create.searchParams.get('novoModelo'),'1');assert.equal(create.searchParams.get('modelo'),null);
+ const clone=new URL(importCloneProfileHref('original one'),'https://billing.example');assert.equal(clone.searchParams.get('clonar'),'original one');assert.equal(importTabFromSearch(clone.searchParams),'settings');
 });
 
 test('browser history returns from entry screen to document and then to its list',()=>{

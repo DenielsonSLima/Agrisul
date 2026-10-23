@@ -9,3 +9,5 @@ export function importDocumentHref(id:string,options:{tab?:ImportTab;date?:strin
  return '/importacoes?'+params.toString();
 }
 export function importUploadHref(){return '/importacoes?importar=1';}
+export function importProfileHref(id?:string){return '/importacoes?aba=configuracoes'+(id?'&modelo='+encodeURIComponent(id):'&novoModelo=1');}
+export function importCloneProfileHref(id:string){return '/importacoes?aba=configuracoes&clonar='+encodeURIComponent(id);}
