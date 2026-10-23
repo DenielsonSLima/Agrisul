@@ -81,8 +81,8 @@ test('quick category creation uses the material-categories RPC contract', async 
   assert.deepEqual(calls, [['material-categories', 'save', input]]);
   assert.deepEqual(
     mutationResources('material-categories'),
-    ['material-categories', 'materials'],
-    'saving a category must refresh both option and material projections',
+    ['material-categories', 'materials', 'purchase-requests'],
+    'saving a category must refresh material options and purchase request groups',
   );
 });
 

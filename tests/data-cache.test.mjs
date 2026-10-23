@@ -73,7 +73,7 @@ try{
  const bCategories=key('owner-b','material-categories',{view:'list'});
  const bMaterials=key('owner-b','materials',{view:'list'});
  for(const queryKey of [aCategories,aMaterials,bCategories,bMaterials])client.setQueryData(queryKey,{saved:true});
- assert.deepEqual(mutationResources('material-categories'),['material-categories','materials']);
+ assert.deepEqual(mutationResources('material-categories'),['material-categories','materials','purchase-requests']);
  for(const resource of realtimeResources.billing_material_categories){
   await client.invalidateQueries({queryKey:billingKeys.resource('owner-a',resource),refetchType:'none'});
  }
