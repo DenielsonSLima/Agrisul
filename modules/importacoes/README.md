@@ -2,6 +2,10 @@
 
 O módulo organiza relatórios por cliente e data do movimento, com documentos em aberto ou finalizados. A importação mantém cada sequência/compartimento como lançamento independente, conserva os campos originais e exige conferência antes da finalização. Dados operacionais, permissões, estado de revisão e projeção da exportação passam por `billing_rpc`.
 
+A entrada do módulo apresenta cards de empresas, cada um com quatro linhas: dias, documentos PDF, lançamentos e pendências. Abrir a empresa leva a uma tela própria com resumo superior e tabela de dias expansíveis. Expandir um dia carrega todos os lançamentos de seus PDFs em seções independentes, preservando os tipos e a revisão de cada documento. O navegador começa com dez colunas principais e oferece todas as colunas; selecionar um campo oculto também o torna visível. Os controles de edição em lote e os avisos são recolhíveis, e cabeçalho e identificação da linha permanecem fixos durante a rolagem.
+
+Os resumos por cliente, dia e documento vêm do Postgres. A listagem aceita `clientId`, retorna somente metadados e não carrega as planilhas ou os lançamentos completos. Um PDF com vários dias é contado uma vez no total da empresa. `get` devolve o documento completo com `summary` e `daySummaries` separados; o snapshot original permanece intacto. Valores decimais são formatados visualmente por texto, sem conversão para `Number`, para preservar a precisão e os códigos textuais com zeros iniciais.
+
 A terceira aba, Configurações, lista modelos ativos e inativos com seu cliente e a marca de padrão. Editar e clonar abrem telas próprias com navegação de retorno. A clonagem copia integralmente a configuração armazenada, incluindo os tipos das colunas e o arquivo Excel, sem inferir os tipos novamente. A cópia recebe outro identificador, registra o modelo de origem e nasce inativa e sem ser padrão; o usuário informa o nome e pode trocar o cliente antes de criá-la.
 
 As ações RPC `clone`, `set-active` e `set-default` exigem permissão de escrita e a revisão atual do modelo. O banco garante somente um padrão ativo por proprietário e cliente, incluindo o grupo genérico. Inativar também remove a marca de padrão e bloqueia novos PDFs. Documentos anteriores mantêm seus snapshots, permitem conferência e exportação e continuam sendo retornados em tentativas repetidas da mesma importação. O importador oferece modelos ativos compatíveis com o cliente e prefere seu padrão; na ausência dele, usa o padrão genérico. Alterar essas opções não altera os dados ou tipos de documentos já importados.
@@ -14,7 +18,13 @@ Ao carregar o modelo, os tipos são identificados pelos valores e formatos reais
 
 Os tipos de coluna são identificados pelos valores e pelos formatos reais do Excel. Nomes como `COD_` ou `DATA` não substituem essa evidência. Colunas vazias sem formato explícito conservam a configuração existente; tipos mistos exigem escolha explícita. A exportação preserva formatos numéricos, de data e de texto compatíveis, inclusive nas linhas novas. Valores numéricos que excedam a precisão de 15 dígitos significativos do Excel interrompem a exportação com uma mensagem: o aplicativo nunca troca uma coluna numérica por texto silenciosamente. Estilos compartilhados do modelo são isolados antes de alterar formatos, evitando que a mudança de uma célula afete o tipo de outras colunas.
 
-## Evidências da amostra Taquari
+## Atualização do modelo em 23/10/2026
+
+A planilha manual concluída foi comparada com os 30 lançamentos existentes e substituiu o arquivo Excel do modelo padrão Taquari. As 46 colunas mantiveram seus tipos: 24 numéricas, quatro de data e 18 de texto. As regras de conjunto, os de/para e `COD_TERCEIRO = 77` foram preservados. A atualização do modelo vale para novas importações; os snapshots e os lançamentos anteriores permaneceram intactos.
+
+A comparação dessa revisão encontrou 1.346 valores iguais e 34 diferentes nas 1.380 células: 21 entradas ainda vazias, três áreas vazias, nove valores de tipo de cultura preenchidos no automático e vazios no manual, e uma entrada 650 no automático versus 649 no manual. Nenhuma divergência de tipo foi encontrada. Essas diferenças são dados para conferência, sem criar regras a partir da numeração manual das entradas.
+
+## Evidências da amostra inicial Taquari
 
 - O PDF fornecido é um relatório analítico selecionável de duas páginas, movimento de **22/10/2026**, emitido em 23/10/2026. Foram extraídos **30 lançamentos em 11 entradas/viagens**, nos fundos 1582 (Santana I) e 1591 (Santana 2). O total líquido **impresso** é **639,720 t**. Esse total não é recalculado pelo extrator.
 - Há entradas com duas sequências e outras com três. Uma entrada pode continuar na página seguinte. O fundo 1591 também passa do talhão 19 para o 3; não se deve preencher talhão por uma constante da fazenda.

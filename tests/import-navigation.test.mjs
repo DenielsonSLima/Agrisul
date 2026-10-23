@@ -5,7 +5,7 @@ import ts from 'typescript';
 import {createModuleNavigation} from '../shared/navigation/navigationStore.ts';
 
 const source=ts.transpileModule(readFileSync(new URL('../modules/importacoes/navigation.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
-const {importDocumentHref,importTabFromSearch,importTabHref,importUploadHref,importProfileHref,importCloneProfileHref}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+const {importClientHref,importDocumentHref,importTabFromSearch,importTabHref,importUploadHref,importProfileHref,importCloneProfileHref}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 
 test('three import tabs use shareable URLs and unknown tabs default to open',()=>{
  for(const tab of ['open','finished','settings']){const url=new URL(importTabHref(tab),'https://billing.example');assert.equal(url.pathname,'/importacoes');assert.equal(importTabFromSearch(url.searchParams),tab);}
@@ -46,6 +46,13 @@ test('a cloned model opens in its own configuration editor route',()=>{
  const edit=new URL(importProfileHref('clone one'),'https://billing.example');assert.equal(importTabFromSearch(edit.searchParams),'settings');assert.equal(edit.searchParams.get('modelo'),'clone one');
  const create=new URL(importProfileHref(),'https://billing.example');assert.equal(create.searchParams.get('novoModelo'),'1');assert.equal(create.searchParams.get('modelo'),null);
  const clone=new URL(importCloneProfileHref('original one'),'https://billing.example');assert.equal(clone.searchParams.get('clonar'),'original one');assert.equal(importTabFromSearch(clone.searchParams),'settings');
+});
+
+test('company, day and editor routes retain the selected client and finalized status',()=>{
+ const company=new URL(importClientHref('client one','finished'),'https://billing.example');assert.equal(company.searchParams.get('cliente'),'client one');assert.equal(importTabFromSearch(company.searchParams),'finished');
+ const entry=new URL(importDocumentHref('doc-one',{clientId:'client one',tab:'finished',date:'2026-10-22',entryId:'entry-one',returnToClient:true}),'https://billing.example');
+ assert.equal(entry.searchParams.get('cliente'),'client one');assert.equal(entry.searchParams.get('dia'),'2026-10-22');assert.equal(entry.searchParams.get('retorno'),'cliente');assert.equal(importTabFromSearch(entry.searchParams),'finished');
+ const upload=new URL(importUploadHref('client one'),'https://billing.example');assert.equal(upload.searchParams.get('cliente'),'client one');assert.equal(upload.searchParams.get('importar'),'1');
 });
 
 test('browser history returns from entry screen to document and then to its list',()=>{

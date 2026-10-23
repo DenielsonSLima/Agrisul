@@ -5,7 +5,7 @@ import {getSupabaseBrowserClient} from '@/shared/supabase/client';
 import type {ImportBulkInput,ImportColumnTypeInput,ImportCollection,ImportDocument,ImportDocumentInput,ImportEntryInput,ImportExport,ImportProfile,ImportProfileInput,ImportProfileRevisionInput,ImportProfileCloneInput,ImportProfileActiveInput,ImportRevisionInput,ImportStatus} from '../types';
 
 export function useImportProfiles(){return useCadastroQuery('import-profiles',{},signal=>rpcRequest<{profiles:ImportProfile[];canManage:boolean}>('import-profiles','list',{},signal));}
-export function useImportDocuments(status:ImportStatus|'all'='open',search=''){return useCadastroQuery('import-documents',{status,search},signal=>rpcRequest<ImportCollection>('import-documents','list',{status,search},signal));}
+export function useImportDocuments(status:ImportStatus|'all'='open',search='',clientId?:string){return useCadastroQuery('import-documents',{status,search,clientId},signal=>rpcRequest<ImportCollection>('import-documents','list',{status,search,...(clientId?{clientId}:{})},signal));}
 export function useImportDocument(id:string|null){return useCadastroQuery('import-documents',{id},signal=>rpcRequest<{document:ImportDocument}>('import-documents','get',{id},signal),!!id);}
 export function useImportMutations(){
  const {user}=useAuth();

@@ -12,7 +12,7 @@ export async function rpcRequest(resource,action,payload,signal){state.calls.pus
 const {state}=await import(fixtureUrl);
 let source=ts.transpileModule(readFileSync(new URL('../modules/importacoes/hooks/useImportacoes.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
 source=source.replace(/from ['"]@\/(?:modules\/cadastro\/hooks\/useCadastroQuery|shared\/supabase\/(?:rpc|AuthProvider|client))['"]/g,`from ${JSON.stringify(fixtureUrl)}`);
-const {useImportMutations,useImportProfiles}=await import(url(source));
+const {useImportMutations,useImportProfiles,useImportDocuments}=await import(url(source));
 
 test('profile lifecycle mutations route revision-protected payloads through the shared RPC wrapper',async()=>{
  state.calls=[];state.actor='owner-one';const actions=useImportMutations();
@@ -23,6 +23,10 @@ test('profile lifecycle mutations route revision-protected payloads through the 
 });
 test('configuration query retains inactive models and passes the cancellation signal',async()=>{
  state.calls=[];const result=await useImportProfiles().fetch();assert.equal(result.profiles[0].active,false);assert.deepEqual(state.calls[0].payload,{});assert.ok(state.calls[0].signal instanceof AbortSignal);
+});
+test('company queries scope their server summaries and document lists through the shared RPC',async()=>{
+ state.calls=[];await useImportDocuments('finished','','client-one').fetch();
+ assert.equal(state.calls[0].resource,'import-documents');assert.equal(state.calls[0].action,'list');assert.deepEqual(state.calls[0].payload,{status:'finished',search:'',clientId:'client-one'});assert.ok(state.calls[0].signal instanceof AbortSignal);
 });
 test('account changes prevent profile metadata writes before RPC dispatch',async()=>{
  state.calls=[];state.actor='another-owner';const actions=useImportMutations();await assert.rejects(actions.cloneProfile({id:'source',expectedUpdatedAt:'revision'}),/conta foi alterada/);assert.equal(state.calls.length,0);state.actor='owner-one';
