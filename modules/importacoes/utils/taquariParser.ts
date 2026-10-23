@@ -89,7 +89,7 @@ export function parseTaquariPages(pages:ExtractedPage[], profile:Pick<ImportProf
   }
   if (!entries.length) throw new Error('Nenhum lançamento Taquari foi encontrado. Use o relatório analítico por equipamento com texto selecionável; PDFs digitalizados precisam de OCR.');
   // This is a reference to an actual source row, never a generated transport/equipment code.
-  const principalKey = (entry:ParsedImportEntry)=>`${entry.date}|${entry.source.entrada}|${entry.source.fazendaOrigem}`;
+  const principalKey = (entry:ParsedImportEntry)=>`${entry.source.dataMovimento||entry.date}|${entry.source.entrada}`;
   const principals = new Map<string,Set<string>>();
   for (const entry of entries) {
     if (entry.source.sequencia !== '1') continue;

@@ -99,18 +99,29 @@ test('uses actual sequence-one equipment across pages and leaves unknown plot/or
   assert.equal(unknown.values.NR_ORDEM_COLHEITA,'');
   assert.equal(unknown.values.COD_ENTRADA,'');
   assert.equal(unknown.values.COD_TIPOCOLHEITA,'1');
-  assert.equal(unknown.values.COD_TIPOCARGA,'3');
+  assert.equal(unknown.values.COD_TIPOCARGA,'');
 });
 
-test('does not borrow principal equipment from another movement date or agricultural fund',()=>{
+test('reuses sequence-one equipment across farms in the same source entry but not across movement dates',()=>{
   const profile=createTaquariProfile();
   const nextDay=line2.replaceAll('22/10/2026','23/10/2026');
   const otherFund=line2.replace('1582-1-54','1591-1-19').replace('7230','7231');
   const {entries,warnings}=parseTaquariPages([{number:1,lines:[line1,nextDay,otherFund]}],profile);
   assert.equal(entries[0].source.equipamentoPrincipal,'6269');
   assert.equal(entries[1].source.equipamentoPrincipal,'');
-  assert.equal(entries[2].source.equipamentoPrincipal,'');
+  assert.equal(entries[2].source.equipamentoPrincipal,'6269');
   assert.equal(entries[1].values.COD_EQUIPAMENTO_TRANSPORTE,'');
-  assert.equal(entries[2].values.COD_EQUIPAMENTO_COMPARTIMENTO,'');
+  assert.equal(entries[2].values.COD_EQUIPAMENTO_COMPARTIMENTO,'6269');
+  assert.equal(entries[2].values.COD_EQUIPAMENTO_TRANSPORTE,'6269');
   assert.ok(warnings.some(warning=>warning.includes('sequência 1 inequívoca')));
+});
+
+test('Taquari load type comes from the RPC sequence rule rather than a farm lookup',()=>{
+ const profile=createTaquariProfile();const load=profile.fields.find(field=>field.key==='COD_TIPOCARGA');
+ assert.equal(load.source,'pdf');assert.equal(load.sourceKey,'quantidadeVeiculosConjunto');assert.deepEqual(load.mappings,{});assert.equal(load.defaultValue,'');
+ assert.equal(load.type,'text');assert.equal(profile.fields.find(field=>field.key==='PESOBRUTO').type,'decimal');assert.equal(profile.fields.find(field=>field.key==='DATAMOVIMENTO').type,'date');
+ assert.equal(profile.fields.find(field=>field.key==='COD_TERCEIRO').defaultValue,'77');
+ const parsed=parseTaquariPages([{number:1,lines:[line1,line2]}],profile);
+ assert.equal(parsed.entries[0].values.COD_TIPOCARGA,'');assert.equal(parsed.entries[1].values.COD_TIPOCARGA,'');
+ assert.equal(parsed.entries[1].values.COD_EQUIPAMENTO_TRANSPORTE,'6269');assert.equal(parsed.entries[1].values.COD_EQUIPAMENTO_COMPARTIMENTO,'6269');
 });
