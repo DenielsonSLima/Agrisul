@@ -184,9 +184,11 @@ export async function createImportWorkbook(payload:ImportExport, templateFile?:F
   let sheet = workbook.getWorksheet(payload.sheetName);
   if (!sheet) sheet = workbook.addWorksheet(payload.sheetName);
   const formatFallbacks = new Map<string,string>();
+  const styleFallbacks = new Map<string,Partial<import('exceljs').Style>>();
   const templateRows = existingRowNumbers(sheet).filter(number=>number>=payload.startRow);
   const templateRowSet = new Set(templateRows);
   for (const field of payload.columns) {
+    if (usesTemplate && templateRows.length) styleFallbacks.set(field.column,structuredClone(sheet.getCell(`${field.column}${templateRows[0]}`).style));
     const columnFormat = sheet.getColumn(field.column).numFmt;
     if (columnFormat && numberFormatType(columnFormat) !== 'general' && isCompatibleFormat(columnFormat,field.type)) formatFallbacks.set(field.column,columnFormat);
     for (const number of templateRows) {
@@ -209,15 +211,22 @@ export async function createImportWorkbook(payload:ImportExport, templateFile?:F
     for (const field of payload.columns) {
       const cell = sheet!.getCell(`${field.column}${payload.startRow+index}`);
       const value = row.values[field.column] || '';
-      if (value === '') { cell.value = null; continue; }
       // ExcelJS shares loaded style objects across cells. Isolate changes to this cell's type format.
-      cell.style = {...cell.style};
+      const templateStyle = !templateRowSet.has(payload.startRow+index) ? styleFallbacks.get(field.column) : undefined;
+      cell.style = templateStyle ? structuredClone(templateStyle) : {...cell.style};
       const currentFormat = cell.numFmt;
       const fallback = formatFallbacks.get(field.column);
       const preserveNumericGeneral = usesTemplate && field.type === 'decimal'
         && templateRowSet.has(payload.startRow+index) && numberFormatType(currentFormat) === 'general';
       const chosenFormat = numberFormatType(currentFormat) !== 'general' && isCompatibleFormat(currentFormat,field.type) ? currentFormat
         : preserveNumericGeneral ? 'General' : fallback || (field.type === 'date' ? 'dd/mm/yyyy' : field.type === 'decimal' ? '0.###############' : '@');
+      if (value === '') {
+        cell.value = null;
+        // Carry explicit template formats into blank new rows too. A completely
+        // unformatted blank template column remains General, without inventing a type.
+        if (!usesTemplate || fallback || numberFormatType(currentFormat) !== 'general') cell.numFmt = chosenFormat;
+        continue;
+      }
       if (field.type === 'date') {
         cell.value = new Date(`${isoDate(value)}T00:00:00Z`);
       } else if (field.type === 'decimal') {

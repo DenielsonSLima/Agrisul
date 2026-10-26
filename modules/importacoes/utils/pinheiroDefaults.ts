@@ -48,7 +48,9 @@ const numeric = new Set([
   'PESOBRUTO','TARA','NR_ORDEM_COLHEITA','COD_TIPOCULTURA',
 ]);
 const dates = new Set(['DATACHEGADA','DATASAIDA','DATAMOVIMENTO']);
-const required = new Set([...numeric].filter(key=>key!=='NR_ORDEM_COLHEITA').concat(['COD_TIPOCOLHEITA','DATACHEGADA','DATASAIDA','DATAMOVIMENTO','COD_TIPOCARGA']));
+// The user explicitly permits missing ERP entry/equipment codes to remain blank.
+const optionalManual = new Set(['NR_ORDEM_COLHEITA','COD_ENTRADA','COD_EQUIPAMENTO_TRANSPORTE','COD_EQUIPAMENTO_COMPARTIMENTO']);
+const required = new Set([...numeric].filter(key=>!optionalManual.has(key)).concat(['COD_TIPOCOLHEITA','DATACHEGADA','DATASAIDA','DATAMOVIMENTO','COD_TIPOCARGA']));
 function columnLabel(index:number):string {
   let label='';for(let value=index+1;value>0;value=Math.floor((value-1)/26))label=String.fromCharCode(65+(value-1)%26)+label;
   return label;

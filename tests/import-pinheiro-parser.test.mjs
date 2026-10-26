@@ -22,6 +22,7 @@ test('Pinheiro keeps its own 46 headers, native sample types and explicit mappin
  assert.equal(field('COD_TALHAO').source,'manual');assert.equal(field('AREA').sourceKey,'talhao');assert.deepEqual(field('AREA').mappings,{'15':'19.56','21':'19.52'});
  assert.equal(field('NR_ORDEM_COLHEITA').source,'manual');assert.equal(field('NR_ORDEM_COLHEITA').required,false);assert.equal(field('NR_ORDEM_COLHEITA').type,'decimal');assert.deepEqual(field('NR_ORDEM_COLHEITA').mappings,{});
  assert.equal(field('COD_EQUIPAMENTO_TRANSPORTE').source,'manual');assert.equal(field('COD_EQUIPAMENTO_COMPARTIMENTO').source,'manual');assert.equal(field('COD_ENTRADA').source,'manual');assert.ok(PINHEIRO_SOURCE_FIELDS.some(([key])=>key==='pesoAnalisado'));
+ for(const key of ['COD_ENTRADA','COD_EQUIPAMENTO_TRANSPORTE','COD_EQUIPAMENTO_COMPARTIMENTO']){assert.equal(field(key).required,false);assert.equal(field(key).type,'decimal');assert.equal(field(key).defaultValue,'');}
 });
 
 test('extracts the five demonstrated report rows without inventing ERP, vehicle or conventional weights',()=>{

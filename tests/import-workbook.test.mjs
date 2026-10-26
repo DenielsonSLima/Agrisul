@@ -176,3 +176,23 @@ test('preserves native numeric General format in the template and additional row
     assert.equal(actual.getCell(`D${row}`).numFmt,'#,##0.000');
   }
 });
+
+test('blank cells keep explicit template column formats beyond the original rows without becoming zero or text',async()=>{
+ const template=new ExcelJS.Workbook(),sheet=template.addWorksheet('Plan1');
+ sheet.addRow(['CODIGO','PESO','DATA','NUMERO','SEM_EVIDENCIA']);
+ sheet.addRow(['000123',12.345,new Date('2026-10-24T00:00:00Z'),806,null]);
+ const formats=['@','#,##0.000','mm-dd-yy','General','General'];
+ formats.forEach((format,index)=>{sheet.getRow(2).getCell(index+1).numFmt=format;});
+ sheet.getCell('A2').font={name:'Arial',size:14,color:{argb:'FF102030'}};sheet.getCell('A2').alignment={horizontal:'center'};
+ sheet.getCell('B2').alignment={shrinkToFit:true};sheet.getCell('B2').border={bottom:{style:'thin',color:{argb:'FF222222'}}};
+ const templateBase64=Buffer.from(await template.xlsx.writeBuffer()).toString('base64');
+ const bytes=await createImportWorkbook({document:{profileSnapshot:{templateBase64}},sheetName:'Plan1',startRow:2,
+  columns:['text','decimal','date','decimal','text'].map((type,index)=>({key:`FIELD_${index}`,column:String.fromCharCode(65+index),type})),
+  rows:[{entryId:'sample',values:{A:'000123',B:'12.345',C:'2026-10-24',D:'806',E:''}},{entryId:'blank',values:{A:'',B:'',C:'',D:'',E:''}}]});
+ const workbook=new ExcelJS.Workbook();await workbook.xlsx.load(bytes.buffer);const actual=workbook.getWorksheet('Plan1');
+ for(const row of [2,3])for(let col=1;col<=5;col++)assert.equal(actual.getRow(row).getCell(col).numFmt??'General',formats[col-1]);
+ for(let col=1;col<=5;col++){assert.equal(actual.getRow(3).getCell(col).value,null);assert.equal(actual.getRow(3).getCell(col).type,ExcelJS.ValueType.Null);}
+ for(let col=1;col<=5;col++)assert.deepEqual(actual.getRow(3).getCell(col).style,actual.getRow(2).getCell(col).style,'Blank new rows keep the sample cell font, alignment, borders and format');
+ assert.equal(actual.getCell('A2').type,ExcelJS.ValueType.String);assert.equal(actual.getCell('A2').value,'000123');
+ assert.equal(actual.getCell('B2').type,ExcelJS.ValueType.Number);assert.equal(actual.getCell('C2').type,ExcelJS.ValueType.Date);
+});
