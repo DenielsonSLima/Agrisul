@@ -14,7 +14,8 @@ function source(name) {
 const dataUrl = text=>'data:text/javascript;base64,'+Buffer.from(text).toString('base64');
 const defaultsUrl = dataUrl(source('defaults'));
 const parserUrl = dataUrl(source('taquariParser'));
-const ioSource = source('documentIO').replaceAll("'./defaults'",JSON.stringify(defaultsUrl)).replaceAll("'./taquariParser'",JSON.stringify(parserUrl))
+const pinheiroUrl = dataUrl(source('pinheiroParser'));
+const ioSource = source('documentIO').replaceAll("'./defaults'",JSON.stringify(defaultsUrl)).replaceAll("'./taquariParser'",JSON.stringify(parserUrl)).replaceAll("'./pinheiroParser'",JSON.stringify(pinheiroUrl))
   .replace("import('exceljs')",`import(${JSON.stringify(pathToFileURL(require.resolve('exceljs')).href)})`);
 const {createImportWorkbook,inspectWorkbookTemplate} = await import(dataUrl(ioSource));
 

@@ -1,5 +1,6 @@
 import type { ImportExport, ImportField, ImportProfileInput } from '../types';
 import { excelColumn } from './defaults';
+import {parsePinheiroPages} from './pinheiroParser';
 import { isoDate, parseTaquariPages, type ExtractedPage, type ParsedImport } from './taquariParser';
 export { createTaquariProfile, TAQUARI_SOURCE_FIELDS } from './defaults';
 
@@ -7,6 +8,7 @@ const MAX_PDF_BYTES = 25 * 1024 * 1024;
 const MAX_WORKBOOK_BYTES = 5 * 1024 * 1024;
 
 export async function parseImportPdf(file:File, profile:ImportProfileInput):Promise<ParsedImport> {
+  if (!['taquari-equipment-v1','pinheiro-usjp-v1'].includes(profile.parser)) throw new Error('Selecione um modelo com extrator compatível.');
   if (!file.name.toLowerCase().endsWith('.pdf')) throw new Error('Selecione um arquivo PDF.');
   if (file.size > MAX_PDF_BYTES) throw new Error('O PDF deve ter até 25 MB.');
   const pdfjs = await import('pdfjs-dist');
@@ -31,7 +33,7 @@ export async function parseImportPdf(file:File, profile:ImportProfileInput):Prom
       pages.push({number,lines:rows.map(row => row.parts.sort((a,b) => a.x-b.x).map(item => item.text).join(' '))});
       page.cleanup();
     }
-    return parseTaquariPages(pages,profile);
+    return profile.parser==='pinheiro-usjp-v1'?parsePinheiroPages(pages,profile):parseTaquariPages(pages,profile);
   } catch (error) {
     if (error instanceof Error && /password/i.test(error.message)) throw new Error('O PDF está protegido por senha. Exporte uma cópia sem senha para importar.');
     throw error;

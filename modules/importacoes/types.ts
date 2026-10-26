@@ -14,6 +14,7 @@ export interface ImportProfileActiveInput extends ImportProfileRevisionInput {ac
 export interface ImportEntry {
   id: string; date: string; values: Record<string,string>; source: Record<string,string>; sourcePage: number;
   sourceLine: string; reviewed: boolean;
+  groupKey?: string | null; groupOrdinal?: number | null;
 }
 export interface ImportDocument {
   id: string; clientId: string; clientName: string; profileId: string; profileSnapshot: ImportProfile;
@@ -23,7 +24,7 @@ export interface ImportDocument {
 }
 export interface ImportDocumentInput {
   id?: string; profileId: string; clientId: string; sourceName: string; sourceHash: string;
-  entries: Array<Omit<ImportEntry,'id'|'reviewed'|'source'> & {source?:Record<string,string>}>;
+  entries: Array<Omit<ImportEntry,'id'|'reviewed'|'source'|'groupKey'|'groupOrdinal'> & {source?:Record<string,string>}>;
 }
 export interface ImportEntryInput {
   id: string; entryId?: string; date: string; values: Record<string,string>; reviewed: boolean; expectedUpdatedAt: string;

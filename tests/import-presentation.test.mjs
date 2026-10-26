@@ -6,7 +6,7 @@ const url=source=>'data:text/javascript;base64,'+Buffer.from(source).toString('b
 const transpile=path=>ts.transpileModule(readFileSync(new URL(path,import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
 const shared=url(transpile('../shared/utils/presentation.ts'));
 const source=transpile('../modules/importacoes/utils/presentation.ts').replace(/from ['"]@\/shared\/utils\/presentation['"]/,`from ${JSON.stringify(shared)}`);
-const {importValue,importCount,importFieldLabel,mainImportFields}=await import(url(source));
+const {importValue,importCount,importFieldLabel,importGroupDecoration,mainImportFields}=await import(url(source));
 const {createTaquariProfile}=await import(url(transpile('../modules/importacoes/utils/defaults.ts')));
 
 test('presentation formats exact decimal strings in pt-BR without losing precision or textual leading zeros',()=>{
@@ -24,4 +24,22 @@ test('main columns keep all original field types and reveal a selected hidden co
 test('human column titles are presentation only and retain a configured custom label',()=>{
  assert.equal(importFieldLabel({key:'COD_FAZENDA',label:'COD FAZENDA'}),'Fazenda');
  assert.equal(importFieldLabel({key:'COD_FAZENDA',label:'Código no meu sistema'}),'Código no meu sistema');
+});
+
+test('all trailers in an RPC group share a band and only the next group changes its color',()=>{
+ const entries=[{groupKey:'original-a',groupOrdinal:1},{groupKey:'original-a',groupOrdinal:1},{groupKey:'original-b',groupOrdinal:2},{groupKey:'original-b',groupOrdinal:2},{groupKey:'original-b',groupOrdinal:2},{groupKey:'original-c',groupOrdinal:3}];
+ const decoration=entries.map((entry,index)=>importGroupDecoration(entry,entries[index-1]));
+ assert.deepEqual(decoration.map(item=>item.band),['base','base','alternate','alternate','alternate','base']);
+ assert.deepEqual(decoration.map(item=>item.start),[true,false,true,false,false,true]);
+ assert.equal(decoration[1].key,'original-a');assert.equal(decoration[4].ordinal,2);
+});
+
+test('group decoration trusts the RPC ordinal across day filters and never infers grouping from editable ERP values',()=>{
+ const source={groupKey:'server-projected-key',groupOrdinal:8,values:{COD_ENTRADA:'different-code',COD_FAZENDA:'5010'},source:{entrada:'2874'}};
+ assert.equal(importGroupDecoration(source).band,'alternate');
+ assert.equal(importGroupDecoration({...source,values:{COD_ENTRADA:'same-code',COD_FAZENDA:'5011'}}).band,'alternate');
+ assert.deepEqual(importGroupDecoration({}),{key:null,ordinal:null,band:'none',start:false});
+ assert.equal(importGroupDecoration({groupKey:'known',groupOrdinal:null}).band,'none');
+ assert.equal(importGroupDecoration({groupKey:null,groupOrdinal:1}).band,'none');
+ for(const ordinal of [0,-1,1.5,NaN,Infinity])assert.equal(importGroupDecoration({groupKey:'known',groupOrdinal:ordinal}).band,'none');
 });

@@ -1,5 +1,15 @@
 # Importações de colheita
 
+## Pinheiro / USJP
+
+O modelo `pinheiro-usjp-v1` é independente do Taquari e usa o Excel `import01usjp.xlsx`: 46 colunas, com 18 colunas numéricas, quatro textuais preenchidas, três de data e 21 vazias sem evidência de tipo. As vazias começam como texto manual. `COD_TIPOCOLHEITA` e `COD_TIPOCARGA` são texto, conforme as células `@`; frente 26, terceiro 1 e fundo 311272 → fazenda 5032 pertencem somente ao perfil Pinheiro.
+
+Cada BA é um lançamento; o conjunto é identificado pela combinação original de data/hora do BA e data/hora da tara. O banco conta as análises desse par, preserva a ordem das linhas do relatório e calcula a convenção confirmada pelo usuário: tara 1/2 ou 1/2/3 e bruto = peso analisado + essa tara. São valores convencionais de importação, não medições adicionais da balança. A prévia não faz esses cálculos. Datas civis de chegada/saída vêm do BA/tara; o movimento usa o período agrícola das 06:00 às 05:59 seguintes, incluindo os BAs da madrugada. Uma saída posterior ao fechamento continua válida se o BA estiver no período.
+
+O exemplo enviado tem 22 BAs em nove conjuntos; oito fotografias repetem um boletim e duas guias, sem representar oito relatórios diferentes. Os cinco registros do Excel foram conciliados com os dois primeiros conjuntos. Entradas ERP, códigos dos equipamentos e demais vínculos dos outros 17 BAs não são extrapolados. Os talhões 15/21 usam as áreas 19,56/19,52 e ordens 137/136 anotadas; a linha 6 do Excel traz ordem 137 para o talhão 21 e permanece como exceção explícita para conferência. Guias `0162` e `0163` mantêm os zeros na origem. O leitor recorrente aceita o relatório USJP com texto selecionável; fotos e PDFs digitalizados requerem transcrição/OCR e conferência.
+
+Os fundos alternados da tabela usam `groupKey` e `groupOrdinal` projetados pela RPC, sem contar conjuntos no navegador. Linhas do mesmo conjunto mantêm a cor e a coluna fixa acompanha o fundo. A seleção continua verde; linhas manuais sem identidade de origem não recebem um conjunto presumido.
+
 O módulo organiza relatórios por cliente e data do movimento, com documentos em aberto ou finalizados. A importação mantém cada sequência/compartimento como lançamento independente, conserva os campos originais e exige conferência antes da finalização. Dados operacionais, permissões, estado de revisão e projeção da exportação passam por `billing_rpc`.
 
 A entrada do módulo apresenta quatro cards de empresas por linha em telas grandes e se adapta para três, dois ou um nas menores. Cada card mostra dias, documentos PDF, lançamentos e pendências. Abrir a empresa leva a uma tela própria com resumo superior e tabela de dias expansíveis. Ambos mostram também a quantidade de conjuntos. Expandir um dia carrega todos os lançamentos de seus PDFs em seções independentes, preservando os tipos e a revisão de cada documento. O navegador começa com dez colunas principais e oferece todas as colunas; selecionar um campo oculto também o torna visível. Os controles de edição em lote e os avisos são recolhíveis, e cabeçalho e identificação da linha permanecem fixos durante a rolagem.
