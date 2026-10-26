@@ -19,7 +19,8 @@ test('Pinheiro keeps its own 46 headers, native sample types and explicit mappin
  const empty=['COD_FUNCIONARIO','DATACARREGAMENTO','HORACARREGAMENTO','ORDEM_CARREGAMENTO','NUMERO_ANALISE','PBU','LEITURA_SACARIMETRICA','BRIX','POL','COD_COLHEDORA','COD_OPER_COLHEDORA_TERCEIRO','COD_OPER_COLHEDORA_FUNCIONARIO','COD_TRANSBORDO','COD_OPER_TRANSBORDO_TERCEIRO','COD_OPER_TRANSBORDO_FUNCIONA','COD_CARREGADEIRA','COD_OPER_CARREGADEIRA_TERCEIRO','COD_OPER_CARREGADEIRA_FUNCIONA','COD_TRATOR_REBOQUE','COD_OPER_TRATOREBO_TERCEIRO','COD_OPER_TRATOREBO_FUNCIONARIO'];
  assert.equal(empty.length,21);for(const key of empty){assert.equal(field(key).source,'manual');assert.equal(field(key).type,'text');assert.equal(field(key).defaultValue,'');}
  assert.equal(field('COD_TERCEIRO').defaultValue,'1');assert.equal(field('COD_FRENTE').defaultValue,'26');assert.deepEqual(field('COD_FAZENDA').mappings,{'311272':'5032'});
- assert.equal(field('COD_TALHAO').source,'manual');assert.equal(field('AREA').sourceKey,'talhao');assert.deepEqual(field('AREA').mappings,{'15':'19.56','21':'19.52'});assert.deepEqual(field('NR_ORDEM_COLHEITA').mappings,{'15':'137','21':'136'});
+ assert.equal(field('COD_TALHAO').source,'manual');assert.equal(field('AREA').sourceKey,'talhao');assert.deepEqual(field('AREA').mappings,{'15':'19.56','21':'19.52'});
+ assert.equal(field('NR_ORDEM_COLHEITA').source,'manual');assert.equal(field('NR_ORDEM_COLHEITA').required,false);assert.equal(field('NR_ORDEM_COLHEITA').type,'decimal');assert.deepEqual(field('NR_ORDEM_COLHEITA').mappings,{});
  assert.equal(field('COD_EQUIPAMENTO_TRANSPORTE').source,'manual');assert.equal(field('COD_EQUIPAMENTO_COMPARTIMENTO').source,'manual');assert.equal(field('COD_ENTRADA').source,'manual');assert.ok(PINHEIRO_SOURCE_FIELDS.some(([key])=>key==='pesoAnalisado'));
 });
 

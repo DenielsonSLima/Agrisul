@@ -33,13 +33,13 @@ const fixed:Record<string,string> = {
   COD_FINALIDADE:'4',COD_TIPOCOLHEITA:'2',COD_TERCEIRO:'1',COD_TIPOCULTURA:'1',
 };
 const sources:Record<string,string> = {
-  COD_FAZENDA:'fazendaOrigem',AREA:'talhao',NR_ORDEM_COLHEITA:'talhao',
+  COD_FAZENDA:'fazendaOrigem',AREA:'talhao',
   DATACHEGADA:'dataChegada',HORACHEGADA:'horaChegada',DATASAIDA:'dataSaida',HORASAIDA:'horaSaida',
   DATAMOVIMENTO:'dataMovimento',COD_TIPOCARGA:'quantidadeAnalisesConjunto',
   PESOBRUTO:'pesoBrutoConvencional',TARA:'taraConvencional',
 };
 const mappings:Record<string,Record<string,string>> = {
-  COD_FAZENDA:{'311272':'5032'},AREA:{'15':'19.56','21':'19.52'},NR_ORDEM_COLHEITA:{'15':'137','21':'136'},
+  COD_FAZENDA:{'311272':'5032'},AREA:{'15':'19.56','21':'19.52'},
 };
 // Native NUMBER cells in import01usjp.xlsx, never inferred from a column name.
 const numeric = new Set([
@@ -48,7 +48,7 @@ const numeric = new Set([
   'PESOBRUTO','TARA','NR_ORDEM_COLHEITA','COD_TIPOCULTURA',
 ]);
 const dates = new Set(['DATACHEGADA','DATASAIDA','DATAMOVIMENTO']);
-const required = new Set([...numeric,'COD_TIPOCOLHEITA','DATACHEGADA','DATASAIDA','DATAMOVIMENTO','COD_TIPOCARGA']);
+const required = new Set([...numeric].filter(key=>key!=='NR_ORDEM_COLHEITA').concat(['COD_TIPOCOLHEITA','DATACHEGADA','DATASAIDA','DATAMOVIMENTO','COD_TIPOCARGA']));
 function columnLabel(index:number):string {
   let label='';for(let value=index+1;value>0;value=Math.floor((value-1)/26))label=String.fromCharCode(65+(value-1)%26)+label;
   return label;
