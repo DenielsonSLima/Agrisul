@@ -36,6 +36,7 @@ export function documentDecimal(value:string):string {
 
 function extractValue(field:ImportField, source:Record<string,string>, sourceLine:string):string {
   if (field.source !== 'pdf') return field.defaultValue || '';
+  if (field.sourceKey === 'entradaSequencialConjunto') return '';
   let result = source[field.sourceKey || field.key] || '';
   if (field.pattern) {
     if (field.pattern.length > 500) throw new Error(`Expressão de ${field.label} excede 500 caracteres.`);
@@ -75,7 +76,7 @@ export function parseTaquariPages(pages:ExtractedPage[], profile:Pick<ImportProf
         dataMovimento:isoDate(movimento), fazendaOrigem, fazendaNome:farmCode === fazendaOrigem ? farmName : '',
         zona, talhao, itens, ordemCorte, numeroAnalise, bituca, enc, equipamento, notaFiscal:notaFiscal || '',
         pesoBruto:documentDecimal(bruto), tara:documentDecimal(tara), pesoLiquido:documentDecimal(liquido),
-        fazendaZonaTalhao:`${fazendaOrigem}-${zona}-${talhao}`, equipamentoPrincipal:'',
+        fazendaZonaTalhao:`${fazendaOrigem}-${zona}-${talhao}`, equipamentoPrincipal:'',entradaSequencialConjunto:'',
       };
       const signature = `${source.dataMovimento}|${entrada}|${sequencia}|${numeroAnalise}`;
       if (signatures.has(signature)) throw new Error(`Linha repetida no PDF: entrada ${entrada}, sequência ${sequencia}, análise ${numeroAnalise}. Confira o arquivo.`);
@@ -104,8 +105,9 @@ export function parseTaquariPages(pages:ExtractedPage[], profile:Pick<ImportProf
   }
   if (entries.some(entry=>!entry.source.equipamentoPrincipal)) warnings.push('Há entradas sem uma sequência 1 inequívoca no PDF. O equipamento principal dessas entradas ficou vazio para conferência.');
   if (profile.fields.some(field => field.source === 'manual' && field.required && !field.defaultValue)) {
-    warnings.push('Códigos de destino e informações manuais devem ser preenchidos e conferidos antes de finalizar.');
+    warnings.push('Códigos de destino e informações manuais ausentes ficam pendentes de conferência. Você pode finalizar ou exportar sem preenchê-los.');
   }
   warnings.push('Cada sequência do PDF é um lançamento separado. Equipamentos, entradas e ordens do sistema de destino podem ter códigos diferentes dos impressos.');
+  if(profile.fields.some(field=>field.source==='pdf'&&field.sourceKey==='entradaSequencialConjunto'))warnings.push('As entradas sequenciais por conjunto serão calculadas no banco ao salvar, usando o primeiro número configurado no perfil.');
   return {entries,warnings};
 }

@@ -13,6 +13,7 @@ export const PINHEIRO_SOURCE_FIELDS = [
   ['polCana','Pol da cana'],['atr','ATR'],['umidade','Umidade'],['amido','Amido'],['agio','Ágio'],
   ['talhao','Talhão informado na guia (conferir vínculo)'],
   ['quantidadeAnalisesConjunto','Quantidade de análises do conjunto (calculada no banco)'],
+  ['entradaSequencialConjunto','Entrada sequencial por conjunto (calculada no banco)'],
   ['sequencia','Sequência da análise no conjunto (calculada no banco)'],
   ['taraConvencional','Tara convencional da sequência (calculada no banco)'],
   ['pesoBrutoConvencional','Bruto convencional: analisada + tara (calculado no banco)'],
@@ -33,7 +34,7 @@ const fixed:Record<string,string> = {
   COD_FINALIDADE:'4',COD_TIPOCOLHEITA:'2',COD_TERCEIRO:'1',COD_TIPOCULTURA:'1',
 };
 const sources:Record<string,string> = {
-  COD_FAZENDA:'fazendaOrigem',AREA:'talhao',
+  COD_FAZENDA:'fazendaOrigem',AREA:'talhao',COD_ENTRADA:'entradaSequencialConjunto',
   DATACHEGADA:'dataChegada',HORACHEGADA:'horaChegada',DATASAIDA:'dataSaida',HORASAIDA:'horaSaida',
   DATAMOVIMENTO:'dataMovimento',COD_TIPOCARGA:'quantidadeAnalisesConjunto',
   PESOBRUTO:'pesoBrutoConvencional',TARA:'taraConvencional',
@@ -48,8 +49,8 @@ const numeric = new Set([
   'PESOBRUTO','TARA','NR_ORDEM_COLHEITA','COD_TIPOCULTURA',
 ]);
 const dates = new Set(['DATACHEGADA','DATASAIDA','DATAMOVIMENTO']);
-// The user explicitly permits missing ERP entry/equipment codes to remain blank.
-const optionalManual = new Set(['NR_ORDEM_COLHEITA','COD_ENTRADA','COD_EQUIPAMENTO_TRANSPORTE','COD_EQUIPAMENTO_COMPARTIMENTO']);
+// Harvest orders are optional; entry and both equipment codes require review.
+const optionalManual = new Set(['NR_ORDEM_COLHEITA']);
 const required = new Set([...numeric].filter(key=>!optionalManual.has(key)).concat(['COD_TIPOCOLHEITA','DATACHEGADA','DATASAIDA','DATAMOVIMENTO','COD_TIPOCARGA']));
 function columnLabel(index:number):string {
   let label='';for(let value=index+1;value>0;value=Math.floor((value-1)/26))label=String.fromCharCode(65+(value-1)%26)+label;
@@ -64,5 +65,5 @@ export function createPinheiroProfile():ImportProfileInput {
     pattern:'',mappings:{...mappings[key]},type:numeric.has(key)?'decimal':dates.has(key)?'date':'text',
     required:required.has(key),defaultValue:fixed[key]||'',
   }));
-  return {name:'Pinheiro · Boletins USJP',clientId:null,parser:'pinheiro-usjp-v1',sheetName:'Plan1',startRow:2,fields};
+  return {name:'Pinheiro · Boletins USJP',clientId:null,parser:'pinheiro-usjp-v1',sheetName:'Plan1',startRow:2,entrySequenceStart:'806',fields};
 }

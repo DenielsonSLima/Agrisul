@@ -5,7 +5,7 @@ export interface ImportField {
 }
 export interface ImportProfileInput {
   id?: string; name: string; clientId: string | null; parser: string; sheetName: string; startRow: number;
-  fields: ImportField[]; templateBase64?: string; templateName?: string; expectedUpdatedAt?: string;
+  fields: ImportField[]; templateBase64?: string; templateName?: string; expectedUpdatedAt?: string; entrySequenceStart?: string;
 }
 export interface ImportProfile extends Omit<ImportProfileInput,'id'|'expectedUpdatedAt'> { id: string; updatedAt: string; createdAt: string; active: boolean; isDefault: boolean; clonedFromId: string | null }
 export interface ImportProfileRevisionInput {id:string;expectedUpdatedAt:string}
@@ -30,6 +30,7 @@ export interface ImportEntryInput {
   id: string; entryId?: string; date: string; values: Record<string,string>; reviewed: boolean; expectedUpdatedAt: string;
 }
 export interface ImportRevisionInput { id: string; expectedUpdatedAt: string }
+export interface ImportNumberGroupsInput extends ImportRevisionInput { start?: string; anchorEntryId?: string }
 export interface ImportBulkInput extends ImportRevisionInput { entryIds: string[]; fieldKey?: string; fieldKeys?: string[]; value: string }
 export interface ImportColumnTypeInput extends ImportRevisionInput { fieldKey?: string; fieldKeys?: string[]; type: ImportField['type'] }
 export interface ImportOperationalSummary {dayCount:number;documentCount:number;entryCount:number;groupCount:number;pendingCount:number;reviewedCount:number;dateFrom:string|null;dateTo:string|null}
@@ -40,6 +41,11 @@ export interface ImportCollection {
   clients: ImportClientGroup[];
   total: number; canManage: boolean;
 }
+export type ImportLedgerGroupBy = 'none' | 'day' | 'farm' | 'plot' | 'source-group';
+export interface ImportLedgerParams {clientId:string;status:ImportStatus|'all';dateFrom?:string;dateTo?:string;farm?:string;plot?:string;groupBy:ImportLedgerGroupBy}
+export interface ImportLedgerDocument {id:string;sourceName:string;profileName:string;status:ImportStatus;updatedAt:string;fields:ImportField[]}
+export interface ImportLedgerRow {documentId:string;entry:ImportEntry;bandOrdinal?:number|null;groupBand?:'even'|'odd'|null;groupStart?:boolean}
+export interface ImportLedger {clientId:string;clientName:string;summary:ImportOperationalSummary;facets:{farms:Array<{value:string;label:string}>;plots:Array<{value:string;label:string}>};documents:ImportLedgerDocument[];groups:Array<{key:string;label:string;summary:ImportOperationalSummary;entries:ImportLedgerRow[]}>;canManage:boolean}
 export interface ImportExport {
   document: ImportDocument; sheetName: string; startRow: number;
   columns: Array<{key:string; column:string; label:string; type:ImportField['type']}>;

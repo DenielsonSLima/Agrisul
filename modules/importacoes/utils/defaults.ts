@@ -12,6 +12,7 @@ export const TAQUARI_SOURCE_FIELDS = [
   ['pesoLiquido', 'Peso líquido informado (t)'],
   ['equipamentoPrincipal', 'Equipamento da sequência 1 da entrada'], ['fazendaZonaTalhao', 'Fundo, zona e talhão (código composto)'],
   ['quantidadeVeiculosConjunto', 'Quantidade de reboques do conjunto (calculada ao importar)'],
+  ['entradaSequencialConjunto', 'Entrada sequencial por conjunto (calculada no banco)'],
 ] as const;
 
 const headings = [
@@ -36,7 +37,7 @@ const sourceKeys: Record<string, string> = {
   NUMERO_ANALISE:'numeroAnalise', PESOBRUTO:'pesoBruto', TARA:'tara', AREA:'fazendaZonaTalhao',
   COD_TIPOCOLHEITA:'fazendaOrigem', COD_TIPOCARGA:'quantidadeVeiculosConjunto',
   COD_EQUIPAMENTO_TRANSPORTE:'equipamentoPrincipal', COD_EQUIPAMENTO_COMPARTIMENTO:'equipamentoPrincipal',
-  NR_ORDEM_COLHEITA:'ordemCorte',
+  NR_ORDEM_COLHEITA:'ordemCorte',COD_ENTRADA:'entradaSequencialConjunto',
 };
 const explicitMappings:Record<string,Record<string,string>> = {
   COD_FAZENDA:{'1582':'5010','1591':'5011'},
@@ -50,7 +51,7 @@ const mandatory = new Set([
   'COD_TIPOCARGA','COD_EQUIPAMENTO_TRANSPORTE','COD_TERCEIRO','COD_EQUIPAMENTO_COMPARTIMENTO',
   'PESOBRUTO','TARA','NR_ORDEM_COLHEITA','COD_TIPOCULTURA',
 ]);
-const decimal = new Set(['AREA','PESOBRUTO','TARA','PBU','LEITURA_SACARIMETRICA','BRIX','POL']);
+const decimal = new Set(['COD_ENTRADA','AREA','PESOBRUTO','TARA','PBU','LEITURA_SACARIMETRICA','BRIX','POL']);
 const dates = new Set(['DATACHEGADA','DATASAIDA','DATAMOVIMENTO','DATACARREGAMENTO']);
 
 export function excelColumn(index: number): string {

@@ -12,7 +12,7 @@ export async function rpcRequest(resource,action,payload,signal){state.calls.pus
 const {state}=await import(fixtureUrl);
 let source=ts.transpileModule(readFileSync(new URL('../modules/importacoes/hooks/useImportacoes.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
 source=source.replace(/from ['"]@\/(?:modules\/cadastro\/hooks\/useCadastroQuery|shared\/supabase\/(?:rpc|AuthProvider|client))['"]/g,`from ${JSON.stringify(fixtureUrl)}`);
-const {useImportMutations,useImportProfiles,useImportDocuments}=await import(url(source));
+const {useImportMutations,useImportProfiles,useImportDocuments,useImportLedger}=await import(url(source));
 
 test('profile lifecycle mutations route revision-protected payloads through the shared RPC wrapper',async()=>{
  state.calls=[];state.actor='owner-one';const actions=useImportMutations();
@@ -24,9 +24,42 @@ test('profile lifecycle mutations route revision-protected payloads through the 
 test('configuration query retains inactive models and passes the cancellation signal',async()=>{
  state.calls=[];const result=await useImportProfiles().fetch();assert.equal(result.profiles[0].active,false);assert.deepEqual(state.calls[0].payload,{});assert.ok(state.calls[0].signal instanceof AbortSignal);
 });
+
+test('Pinheiro profile save preserves the sequence start as exact text through the shared RPC',async()=>{
+ state.calls=[];state.actor='owner-one';
+ const profile={name:'Pinheiro',clientId:null,parser:'pinheiro-usjp-v1',sheetName:'Plan1',startRow:2,fields:[],entrySequenceStart:'999999999999999'};
+ await useImportMutations().saveProfile(profile);
+ assert.equal(state.calls[0].resource,'import-profiles');assert.equal(state.calls[0].action,'save');assert.deepEqual(state.calls[0].payload,profile);assert.equal(typeof state.calls[0].payload.entrySequenceStart,'string');
+});
+
+test('Taquari profile save distinguishes an explicit cleared start from an unchanged omitted start',async()=>{
+ state.calls=[];state.actor='owner-one';const mutations=useImportMutations();
+ const unchanged={id:'taquari',name:'Taquari',clientId:null,parser:'taquari-equipment-v1',sheetName:'Plan1',startRow:2,fields:[],expectedUpdatedAt:'revision'};
+ await mutations.saveProfile(unchanged);await mutations.saveProfile({...unchanged,entrySequenceStart:''});
+ assert.equal(Object.hasOwn(state.calls[0].payload,'entrySequenceStart'),false);
+ assert.equal(Object.hasOwn(state.calls[1].payload,'entrySequenceStart'),true);assert.equal(state.calls[1].payload.entrySequenceStart,'');
+});
+
+test('anchored entry numbering and edit endpoints preserve exact inputs for atomic server distribution',async()=>{
+ state.calls=[];state.actor='owner-one';const mutations=useImportMutations();
+ const anchored={id:'document',expectedUpdatedAt:'revision',start:'921',anchorEntryId:'entry-middle'};
+ await mutations.numberGroups(anchored);
+ const bulk={id:'document',expectedUpdatedAt:'revision-two',entryIds:['entry-last','entry-middle'],fieldKeys:['COD_ENTRADA'],value:'921'};
+ await mutations.saveBulk(bulk);
+ const edited={id:'document',entryId:'entry-middle',expectedUpdatedAt:'revision-three',date:'2026-10-22',values:{COD_ENTRADA:'921',COD_TALHAO:'00054'},reviewed:false};
+ await mutations.saveEntry(edited);
+ assert.deepEqual(state.calls.map(call=>[call.resource,call.action]),[['import-documents','number-groups'],['import-documents','save-bulk'],['import-documents','save-entry']]);
+ assert.deepEqual(state.calls.map(call=>call.payload),[anchored,bulk,edited]);
+});
 test('company queries scope their server summaries and document lists through the shared RPC',async()=>{
  state.calls=[];await useImportDocuments('finished','','client-one').fetch();
  assert.equal(state.calls[0].resource,'import-documents');assert.equal(state.calls[0].action,'list');assert.deepEqual(state.calls[0].payload,{status:'finished',search:'',clientId:'client-one'});assert.ok(state.calls[0].signal instanceof AbortSignal);
+});
+
+test('company ledger sends filters and grouping to Postgres with an isolated query key and abort signal',async()=>{
+ state.calls=[];const params={clientId:'client-one',status:'open',dateFrom:'2026-10-22',dateTo:'2026-10-25',farm:'0005010',plot:'__empty__',groupBy:'source-group'};
+ const query=useImportLedger(params);await query.fetch();
+ assert.deepEqual(query.params,{view:'ledger',...params});assert.equal(state.calls[0].resource,'import-documents');assert.equal(state.calls[0].action,'ledger');assert.deepEqual(state.calls[0].payload,params);assert.ok(state.calls[0].signal instanceof AbortSignal);
 });
 test('account changes prevent profile metadata writes before RPC dispatch',async()=>{
  state.calls=[];state.actor='another-owner';const actions=useImportMutations();await assert.rejects(actions.cloneProfile({id:'source',expectedUpdatedAt:'revision'}),/conta foi alterada/);assert.equal(state.calls.length,0);state.actor='owner-one';

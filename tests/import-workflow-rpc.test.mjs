@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createCaneWeighingDb} from '../supabase/tests/helpers/cane-weighing-db.mjs';
 
-test('PDF imports: revisions, duplicate retries, review gate, canonical decimals, export snapshot and tenant isolation',async()=>{
+test('PDF imports: revisions, duplicate retries, optional review, canonical decimals, export snapshot and tenant isolation',async()=>{
  const {db,ids,setActor}=await createCaneWeighingDb();
  const rpc=async(resource,action,payload={})=>(await db.query('select public.billing_rpc($1,$2,$3::jsonb) result',[resource,action,JSON.stringify(payload)])).rows[0].result;
  const profile=(action,payload)=>rpc('import-profiles',action,payload);
@@ -34,8 +34,10 @@ test('PDF imports: revisions, duplicate retries, review gate, canonical decimals
   assert.equal((await docs('list',{search:'Taquari'})).clients[0].clientName,'Destilaria Taquari');
   assert.equal((await docs('list',{search:'Capela'})).total,1,'Legal names remain searchable');
   assert.equal((await docs('list',{search:'moagem.pdf'})).total,1,'Source names remain searchable');
-  await denied(()=>docs('finalize',{id:d.id,expectedUpdatedAt:d.updatedAt}),'23514');
-  await denied(()=>docs('export',{id:d.id}),'23514');
+  assert.deepEqual((await docs('export',{id:d.id})).rows[0].values,{A:'',B:'1234.1256',C:'2026-10-22'});
+  d=(await docs('finalize',{id:d.id,expectedUpdatedAt:d.updatedAt})).document;
+  assert.equal(d.pendingCount,1);assert.equal(d.entries[0].reviewed,false);
+  d=(await docs('reopen',{id:d.id,expectedUpdatedAt:d.updatedAt})).document;
   const entryPayload={id:d.id,entryId:d.entries[0].id,date:'2026-10-22',values:d.entries[0].values,reviewed:true,expectedUpdatedAt:d.updatedAt};
   await denied(()=>docs('save-entry',entryPayload),'23514');
   await denied(()=>docs('save-entry',{...entryPayload,values:{...entryPayload.values,EXTRA:'forged'}}),'22023');

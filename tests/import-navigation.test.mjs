@@ -5,12 +5,22 @@ import ts from 'typescript';
 import {createModuleNavigation} from '../shared/navigation/navigationStore.ts';
 
 const source=ts.transpileModule(readFileSync(new URL('../modules/importacoes/navigation.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
-const {importClientHref,importDocumentHref,importTabFromSearch,importTabHref,importUploadHref,importProfileHref,importCloneProfileHref}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+const {importClientFiltersFromSearch,importClientHref,importDocumentHref,importTabFromSearch,importTabHref,importUploadHref,importProfileHref,importCloneProfileHref}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 
 test('three import tabs use shareable URLs and unknown tabs default to open',()=>{
  for(const tab of ['open','finished','settings']){const url=new URL(importTabHref(tab),'https://billing.example');assert.equal(url.pathname,'/importacoes');assert.equal(importTabFromSearch(url.searchParams),tab);}
  assert.equal(importTabHref('settings'),'/importacoes?aba=configuracoes');
  assert.equal(importTabFromSearch(new URLSearchParams('aba=desconhecida')),'open');
+});
+
+test('company ledger filters and grouping survive document and entry navigation without altering ERP text codes',()=>{
+ const filters={dateFrom:'2026-10-22',dateTo:'2026-10-25',farm:'0005010',plot:'__empty__',groupBy:'source-group'};
+ const company=new URL(importClientHref('client-one','finished',filters),'https://billing.example');
+ assert.deepEqual(importClientFiltersFromSearch(company.searchParams),filters);assert.equal(importTabFromSearch(company.searchParams),'finished');
+ const entry=new URL(importDocumentHref('document-one',{clientId:'client-one',tab:'finished',date:'2026-10-23',entryId:'entry-one',returnToClient:true,filters}),'https://billing.example');
+ assert.deepEqual(importClientFiltersFromSearch(entry.searchParams),filters);assert.equal(entry.searchParams.get('retorno'),'cliente');assert.equal(entry.searchParams.get('dia'),'2026-10-23');
+ const cleared=new URL(importClientHref('client-one','open',{groupBy:'none'}),'https://billing.example');assert.equal(cleared.searchParams.get('agrupar'),null);assert.deepEqual(importClientFiltersFromSearch(cleared.searchParams),{dateFrom:undefined,dateTo:undefined,farm:undefined,plot:undefined,groupBy:'none'});
+ assert.equal(importClientFiltersFromSearch(new URLSearchParams('agrupar=invalid')).groupBy,'none');
 });
 
 test('module navigation restores import tabs on browser back and forward',()=>{

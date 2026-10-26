@@ -12,7 +12,7 @@ const pages=lines=>[{number:1,lines:[header,...lines]}];
 const profile=createPinheiroProfile();
 
 test('Pinheiro keeps its own 46 headers, native sample types and explicit mappings',()=>{
- assert.equal(profile.parser,'pinheiro-usjp-v1');assert.equal(profile.fields.length,46);assert.equal(profile.fields.at(-1).column,'AT');assert.equal(profile.sheetName,'Plan1');assert.equal(profile.startRow,2);
+ assert.equal(profile.parser,'pinheiro-usjp-v1');assert.equal(profile.fields.length,46);assert.equal(profile.fields.at(-1).column,'AT');assert.equal(profile.sheetName,'Plan1');assert.equal(profile.startRow,2);assert.equal(profile.entrySequenceStart,'806');
  const field=key=>profile.fields.find(field=>field.key===key);
  assert.equal(profile.fields.filter(field=>field.type==='decimal').length,18);assert.equal(profile.fields.filter(field=>field.type==='date').length,3);
  for(const key of ['COD_TIPOCOLHEITA','COD_TIPOCARGA','HORACHEGADA','HORASAIDA'])assert.equal(field(key).type,'text');
@@ -21,8 +21,8 @@ test('Pinheiro keeps its own 46 headers, native sample types and explicit mappin
  assert.equal(field('COD_TERCEIRO').defaultValue,'1');assert.equal(field('COD_FRENTE').defaultValue,'26');assert.deepEqual(field('COD_FAZENDA').mappings,{'311272':'5032'});
  assert.equal(field('COD_TALHAO').source,'manual');assert.equal(field('AREA').sourceKey,'talhao');assert.deepEqual(field('AREA').mappings,{'15':'19.56','21':'19.52'});
  assert.equal(field('NR_ORDEM_COLHEITA').source,'manual');assert.equal(field('NR_ORDEM_COLHEITA').required,false);assert.equal(field('NR_ORDEM_COLHEITA').type,'decimal');assert.deepEqual(field('NR_ORDEM_COLHEITA').mappings,{});
- assert.equal(field('COD_EQUIPAMENTO_TRANSPORTE').source,'manual');assert.equal(field('COD_EQUIPAMENTO_COMPARTIMENTO').source,'manual');assert.equal(field('COD_ENTRADA').source,'manual');assert.ok(PINHEIRO_SOURCE_FIELDS.some(([key])=>key==='pesoAnalisado'));
- for(const key of ['COD_ENTRADA','COD_EQUIPAMENTO_TRANSPORTE','COD_EQUIPAMENTO_COMPARTIMENTO']){assert.equal(field(key).required,false);assert.equal(field(key).type,'decimal');assert.equal(field(key).defaultValue,'');}
+ assert.equal(field('COD_EQUIPAMENTO_TRANSPORTE').source,'manual');assert.equal(field('COD_EQUIPAMENTO_COMPARTIMENTO').source,'manual');assert.equal(field('COD_ENTRADA').source,'pdf');assert.equal(field('COD_ENTRADA').sourceKey,'entradaSequencialConjunto');assert.equal(field('COD_ENTRADA').column,'L');assert.ok(PINHEIRO_SOURCE_FIELDS.some(([key])=>key==='pesoAnalisado'));assert.ok(PINHEIRO_SOURCE_FIELDS.some(([key])=>key==='entradaSequencialConjunto'));
+ for(const key of ['COD_ENTRADA','COD_EQUIPAMENTO_TRANSPORTE','COD_EQUIPAMENTO_COMPARTIMENTO']){assert.equal(field(key).required,true);assert.equal(field(key).type,'decimal');assert.equal(field(key).defaultValue,'');}
 });
 
 test('extracts the five demonstrated report rows without inventing ERP, vehicle or conventional weights',()=>{
@@ -30,7 +30,7 @@ test('extracts the five demonstrated report rows without inventing ERP, vehicle 
  const result=parsePinheiroPages(pages(lines),profile);assert.equal(result.entries.length,5);
  assert.deepEqual(result.entries.map(entry=>entry.source.numeroAnalise),['944382','944383','944379','944380','944381']);
  const first=result.entries[0];assert.equal(first.source.dataHoraBA,'2026-10-24T06:48');assert.equal(first.source.dataHoraTara,'2026-10-24T07:24');assert.equal(first.source.periodoInicio,'2026-10-24T06:00');assert.equal(first.source.periodoFim,'2026-10-25T05:59');assert.equal(first.source.pesoAnalisado,'31.650');assert.equal(first.source.agio,'-7.6039');assert.equal(first.values.COD_FAZENDA,'5032');assert.equal(first.values.COD_TERCEIRO,'1');assert.equal(first.values.COD_TIPOCOLHEITA,'2');
- for(const entry of result.entries){assert.equal(entry.date,'2026-10-24');for(const key of ['quantidadeAnalisesConjunto','sequencia','taraConvencional','pesoBrutoConvencional'])assert.equal(entry.source[key],'');for(const key of ['COD_ENTRADA','COD_TALHAO','AREA','NR_ORDEM_COLHEITA','COD_EQUIPAMENTO_TRANSPORTE','COD_EQUIPAMENTO_COMPARTIMENTO','COD_TIPOCARGA','PESOBRUTO','TARA','NUMERO_ANALISE','PBU','BRIX','POL'])assert.equal(entry.values[key],'');}
+ for(const entry of result.entries){assert.equal(entry.date,'2026-10-24');for(const key of ['quantidadeAnalisesConjunto','entradaSequencialConjunto','sequencia','taraConvencional','pesoBrutoConvencional'])assert.equal(entry.source[key],'');for(const key of ['COD_ENTRADA','COD_TALHAO','AREA','NR_ORDEM_COLHEITA','COD_EQUIPAMENTO_TRANSPORTE','COD_EQUIPAMENTO_COMPARTIMENTO','COD_TIPOCARGA','PESOBRUTO','TARA','NUMERO_ANALISE','PBU','BRIX','POL'])assert.equal(entry.values[key],'');}
  assert.ok(result.warnings.length);
 });
 
@@ -71,4 +71,14 @@ test('refuses malformed candidates, duplicate BAs, invalid dates/hours and confl
 test('explicit configuration can expose source analytics while derived source patterns remain server-owned',()=>{
  const configured=createPinheiroProfile();Object.assign(configured.fields.find(field=>field.key==='PBU'),{source:'pdf',sourceKey:'pbu',type:'decimal'});Object.assign(configured.fields.find(field=>field.key==='NUMERO_ANALISE'),{source:'pdf',sourceKey:'numeroAnalise',type:'text'});Object.assign(configured.fields.find(field=>field.key==='TARA'),{pattern:'(31,650)',defaultValue:'123'});
  const result=parsePinheiroPages(pages([row()]),configured).entries[0];assert.equal(result.values.PBU,'150.22');assert.equal(result.values.NUMERO_ANALISE,'944382');assert.equal(result.values.TARA,'');
+});
+
+test('sequential entries remain server-owned for every source row regardless of configured start, regex or fallback',()=>{
+ const configured=createPinheiroProfile();configured.entrySequenceStart='999999999999999';
+ Object.assign(configured.fields.find(field=>field.key==='COD_ENTRADA'),{pattern:'(944382)',defaultValue:'123',mappings:{'944382':'456'}});
+ const result=parsePinheiroPages(pages([row(),row('944383'),row('944379','24/10 07:31','24/10 06:45')]),configured);
+ assert.equal(result.entries.length,3);
+ for(const entry of result.entries){assert.equal(entry.values.COD_ENTRADA,'');assert.equal(entry.source.entradaSequencialConjunto,'');assert.equal(entry.reviewed,undefined);}
+ assert.equal(configured.entrySequenceStart,'999999999999999');
+ assert.ok(result.warnings.some(warning=>warning.includes('conjuntos já importados reaproveitam o código')));
 });

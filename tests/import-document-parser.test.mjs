@@ -83,6 +83,7 @@ test('decimal conversion is lexical and the template keeps all 46 ERP columns in
   assert.equal(profile.fields[45].column,'AT');
   assert.equal(profile.sheetName,'Plan1');
   assert.equal(profile.startRow,2);
+  assert.equal(profile.entrySequenceStart,undefined);
   assert.equal(excelColumn(26),'AA');
 });
 
@@ -124,4 +125,13 @@ test('Taquari load type comes from the RPC sequence rule rather than a farm look
  const parsed=parseTaquariPages([{number:1,lines:[line1,line2]}],profile);
  assert.equal(parsed.entries[0].values.COD_TIPOCARGA,'');assert.equal(parsed.entries[1].values.COD_TIPOCARGA,'');
  assert.equal(parsed.entries[1].values.COD_EQUIPAMENTO_TRANSPORTE,'6269');assert.equal(parsed.entries[1].values.COD_EQUIPAMENTO_COMPARTIMENTO,'6269');
+});
+
+test('Taquari sequential entry preview remains empty until the RPC numbers the source groups',()=>{
+ const profile=createTaquariProfile();const field=profile.fields.find(field=>field.key==='COD_ENTRADA');
+ assert.equal(field.source,'pdf');assert.equal(field.sourceKey,'entradaSequencialConjunto');assert.equal(field.type,'decimal');assert.equal(field.required,true);assert.equal(field.column,'L');
+ Object.assign(field,{pattern:'(2874)',defaultValue:'921',mappings:{'2874':'999'}});
+ const parsed=parseTaquariPages([{number:1,lines:[line1,line2]}],profile);
+ for(const entry of parsed.entries){assert.equal(entry.values.COD_ENTRADA,'');assert.equal(entry.source.entradaSequencialConjunto,'');}
+ assert.ok(parsed.warnings.some(warning=>warning.includes('calculadas no banco')));
 });

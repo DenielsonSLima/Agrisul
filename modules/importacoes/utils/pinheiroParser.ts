@@ -5,7 +5,7 @@ const dateToken='\\d{2}/\\d{2}(?:/\\d{4})?';
 const rowPattern=new RegExp(`^(\\d+)\\s*-\\s*(.+?)\\s+(${dateToken})\\s+(\\d{2}:\\d{2})\\s+(${dateToken})\\s+(\\d{2}:\\d{2})\\s+(\\d+)\\s+(.+)$`);
 // A damaged date must not make a farm/analysis row disappear from the preview.
 const rowCandidate=/^\s*\d+\s*-\s*.+\s+\d/;
-const serverSources=new Set(['quantidadeAnalisesConjunto','sequencia','taraConvencional','pesoBrutoConvencional']);
+const serverSources=new Set(['quantidadeAnalisesConjunto','entradaSequencialConjunto','sequencia','taraConvencional','pesoBrutoConvencional']);
 const baseAnalysisKeys=['pesoAnalisado','brixCana','brixCaldo','leituraSacarimetricaCorrigida','pbu'];
 const middleAnalysisKeys=['arCana','polCaldo','fibra','purezaCana','purezaCaldo','polCana','atr','umidade'];
 
@@ -110,7 +110,7 @@ export function parsePinheiroPages(pages:ExtractedPage[],profile:Pick<ImportProf
         periodoInicio:range.start,periodoFim:range.end,dataHoraBA,dataHoraTara,
         dataChegada:dataHoraBA.slice(0,10),horaChegada:baTime,dataSaida:dataHoraTara.slice(0,10),horaSaida:taraTime,
         dataMovimento:range.start.slice(0,10),fazendaOrigem,fazendaNome:fazendaNome.trim(),numeroAnalise,
-        ...analysisValues(tail),talhao:'',quantidadeAnalisesConjunto:'',sequencia:'',taraConvencional:'',pesoBrutoConvencional:'',
+        ...analysisValues(tail),talhao:'',quantidadeAnalisesConjunto:'',entradaSequencialConjunto:'',sequencia:'',taraConvencional:'',pesoBrutoConvencional:'',
       };
       // Retain source-row order. Counts, sequences, group identity and weights
       // are validated/calculated by the import RPC, never by this preview.
@@ -121,9 +121,9 @@ export function parsePinheiroPages(pages:ExtractedPage[],profile:Pick<ImportProf
   if(malformed.length){const first=malformed[0];throw new Error(`${malformed.length} lançamento(s) USJP não puderam ser lidos. Página ${first.page}: ${first.reason} ${first.line.slice(0,100)}`);}
   if(!entries.length)throw new Error('Nenhum boletim USJP foi encontrado. Use o relatório detalhado com texto selecionável; fotos e PDFs digitalizados precisam de OCR e conferência.');
   return {entries,warnings:[
-    'Cada BA é um lançamento. Conjuntos, sequências, tara convencional e bruto convencional serão calculados e validados no banco ao importar.',
+    'Cada BA é um lançamento. Conjuntos, entradas sequenciais, sequências, tara convencional e bruto convencional serão calculados e validados no banco ao importar.',
     'Datas de chegada e saída preservam o dia civil; o movimento usa o início do período agrícola e será validado pelo servidor.',
-    'Guias, talhões, entradas ERP e equipamentos exigem vínculo e conferência. Nenhum código de caminhão foi gerado a partir da placa.',
+    'A entrada se repete no conjunto; próximos PDFs continuam a sequência do cliente e conjuntos já importados reaproveitam o código. Guias, talhões e equipamentos exigem vínculo e conferência. Nenhum código de caminhão foi gerado a partir da placa.',
     'Os campos analíticos originais ficam preservados na origem. Campos de destino vazios da amostra continuam manuais até configurar um mapeamento.',
   ]};
 }
