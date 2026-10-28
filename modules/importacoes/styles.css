@@ -1,5 +1,6 @@
 /* Light surfaces and readable text throughout the import workspace. */
 .imports-pdf-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.imports-bulk-type-settings{margin-top:13px;padding-top:10px;border-top:1px solid var(--imports-border);font-size:12px;color:var(--imports-muted)}.imports-bulk-type-settings>summary{cursor:pointer;width:fit-content}.imports-bulk-type-settings>p{margin:10px 0;font-size:12px;line-height:1.5}.imports-bulk-type-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .imports-filter-chips{display:flex;align-items:center;flex-wrap:wrap;gap:7px}.imports-filter-chips:empty{display:none}.imports-filter-chips>button{border:1px solid var(--imports-selection-border);border-radius:6px;background:var(--imports-selected);color:var(--imports-brand);padding:6px 9px;font-size:12px;cursor:pointer}.imports-filter-chips>span{font-size:12px;color:var(--imports-muted)}
 .imports-pdf-card{display:flex;flex-direction:column;min-width:0;padding:22px;background:#fff;border:1px solid var(--imports-border);border-radius:12px;box-shadow:0 2px 7px #0f172a05}
 .imports-pdf-card>header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
