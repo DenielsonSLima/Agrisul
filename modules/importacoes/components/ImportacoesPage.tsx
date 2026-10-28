@@ -10,6 +10,7 @@ import {dateLabel} from '@/shared/utils/presentation';
 import {useImportDocument,useImportDocuments,useImportMutations,useImportProfiles,useImportTable} from '../hooks/useImportacoes';
 import {ImportColumnFilter} from './ImportColumnFilter';
 import {ImportEditableCell} from './ImportEditableCell';
+import {ImportWeightSummary} from './ImportWeightSummary';
 import {importCellNavigation,type ImportCellMove} from '../utils/cellNavigation';
 import type {ImportTableFilters} from '../types';
 import type {ImportDocument,ImportDocumentInput,ImportEntry,ImportField,ImportProfile,ImportStatus,ImportOperationalSummary,ImportClientDay} from '../types';
@@ -95,6 +96,7 @@ function ImportDocumentPage({id}:{id:string}){
  <div className="imports-filter-chips">{Object.entries(clientFilters.columnFilters??{}).map(([key,values])=><button type="button" key={key} onClick={()=>{const next={...clientFilters.columnFilters};delete next[key];changeTableFilters({columnFilters:Object.keys(next).length?next:undefined});}} aria-label={`Limpar filtro de ${key==='$date'?'Dia':key==='$reviewed'?'Conferência':document.profileSnapshot.fields.find(field=>field.key===key)?.label??key}`}>{key==='$date'?'Dia':key==='$reviewed'?'Conferência':document.profileSnapshot.fields.find(field=>field.key===key)?.label??key}: {values.length?`${values.length} valor(es)`:'Nenhum valor'} ×</button>)}{clientFilters.sortKey&&<span>Ordenado por {clientFilters.sortKey==='$date'?'Dia':clientFilters.sortKey==='$reviewed'?'Conferência':document.profileSnapshot.fields.find(field=>field.key===clientFilters.sortKey)?.label??clientFilters.sortKey} {clientFilters.sortDirection==='desc'?'↓':'↑'}</span>}</div>
  {table.error&&<div className="imports-inline-error" role="alert"><span>{table.error}</span><button className="btn small" onClick={()=>void table.reload()}>Tentar novamente</button></div>}
  <ImportDayTable key={id} date={selectedDate} document={document} entries={filteredEntries} editable={canManage&&document.status==='open'} updating={table.loading||table.updating} disabled={busy||table.loading||table.updating||!!table.error} columnsExpanded={showAllDocumentColumns} onColumnsChange={setShowAllDocumentColumns} tableFilters={tableFilters} facets={table.data?.facets} onFilterChange={changeTableFilters} onEdit={entry=>navigate(importDocumentHref(id,{tab,clientId:contextClientId,filters:clientFilters,date:selectedDate,entryId:entry.id}))} onRemove={entry=>void remove(entry)}/>
+ {table.data?.weightSummary&&<ImportWeightSummary summary={table.data.weightSummary} updating={table.loading||table.updating}/>}
 
 
  </>}</section>;

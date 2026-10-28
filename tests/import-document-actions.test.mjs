@@ -15,6 +15,7 @@ const fixturesUrl=dataUrl(`import {createElement} from ${JSON.stringify(reactUrl
 export const state={document:null,saving:false,calls:[]};
 export function useImportDocument(){return {data:{document:state.document},loading:false,error:'',reload:async()=>{}}}
 export function useImportTable(){return {data:{entries:state.document.entries,summary:{entryCount:state.document.entries.length},facets:{},updatedAt:state.document.updatedAt},loading:false,error:'',reload:async()=>{}}}
+export function ImportWeightSummary(){return null}
 export function ImportColumnFilter({field}){return createElement('button',{'aria-label':'Filtrar e ordenar '+field.label},'Filtro')}
 export function ImportEditableCell({field,value,blocked}){return createElement('button',{disabled:blocked,'aria-label':'Editar '+field.label},value||'—')}
 export function useImportProfiles(){return {data:{profiles:[],canManage:true},loading:false,error:'',reload:async()=>{}}}

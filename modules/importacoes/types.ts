@@ -45,7 +45,11 @@ export type ImportLedgerGroupBy = 'none' | 'day' | 'farm' | 'plot' | 'source-gro
 export interface ImportLedgerParams {clientId:string;status:ImportStatus|'all';dateFrom?:string;dateTo?:string;farm?:string;plot?:string;groupBy:ImportLedgerGroupBy}
 export interface ImportLedgerDocument {id:string;sourceName:string;profileName:string;status:ImportStatus;updatedAt:string;fields:ImportField[];summary:ImportOperationalSummary}
 export interface ImportTableFilters {date?:string;dateFrom?:string;dateTo?:string;farm?:string;plot?:string;columnFilters?:Record<string,string[]>;sortKey?:string;sortDirection?:'asc'|'desc'}
-export interface ImportTable {entries:ImportEntry[];summary:ImportOperationalSummary;facets:Record<string,string[]>;updatedAt:string}
+export interface ImportWeightMetrics {entryCount:number;tripCount:number;grossWeight:string|null;netWeight:string|null;grossMissingCount:number;netMissingCount:number}
+export interface ImportTripWeightSummary extends ImportWeightMetrics {key:string;entryNumbers:string[];groupOrdinal:number|null;date:string;equipmentCodes:string[];totalEntryCount:number;partial:boolean;linked:boolean}
+export interface ImportEquipmentWeightSummary extends ImportWeightMetrics {key:string;equipmentCodes:string[];status:'assigned'|'missing'|'conflict'}
+export interface ImportWeightSummary extends ImportWeightMetrics {equipmentCount:number;unlinkedEntryCount:number;partialTripCount:number;equipment:ImportEquipmentWeightSummary[];trips:ImportTripWeightSummary[];groupSizes:Array<{entryCount:number;tripCount:number}>}
+export interface ImportTable {entries:ImportEntry[];summary:ImportOperationalSummary;facets:Record<string,string[]>;updatedAt:string;weightSummary?:ImportWeightSummary}
 export interface ImportLedgerRow {documentId:string;entry:ImportEntry;bandOrdinal?:number|null;groupBand?:'even'|'odd'|null;groupStart?:boolean}
 export interface ImportLedger {clientId:string;clientName:string;summary:ImportOperationalSummary;facets:{farms:Array<{value:string;label:string}>;plots:Array<{value:string;label:string}>};documents:ImportLedgerDocument[];groups:Array<{key:string;label:string;summary:ImportOperationalSummary;entries:ImportLedgerRow[]}>;canManage:boolean}
 export interface ImportExport {
