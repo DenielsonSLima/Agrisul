@@ -43,7 +43,9 @@ export interface ImportCollection {
 }
 export type ImportLedgerGroupBy = 'none' | 'day' | 'farm' | 'plot' | 'source-group';
 export interface ImportLedgerParams {clientId:string;status:ImportStatus|'all';dateFrom?:string;dateTo?:string;farm?:string;plot?:string;groupBy:ImportLedgerGroupBy}
-export interface ImportLedgerDocument {id:string;sourceName:string;profileName:string;status:ImportStatus;updatedAt:string;fields:ImportField[]}
+export interface ImportLedgerDocument {id:string;sourceName:string;profileName:string;status:ImportStatus;updatedAt:string;fields:ImportField[];summary:ImportOperationalSummary}
+export interface ImportTableFilters {date?:string;dateFrom?:string;dateTo?:string;farm?:string;plot?:string;columnFilters?:Record<string,string[]>;sortKey?:string;sortDirection?:'asc'|'desc'}
+export interface ImportTable {entries:ImportEntry[];summary:ImportOperationalSummary;facets:Record<string,string[]>;updatedAt:string}
 export interface ImportLedgerRow {documentId:string;entry:ImportEntry;bandOrdinal?:number|null;groupBand?:'even'|'odd'|null;groupStart?:boolean}
 export interface ImportLedger {clientId:string;clientName:string;summary:ImportOperationalSummary;facets:{farms:Array<{value:string;label:string}>;plots:Array<{value:string;label:string}>};documents:ImportLedgerDocument[];groups:Array<{key:string;label:string;summary:ImportOperationalSummary;entries:ImportLedgerRow[]}>;canManage:boolean}
 export interface ImportExport {

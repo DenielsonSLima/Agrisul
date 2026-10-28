@@ -13,6 +13,16 @@ test('three import tabs use shareable URLs and unknown tabs default to open',()=
  assert.equal(importTabFromSearch(new URLSearchParams('aba=desconhecida')),'open');
 });
 
+test('Excel column selections, empty selections and ordering survive document and editor links',()=>{
+ const filters={dateFrom:'2026-10-22',farm:'0005010',groupBy:'none',columnFilters:{COD_EQUIPAMENTO_TRANSPORTE:['000123',''],COD_TALHAO:[]},sortKey:'PESOBRUTO',sortDirection:'desc'};
+ for(const entryId of [undefined,'entry-one']){
+  const url=new URL(importDocumentHref('doc-one',{clientId:'client-one',tab:'finished',date:'2026-10-23',entryId,filters}),'https://billing.example');
+  assert.deepEqual(importClientFiltersFromSearch(url.searchParams),{...filters,dateTo:undefined,plot:undefined});
+  assert.equal(url.searchParams.get('dia'),'2026-10-23');assert.equal(importTabFromSearch(url.searchParams),'finished');
+ }
+ for(const invalid of ['{','[]','{"COD_TALHAO":"15"}','{"COD_TALHAO":[15]}'])assert.equal(importClientFiltersFromSearch(new URLSearchParams({colunas:invalid})).columnFilters,undefined);
+});
+
 test('company ledger filters and grouping survive document and entry navigation without altering ERP text codes',()=>{
  const filters={dateFrom:'2026-10-22',dateTo:'2026-10-25',farm:'0005010',plot:'__empty__',groupBy:'source-group'};
  const company=new URL(importClientHref('client-one','finished',filters),'https://billing.example');

@@ -34,25 +34,24 @@ const {createElement}=await import(reactUrl);
 const field=(key,type)=>({key,label:key.replaceAll('_',' '),type,column:'S',source:'manual',required:false,defaultValue:''});
 const summary={dayCount:7,documentCount:2,entryCount:99,groupCount:8,pendingCount:75,reviewedCount:24,dateFrom:'2026-10-22',dateTo:'2026-10-25'};
 const entry=(id,value)=>({id,date:'2026-10-22',values:{COD_EQUIPAMENTO_TRANSPORTE:value},source:{},reviewed:false,sourcePage:1,sourceLine:'',groupKey:id,groupOrdinal:1});
-function fixture(){return {clientId:'client',clientName:'Empresa dos dois modelos',summary,facets:{farms:[{value:'0005010',label:'0005010'}],plots:[{value:'__empty__',label:'Não informado'}]},documents:[{id:'numeric',sourceName:'numeric.pdf',profileName:'Modelo numérico',status:'open',updatedAt:'one',fields:[field('COD_EQUIPAMENTO_TRANSPORTE','decimal')]},{id:'text',sourceName:'text.pdf',profileName:'Modelo textual',status:'open',updatedAt:'two',fields:[field('COD_EQUIPAMENTO_TRANSPORTE','text')]}],groups:[{key:'none',label:'Lançamentos',summary,entries:[{documentId:'numeric',entry:entry('a','123456789012345.123456'),groupBand:'odd',bandOrdinal:1,groupStart:true},{documentId:'text',entry:entry('b','000123'),groupBand:'even',bandOrdinal:2,groupStart:true}]}],canManage:true};}
+function fixture(){return {clientId:'client',clientName:'Empresa dos dois modelos',summary,facets:{farms:[{value:'0005010',label:'0005010'}],plots:[{value:'__empty__',label:'Não informado'}]},documents:[{id:'numeric',sourceName:'numeric.pdf',profileName:'Modelo numérico',status:'open',updatedAt:'one',fields:[field('COD_EQUIPAMENTO_TRANSPORTE','decimal')],summary:{...summary,entryCount:30,pendingCount:25}},{id:'text',sourceName:'text.pdf',profileName:'Modelo textual',status:'open',updatedAt:'two',fields:[field('COD_EQUIPAMENTO_TRANSPORTE','text')],summary:{...summary,entryCount:69,pendingCount:50}}],groups:[{key:'none',label:'Lançamentos',summary,entries:[{documentId:'numeric',entry:entry('a','123456789012345.123456'),groupBand:'odd',bandOrdinal:1,groupStart:true},{documentId:'text',entry:entry('b','000123'),groupBand:'even',bandOrdinal:2,groupStart:true}]}],canManage:true};}
 function render(){return renderToStaticMarkup(createElement(ImportClientLedger,{clientId:'client',status:'open'}));}
 
-test('company defaults to one ledger table across PDFs and displays server summary values instead of counting rows',()=>{
+test('company displays one card per PDF with server summaries and links to independent tables',()=>{
  state.data=fixture();state.search='cliente=client';const html=render();
- assert.equal((html.match(/<table/g)||[]).length,1);assert.match(html,/99 lançamentos/);assert.match(html,/<strong>75<\/strong>/);assert.equal(state.params.groupBy,'none');
+ assert.equal((html.match(/class="imports-pdf-card"/g)||[]).length,2);assert.doesNotMatch(html,/<table/);
+ assert.match(html,/99 lançamentos/);assert.match(html,/<strong>75<\/strong>/);assert.equal(state.params.groupBy,'none');
  assert.match(html,/data-document-id="numeric"/);assert.match(html,/data-document-id="text"/);
- assert.match(html,/data-field-type="decimal"[^>]*>123\.456\.789\.012\.345,123456</);assert.match(html,/data-field-type="text"[^>]*>000123</);
- assert.match(html,/data-group-band="base"/);assert.match(html,/data-group-band="alternate"/);
- assert.match(html,/Conferir lançamento a/);assert.match(html,/Abrir documento numeric\.pdf/);
+ assert.match(html,/<dd>30<\/dd>/);assert.match(html,/<dd>69<\/dd>/);
+ assert.match(html,/Abrir documento numeric\.pdf/);assert.match(html,/Abrir documento text\.pdf/);
 });
 
-test('ledger filters, faceted ERP codes and editor return links retain the exact URL state',()=>{
- state.data=fixture();state.search='cliente=client&de=2026-10-22&ate=2026-10-25&fazenda=0005010&talhao=__empty__&agrupar=plot';const html=render();
- assert.deepEqual(state.params,{clientId:'client',status:'open',dateFrom:'2026-10-22',dateTo:'2026-10-25',farm:'0005010',plot:'__empty__',groupBy:'plot'});
- for(const label of ['Data inicial','Data final','Filtrar por fazenda','Filtrar por talhão','Agrupar lançamentos por','Resumo filtrado da empresa'])assert.ok(html.includes(`aria-label="${label}"`));
+test('card links carry the exact company filters into document tables',()=>{
+ state.data=fixture();state.search='cliente=client&de=2026-10-22&ate=2026-10-25&fazenda=0005010&talhao=__empty__';const html=render();
+ assert.deepEqual(state.params,{clientId:'client',status:'open',dateFrom:'2026-10-22',dateTo:'2026-10-25',farm:'0005010',plot:'__empty__',groupBy:'none'});
+ for(const label of ['Data inicial','Data final','Filtrar por fazenda','Filtrar por talhão','Resumo filtrado da empresa'])assert.ok(html.includes('aria-label="'+label+'"'));
  assert.match(html,/value="0005010" selected=""/);assert.match(html,/value="__empty__" selected=""/);
- assert.match(html,/retorno=cliente[^\"]*fazenda=0005010[^\"]*talhao=__empty__[^\"]*agrupar=plot/);
- assert.match(html,/99 lançamentos · 75 para conferir/);
+ assert.match(html,/documento=numeric[^"]*fazenda=0005010[^"]*talhao=__empty__/);
 });
 
 test('empty filtered results retain filters and a zero server summary without inventing a missing company',()=>{

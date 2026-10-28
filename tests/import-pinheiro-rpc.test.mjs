@@ -75,8 +75,30 @@ test('Pinheiro: separate source contract, agricultural period, conventional NUME
 
   const boundary=[row('950001','2026-10-25T05:59','2026-10-25T06:30'),row('950002','2026-10-25T05:59','2026-10-25T06:30')];
   const late=(await imported(profile.id,'closing-minute',boundary)).document;assert.equal(late.entries[0].date,'2026-10-24');assert.equal(late.entries[0].values.HORASAIDA,'06:30');
+  for(const quantity of [1,2,3,4,5,6]){
+   const minute=String(quantity).padStart(2,'0');
+   const groupRows=Array.from({length:quantity},(_,index)=>row(String(960000+quantity*10+index),`2026-10-24T09:${minute}`,`2026-10-24T10:${minute}`,'12345678901234.123456'));
+   const grouped=(await imported(profile.id,`pinheiro-${quantity}-analyses`,groupRows)).document;
+   const sequences=Array.from({length:quantity},(_,index)=>String(index+1));
+   const gross=sequences.map(sequence=>`${12345678901234n+BigInt(sequence)}.123456`);
+   assert.equal(grouped.entryCount,quantity,`A complete source group may contain ${quantity} analyses`);
+   assert.deepEqual(grouped.entries.map(e=>e.source.quantidadeAnalisesConjunto),Array(quantity).fill(String(quantity)));
+   assert.deepEqual(grouped.entries.map(e=>e.values.COD_TIPOCARGA),Array(quantity).fill(String(quantity)));
+   assert.deepEqual(grouped.entries.map(e=>e.source.sequencia),sequences);
+   assert.deepEqual(grouped.entries.map(e=>e.values.TARA),sequences);
+   assert.deepEqual(grouped.entries.map(e=>e.source.taraConvencional),sequences);
+   assert.deepEqual(grouped.entries.map(e=>e.values.PESOBRUTO),gross,'Conventional gross weight keeps exact NUMERIC precision for every sequence');
+   assert.deepEqual(grouped.entries.map(e=>e.source.pesoBrutoConvencional),gross);
+   assert.equal(new Set(grouped.entries.map(e=>e.groupKey)).size,1);
+   assert.equal(grouped.entries.every(e=>e.groupKey&&e.groupOrdinal===1&&e.date==='2026-10-24'),true);
+   const detail=await docs('get',{id:grouped.id});assert.equal(detail.summary.entryCount,quantity);assert.equal(detail.summary.groupCount,1);
+   const exported=await docs('export',{id:grouped.id});
+   assert.deepEqual(exported.rows.map(e=>e.entryId),grouped.entries.map(e=>e.id));
+   assert.deepEqual(exported.rows.map(e=>e.values.AA),gross);
+   assert.deepEqual(exported.rows.map(e=>e.values.AB),sequences);
+   assert.deepEqual(exported.rows.map(e=>e.values.R),Array(quantity).fill(String(quantity)));
+  }
   const before=(await docs('list',{status:'all'})).total;
-  await denied(()=>imported(profile.id,'incomplete',[rows[0]]),/2 ou 3/);
   await denied(()=>imported(profile.id,'duplicate-ba',[rows[0],rows[0]]),/BA repetido/);
   const modified=(key,value)=>[0,1].map(i=>({...rows[i],source:{...rows[i].source,[key]:value}}));
   await denied(()=>imported(profile.id,'bad-period',modified('periodoFim','2026-10-25T06:00')),/período/);

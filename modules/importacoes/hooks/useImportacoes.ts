@@ -2,12 +2,14 @@ import {useCadastroMutation,useCadastroQuery} from '@/modules/cadastro/hooks/use
 import {rpcRequest} from '@/shared/supabase/rpc';
 import {useAuth} from '@/shared/supabase/AuthProvider';
 import {getSupabaseBrowserClient} from '@/shared/supabase/client';
+import type {ImportTable,ImportTableFilters} from '../types';
 import type {ImportBulkInput,ImportColumnTypeInput,ImportCollection,ImportDocument,ImportDocumentInput,ImportEntryInput,ImportExport,ImportProfile,ImportProfileInput,ImportProfileRevisionInput,ImportProfileCloneInput,ImportProfileActiveInput,ImportRevisionInput,ImportStatus,ImportOperationalSummary,ImportNumberGroupsInput,ImportLedger,ImportLedgerParams} from '../types';
 
 export function useImportProfiles(){return useCadastroQuery('import-profiles',{},signal=>rpcRequest<{profiles:ImportProfile[];canManage:boolean}>('import-profiles','list',{},signal));}
 export function useImportDocuments(status:ImportStatus|'all'='open',search='',clientId?:string){return useCadastroQuery('import-documents',{status,search,clientId},signal=>rpcRequest<ImportCollection>('import-documents','list',{status,search,...(clientId?{clientId}:{})},signal));}
 export function useImportDocument(id:string|null){return useCadastroQuery('import-documents',{id},signal=>rpcRequest<{document:ImportDocument;summary:ImportOperationalSummary;daySummaries:Array<{date:string;summary:ImportOperationalSummary}>}>('import-documents','get',{id},signal),!!id);}
 export function useImportLedger(params:ImportLedgerParams){return useCadastroQuery('import-documents',{view:'ledger',...params},signal=>rpcRequest<ImportLedger>('import-documents','ledger',params as unknown as Record<string,unknown>,signal));}
+export function useImportTable(id:string,filters:ImportTableFilters,enabled=true){return useCadastroQuery('import-documents',{view:'table',id,...filters},signal=>rpcRequest<ImportTable>('import-documents','table',{id,...filters},signal),enabled);}
 export function useImportMutations(){
  const {user}=useAuth();
  const assertActor=async()=>{const {data:{session},error}=await getSupabaseBrowserClient().auth.getSession();if(error||!user||session?.user.id!==user.id)throw new DOMException('A conta foi alterada. Reabra o formulário.','AbortError');};
@@ -25,5 +27,5 @@ export function useImportMutations(){
  const columnType=useCadastroMutation('import-documents',(input:ImportColumnTypeInput)=>call<{document:ImportDocument}>('import-documents','change-column-type',input));
  const numbered=useCadastroMutation('import-documents',(input:ImportNumberGroupsInput)=>call<{document:ImportDocument}>('import-documents','number-groups',input));
  return {saveProfile:profile.mutateAsync,cloneProfile:cloned.mutateAsync,setProfileActive:activated.mutateAsync,setDefaultProfile:defaulted.mutateAsync,importDocument:imported.mutateAsync,saveEntry:entry.mutateAsync,removeEntry:removed.mutateAsync,finalize:finished.mutateAsync,reopen:reopened.mutateAsync,saveBulk:bulk.mutateAsync,changeColumnType:columnType.mutateAsync,
-  numberGroups:numbered.mutateAsync,exportDocument:(id:string)=>call<ImportExport>('import-documents','export',{id}),saving:[profile,cloned,activated,defaulted,imported,entry,removed,finished,reopened,bulk,columnType,numbered].some(m=>m.isPending)};
+  numberGroups:numbered.mutateAsync,exportDocument:(id:string,filters?:ImportTableFilters,expectedUpdatedAt?:string)=>filters?call<ImportExport>('import-documents','export-filtered',{id,...filters,expectedUpdatedAt}):call<ImportExport>('import-documents','export',{id}),saving:[profile,cloned,activated,defaulted,imported,entry,removed,finished,reopened,bulk,columnType,numbered].some(m=>m.isPending)};
 }

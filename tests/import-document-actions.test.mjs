@@ -14,6 +14,8 @@ const icons=['ArrowLeft','ArrowRight','ChevronRight','Building2','CalendarDays',
 const fixturesUrl=dataUrl(`import {createElement} from ${JSON.stringify(reactUrl)};
 export const state={document:null,saving:false,calls:[]};
 export function useImportDocument(){return {data:{document:state.document},loading:false,error:'',reload:async()=>{}}}
+export function useImportTable(){return {data:{entries:state.document.entries,summary:{entryCount:state.document.entries.length},facets:{},updatedAt:state.document.updatedAt},loading:false,error:'',reload:async()=>{}}}
+export function ImportColumnFilter({field}){return createElement('button',{'aria-label':'Filtrar e ordenar '+field.label},'Filtro')}
 export function useImportProfiles(){return {data:{profiles:[],canManage:true},loading:false,error:'',reload:async()=>{}}}
 export function useImportDocuments(){return {}}
 export function useImportMutations(){return {saving:state.saving,finalize:async()=>{state.calls.push('finalize')},exportDocument:async()=>{state.calls.push('export')}}}
@@ -51,4 +53,10 @@ test('a finalized document retains its pending warning and its export and reopen
 test('document actions still prevent duplicate requests while a mutation is in progress',()=>{
  state.document=fixture('open');state.saving=true;const html=renderToStaticMarkup(createElement(ImportDocumentPage,{id:'doc'}));
  assert.match(button(html,'Baixar Excel'),/disabled/);assert.match(button(html,'Finalizar'),/disabled/);state.saving=false;
+});
+
+test('empty table results disable export while keeping column filters available',()=>{
+ state.document=fixture('open');state.document.entries=[];state.saving=false;
+ const html=renderToStaticMarkup(createElement(ImportDocumentPage,{id:'doc'}));
+ assert.match(button(html,'Baixar Excel'),/disabled/);assert.match(html,/Nenhum lançamento neste filtro/);assert.match(html,/Filtrar e ordenar Entrada/);
 });
