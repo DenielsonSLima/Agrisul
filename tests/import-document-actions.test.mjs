@@ -16,6 +16,7 @@ export const state={document:null,saving:false,calls:[]};
 export function useImportDocument(){return {data:{document:state.document},loading:false,error:'',reload:async()=>{}}}
 export function useImportTable(){return {data:{entries:state.document.entries,summary:{entryCount:state.document.entries.length},facets:{},updatedAt:state.document.updatedAt},loading:false,error:'',reload:async()=>{}}}
 export function ImportColumnFilter({field}){return createElement('button',{'aria-label':'Filtrar e ordenar '+field.label},'Filtro')}
+export function ImportEditableCell({field,value,blocked}){return createElement('button',{disabled:blocked,'aria-label':'Editar '+field.label},value||'—')}
 export function useImportProfiles(){return {data:{profiles:[],canManage:true},loading:false,error:'',reload:async()=>{}}}
 export function useImportDocuments(){return {}}
 export function useImportMutations(){return {saving:state.saving,finalize:async()=>{state.calls.push('finalize')},exportDocument:async()=>{state.calls.push('export')}}}
@@ -29,7 +30,7 @@ const Icon=()=>null;export {${icons.map(name=>`Icon as ${name}`).join(',')}};`);
 const {state}=await import(fixturesUrl);
 const sharedUrl=dataUrl(transpile('../shared/utils/presentation.ts'));
 const presentationUrl=dataUrl(transpile('../modules/importacoes/utils/presentation.ts').replace(/from ['"]@\/shared\/utils\/presentation['"]/g,`from ${JSON.stringify(sharedUrl)}`));
-const modules={'../navigation':dataUrl(transpile('../modules/importacoes/navigation.ts')),'../utils/columnSelection':dataUrl(transpile('../modules/importacoes/utils/columnSelection.ts')),'../utils/profileSelection':dataUrl(transpile('../modules/importacoes/utils/profileSelection.ts')),'../utils/presentation':presentationUrl,'@/shared/utils/presentation':sharedUrl};
+const modules={'../utils/cellNavigation':dataUrl(transpile('../modules/importacoes/utils/cellNavigation.ts')),'../navigation':dataUrl(transpile('../modules/importacoes/navigation.ts')),'../utils/columnSelection':dataUrl(transpile('../modules/importacoes/utils/columnSelection.ts')),'../utils/profileSelection':dataUrl(transpile('../modules/importacoes/utils/profileSelection.ts')),'../utils/presentation':presentationUrl,'@/shared/utils/presentation':sharedUrl};
 let source=transpile('../modules/importacoes/components/ImportacoesPage.tsx');
 source=source.replace(/from ['"]react['"]/g,`from ${JSON.stringify(reactUrl)}`).replace(/from ['"]react\/jsx-runtime['"]/g,`from ${JSON.stringify(jsxUrl)}`)
  .replace(/from ['"]([^'"]+)['"]/g,(match,path)=>path.startsWith('file:')?match:`from ${JSON.stringify(modules[path]??fixturesUrl)}`)
