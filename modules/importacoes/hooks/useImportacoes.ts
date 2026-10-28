@@ -1,4 +1,6 @@
 import {useCadastroMutation,useCadastroQuery} from '@/modules/cadastro/hooks/useCadastroQuery';
+import {useQuery} from '@tanstack/react-query';
+import {billingKeys} from '@/shared/query/keys';
 import {rpcRequest} from '@/shared/supabase/rpc';
 import {useAuth} from '@/shared/supabase/AuthProvider';
 import {getSupabaseBrowserClient} from '@/shared/supabase/client';
@@ -9,7 +11,18 @@ export function useImportProfiles(){return useCadastroQuery('import-profiles',{}
 export function useImportDocuments(status:ImportStatus|'all'='open',search='',clientId?:string){return useCadastroQuery('import-documents',{status,search,clientId},signal=>rpcRequest<ImportCollection>('import-documents','list',{status,search,...(clientId?{clientId}:{})},signal));}
 export function useImportDocument(id:string|null){return useCadastroQuery('import-documents',{id},signal=>rpcRequest<{document:ImportDocument;summary:ImportOperationalSummary;daySummaries:Array<{date:string;summary:ImportOperationalSummary}>}>('import-documents','get',{id},signal),!!id);}
 export function useImportLedger(params:ImportLedgerParams){return useCadastroQuery('import-documents',{view:'ledger',...params},signal=>rpcRequest<ImportLedger>('import-documents','ledger',params as unknown as Record<string,unknown>,signal));}
-export function useImportTable(id:string,filters:ImportTableFilters,enabled=true){return useCadastroQuery('import-documents',{view:'table',id,...filters},signal=>rpcRequest<ImportTable>('import-documents','table',{id,...filters},signal),enabled);}
+export function useImportTable(id:string,filters:ImportTableFilters,enabled=true){
+ const {user,ready}=useAuth();const userId=user?.id??'';
+ const query=useQuery({queryKey:[...billingKeys.resource(userId,'import-documents'),{view:'table',id,...filters}],
+  queryFn:({signal})=>rpcRequest<ImportTable>('import-documents','table',{id,...filters},signal),enabled:ready&&!!user&&enabled,
+  placeholderData:(previous,previousQuery)=>{
+   const key=previousQuery?.queryKey;const params=key?.[3] as {id?:string;view?:string}|undefined;
+   return key?.[1]===userId&&params?.view==='table'&&params.id===id?previous:undefined;
+  },
+ });
+ return {data:query.data,loading:!ready||(!!user&&enabled&&query.isPending),updating:query.isFetching||query.isPlaceholderData,
+  error:ready&&!user?'Entre para acessar seus cadastros.':query.error?.message??'',reload:async()=>{if(user&&enabled)await query.refetch();}};
+}
 export function useImportMutations(){
  const {user}=useAuth();
  const assertActor=async()=>{const {data:{session},error}=await getSupabaseBrowserClient().auth.getSession();if(error||!user||session?.user.id!==user.id)throw new DOMException('A conta foi alterada. Reabra o formulário.','AbortError');};
