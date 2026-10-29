@@ -1,9 +1,10 @@
 'use client';
 import {Fragment,useCallback,useRef,useState,type CSSProperties} from 'react';
-import {Activity,ArrowDownRight,ArrowUpRight,Building2,CalendarDays,Download,FileText,Filter,Gauge,Maximize2,Minimize2,MonitorPlay,Newspaper,Pause,Play,RefreshCw,Square,Truck,Wallet,WifiOff} from 'lucide-react';
+import {Activity,ArrowDownRight,ArrowUpRight,Building2,CalendarDays,Eye,EyeOff,FileText,Filter,Gauge,Maximize2,Minimize2,MonitorPlay,Newspaper,Pause,Play,RefreshCw,Square,Truck,Wallet,WifiOff} from 'lucide-react';
 import {BillingQueryState} from '@/shared/components/BillingQueryState';
 import {useWorkspaceCompany} from '@/shared/state/WorkspaceCompanyProvider';
-import {dateLabel,decimalLabel,localDay,moneyLabel} from '@/shared/utils/presentation';
+import {useAuth} from '@/shared/supabase/AuthProvider';
+import {dateLabel,decimalLabel,localDay} from '@/shared/utils/presentation';
 import {MarketTicker} from '@/modules/dashboard-market/MarketTicker';
 import {DashboardNews} from '@/modules/dashboard-news/DashboardNews';
 import {useAgroNews} from '@/modules/dashboard-news/useAgroNews';
@@ -12,27 +13,27 @@ import {useExecutiveSummary} from '../hooks/useSummary';
 import {DASHBOARD_SCENES,useDashboardPresentation} from '../hooks/useDashboardPresentation';
 import {useDashboardSceneTransition} from '../hooks/useDashboardSceneTransition';
 import {defaultRange,shiftDay,validRange} from '../filters';
-import type {ExecutiveSummaryData,ExecutiveSummarySnapshot,SummaryFilters} from '../types';
+import type {ExecutiveSummaryData,SummaryFilters} from '../types';
+import {DashboardValuesProvider,useDashboardValues} from '../dashboardValues';
 import {FinancialComposition,FinancialEvolution,OperationalEvolution} from './SummaryCharts';
 import {DashboardAnalysis,DashboardBars,DashboardContractList,DashboardDimensionList,DashboardHarvest} from './DashboardVisuals';
 import {DashboardClock,DashboardPopover,DashboardSceneNavigation,DashboardSettings} from './DashboardControls';
-import {SummaryExportDialog} from './SummaryExportDialog';
 
-export function ResumoPage(){const workspace=useWorkspaceCompany();return <SummaryDashboard key={workspace.activeCompanyId}/>;}
+export function ResumoPage(){const workspace=useWorkspaceCompany(),{user}=useAuth();return <DashboardValuesProvider key={user?.id} userId={user?.id}><SummaryDashboard key={workspace.activeCompanyId}/></DashboardValuesProvider>;}
 
 function SummaryDashboard(){
+ const {visible,toggle}=useDashboardValues();
  const rootRef=useRef<HTMLElement>(null),filterTrigger=useRef<HTMLButtonElement>(null);
  const presentation=useDashboardPresentation(rootRef);
  const transition=useDashboardSceneTransition(presentation.scene);
  const news=useAgroNews(),atr=useDashboardAtr();
  const [filters,setFilters]=useState<SummaryFilters>(defaultRange),[draft,setDraft]=useState<SummaryFilters>(defaultRange);
- const [filtersOpen,setFiltersOpen]=useState(false),[settingsOpen,setSettingsOpen]=useState(false),[snapshot,setSnapshot]=useState<ExecutiveSummarySnapshot|null>(null);
+ const [filtersOpen,setFiltersOpen]=useState(false),[settingsOpen,setSettingsOpen]=useState(false);
  const closeSettings=useCallback(()=>setSettingsOpen(false),[]),closeFilters=useCallback(()=>setFiltersOpen(false),[]);
  const model=useExecutiveSummary(filters.from,filters.to,{contractId:filters.contractId,status:filters.status}),data=model.data;
  const busy=model.isFetching,failed=!!model.errorMessage,scene=DASHBOARD_SCENES[presentation.scene];
  const newsScene=scene.id==='dashboard-news',showNews=DASHBOARD_SCENES[transition.scene].id==='dashboard-news';
  const activeBusy=newsScene?news.isFetching:busy,activeFailed=newsScene?news.isError:failed,updatedAt=newsScene?news.dataUpdatedAt:model.dataUpdatedAt;
- const openExport=async()=>{if(!data)return;const next={data:structuredClone(data),companyId:model.companyId};if(presentation.fullscreen){await presentation.toggleFullscreen();if(document.fullscreenElement)return;}setSnapshot(next);};
  const start=()=>{closeSettings();closeFilters();void presentation.startPresentation();};
  const preset=(days:number)=>{const to=localDay();setDraft(value=>({...value,from:shiftDay(to,-days+1),to}));};
  return <section ref={rootRef} className={`dashboard-page executive-dashboard ${presentation.presenting?'executive-presenting':''}`} aria-label="Dashboard de acompanhamento">
@@ -49,7 +50,7 @@ function SummaryDashboard(){
       <div className="executive-filter-footer"><button type="button" onClick={()=>setDraft(defaultRange())}>Limpar filtros</button><button type="submit" disabled={!validRange(draft)}>Aplicar filtros</button></div>
      </form></DashboardPopover>}
     </div>
-    <button type="button" className="executive-button executive-icon-button" aria-label="Exportar PDF completo" title="Exportar PDF completo" disabled={newsScene||!data||busy||failed} onClick={()=>void openExport()}><Download size={16}/></button>
+    <button type="button" className={`executive-button executive-icon-button ${visible?'':'is-active'}`} aria-label={visible?'Ocultar valores financeiros':'Exibir valores financeiros'} title={visible?'Ocultar valores financeiros':'Exibir valores financeiros'} aria-pressed={!visible} onClick={toggle}>{visible?<Eye size={16}/>:<EyeOff size={16}/>}</button>
     <button type="button" className="executive-button" aria-label={presentation.fullscreen?'Sair da tela cheia':'Tela cheia'} onClick={()=>void presentation.toggleFullscreen()}>{presentation.fullscreen?<Minimize2 size={16}/>:<Maximize2 size={16}/>}<span>{presentation.fullscreen?'Sair':'Tela cheia'}</span></button>
     {presentation.presenting?<><button type="button" className="executive-button executive-button-primary" onClick={presentation.togglePause}>{presentation.paused?<Play size={15}/>:<Pause size={15}/>}<span>{presentation.paused?'Continuar':'Pausar'}</span></button><button type="button" className="executive-button executive-icon-button" aria-label="Encerrar apresentação" title="Encerrar apresentação" onClick={presentation.stopPresentation}><Square size={14}/></button></>:<button type="button" disabled={newsScene?news.isPending:!data||model.loading||failed} className="executive-button executive-button-primary" onClick={start}><MonitorPlay size={16}/><span>Apresentar</span></button>}
    </div>
@@ -74,16 +75,16 @@ function SummaryDashboard(){
    </div>:<div className="executive-query-state"><BillingQueryState {...model}/></div>}
   </div>
   <footer className="executive-footer"><span>{newsScene?<><Newspaper size={12}/>Fontes do agro · datas de publicação nas manchetes</>:data?.totals.billingPending?<><i className="executive-footer-warning"/>{data.totals.pendingLoadCount} carga(s) com ATR ou cotação pendentes</>:<><Activity size={12}/>Dados dos contratos da empresa ativa</>}</span><span>{presentation.fullscreen&&<span className="executive-session-note">Sessão mantida durante exibição · </span>}{presentation.presenting?(presentation.paused?'Rotação pausada':`Próxima aba em ${presentation.minutes} min`):'Selecione uma aba para explorar'}</span></footer>
-  {snapshot&&<SummaryExportDialog snapshot={snapshot} onClose={()=>setSnapshot(null)}/>}
  </section>;
 }
 
 function DashboardMetrics({data,scene}:{data:ExecutiveSummaryData;scene:number}){
+ const {money}=useDashboardValues();
  const t=data.totals,operation=data.operationalTotals,change=data.comparison.volumeChangePercent;
  return <dl className="executive-metrics">
   <Metric icon={Truck} name="Volume carregado" value={decimalLabel(t.loadedVolume)} unit="t" hint={`${t.loadCount} carregamentos no período`} featured marker="loaded-volume" change={change}/>
   <Metric icon={Gauge} name="ATR médio ponderado" value={decimalLabel(operation.averageAtr)} unit={operation.averageAtr?'kg/t':''} hint="Qualidade ponderada pelo volume" tone="gold"/>
-  {scene===1?<><Metric icon={FileText} name="Carregamentos" value={String(operation.loadCount)} hint={`${operation.farmCount} fazenda(s) de origem`} tone="blue"/><Metric icon={Truck} name="Carga média" value={decimalLabel(operation.averageLoadVolume)} unit="t" hint="Volume médio por carregamento" tone="violet"/></>:<><Metric icon={Wallet} name="Faturamento líquido" value={moneyLabel(t.netAmount)} hint={t.billingPending?'Aguardando ATR ou cotação':'Entregas após os descontos'} tone="blue"/><Metric icon={FileText} name="Contratos na seleção" value={String(t.contractCount)} hint={`${t.activeContractCount} ativos na carteira`} tone="violet"/></>}
+  {scene===1?<><Metric icon={FileText} name="Carregamentos" value={String(operation.loadCount)} hint={`${operation.farmCount} fazenda(s) de origem`} tone="blue"/><Metric icon={Truck} name="Carga média" value={decimalLabel(operation.averageLoadVolume)} unit="t" hint="Volume médio por carregamento" tone="violet"/></>:<><Metric icon={Wallet} name="Faturamento líquido" value={money(t.netAmount)} hint={t.billingPending?'Aguardando ATR ou cotação':'Entregas após os descontos'} tone="blue"/><Metric icon={FileText} name="Contratos na seleção" value={String(t.contractCount)} hint={`${t.activeContractCount} ativos na carteira`} tone="violet"/></>}
  </dl>;
 }
 function Metric({icon:Icon,name,value,unit,hint,tone,featured=false,marker,change}:{icon:typeof Truck;name:string;value:string;unit?:string;hint:string;tone?:string;featured?:boolean;marker?:string;change?:string}){

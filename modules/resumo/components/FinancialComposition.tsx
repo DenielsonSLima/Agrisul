@@ -2,13 +2,14 @@
 import {useId,type CSSProperties} from 'react';
 import {ChartPie} from 'lucide-react';
 import {Cell,Pie,PieChart,ResponsiveContainer} from 'recharts';
-import {moneyLabel} from '@/shared/utils/presentation';
+import {useDashboardValues} from '../dashboardValues';
 import type {ExecutiveSummaryData} from '../types';
 
 const INITIAL_CHART_SIZE={width:1,height:1};
 const amountStyle=(label:string)=>({'--composition-value-length':Math.max(label.length,1)} as CSSProperties);
 
 export function FinancialComposition({totals}:{totals:ExecutiveSummaryData['totals']}){
+ const {money}=useDashboardValues();
  const id=useId();
  // Only chart geometry uses numbers. All displayed totals come from the RPC.
  const parts=totals.billingPending?[]:[
@@ -16,7 +17,7 @@ export function FinancialComposition({totals}:{totals:ExecutiveSummaryData['tota
   {name:'Descontos',value:Number(totals.discountAmount),color:'#bd8f46'},
  ];
  const visible=parts.every(part=>Number.isFinite(part.value)&&part.value>=0)&&parts.some(part=>part.value>0);
- const gross=moneyLabel(totals.grossAmount),net=moneyLabel(totals.netAmount),discount=moneyLabel(totals.discountAmount);
+ const gross=money(totals.grossAmount),net=money(totals.netAmount),discount=money(totals.discountAmount);
  const status=totals.billingPending?'Valores a apurar':visible?'':'Sem composição proporcional';
  return <section className="summary-panel financial-composition" aria-labelledby={id}>
   <header className="summary-panel-heading"><div><span className="summary-kicker"><ChartPie size={15}/>COMPOSIÇÃO NO PERÍODO</span><h3 id={id}>Do bruto ao líquido</h3><p>Descontos aplicados às entregas da seleção.</p></div></header>

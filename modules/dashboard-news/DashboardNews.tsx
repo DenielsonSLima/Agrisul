@@ -10,6 +10,7 @@ import type {useAgroNews} from './useAgroNews';
 import type {useDashboardAtr} from './useDashboardAtr';
 import {DashboardWeather} from './DashboardWeather';
 import {headlineIntervalMs,usableNewsImage} from './presentation';
+import {DASHBOARD_MONEY_MASK,useDashboardValues} from '@/modules/resumo/dashboardValues';
 
 type NewsQuery=ReturnType<typeof useAgroNews>;
 type AtrQuery=ReturnType<typeof useDashboardAtr>;
@@ -103,6 +104,7 @@ const atrSeries=[
 const atrQuote=(value:string|null)=>value!==null&&value!==''?`R$ ${formatAtrValue(value)}`:'Não informado';
 const chartQuote=(value:string|null)=>value!==null&&value!==''&&Number.isFinite(Number(value))?Number(value):null;
 function DashboardAtr({atr}:{atr:AtrQuery}){
+ const {visible}=useDashboardValues(),quote=(value:string|null)=>visible?atrQuote(value):DASHBOARD_MONEY_MASK;
  const record=atr.record;
  // Number conversion is chart geometry only. Captions, legend and tooltip
  // retain the exact decimal strings returned by the authenticated ATR RPC.
@@ -114,15 +116,15 @@ function DashboardAtr({atr}:{atr:AtrQuery}){
  return <aside className="dashboard-atr-card" data-dashboard-card aria-label="Cotações de ATR cadastradas pelo grupo">
   <header><div><span className="agro-news-eyebrow">REFERÊNCIA DO GRUPO</span><h3>ATR <small>R$/kg</small></h3></div><ModuleLink href="/cadastro?secao=atr" className="dashboard-atr-manage" aria-label="Abrir cadastro de ATR" title="Abrir cadastro de ATR"><ArrowUpRight size={15}/></ModuleLink></header>
   {record?<><p className="dashboard-atr-period">{chart.length===3?'Últimos 3 meses cadastrados':`${chart.length} ${chart.length===1?'mês cadastrado':'meses cadastrados'}`}<span>{atrMonths[record.month-1].slice(0,3)}/{record.year}</span></p>
-   <div className="dashboard-atr-chart" data-dashboard-chart role="img" aria-label={`ATR mensal bruto e líquido em barras; acumulado bruto e líquido em linhas. ${chart.map(row=>`${row.month}: ${atrSeries.map(series=>`${series.label} ${atrQuote(row.original[series.key])}`).join(', ')}`).join('. ')}`}>
+   <div className="dashboard-atr-chart" data-dashboard-chart role="img" aria-label={`ATR mensal bruto e líquido em barras; acumulado bruto e líquido em linhas. ${chart.map(row=>`${row.month}: ${atrSeries.map(series=>`${series.label} ${quote(row.original[series.key])}`).join(', ')}`).join('. ')}`}>
     <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{width:1,height:1}}><ComposedChart data={chart} margin={{top:9,right:10,left:0,bottom:0}} barGap={3}>
-     <CartesianGrid vertical={false} stroke="#edf1eb" strokeDasharray="3 4"/><XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fontSize:9,fill:'#8c9c8d'}} height={21}/><YAxis width={31} axisLine={false} tickLine={false} tickCount={3} domain={[0,'auto']} tick={{fontSize:8,fill:'#9bab9b'}} tickFormatter={value=>Number(value).toLocaleString('pt-BR',{maximumFractionDigits:2})}/>
-     <Tooltip formatter={(_value,name,item)=>{const series=atrSeries.find(series=>series.key===item.dataKey),original=item.payload?.original as AtrRecord|undefined;return [series&&original?atrQuote(original[series.key]):'Não informado',String(name)];}} cursor={{fill:'#edf4ee77'}} contentStyle={{fontSize:10,border:'1px solid #dce6dc',borderRadius:8}}/>
+     <CartesianGrid vertical={false} stroke="#edf1eb" strokeDasharray="3 4"/><XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fontSize:9,fill:'#8c9c8d'}} height={21}/><YAxis width={31} axisLine={false} tickLine={false} tickCount={3} domain={[0,'auto']} tick={{fontSize:8,fill:'#9bab9b'}} tickFormatter={value=>visible?Number(value).toLocaleString('pt-BR',{maximumFractionDigits:2}):'***'}/>
+     <Tooltip formatter={(_value,name,item)=>{const series=atrSeries.find(series=>series.key===item.dataKey),original=item.payload?.original as AtrRecord|undefined;return [series&&original?quote(original[series.key]):'Não informado',String(name)];}} cursor={{fill:'#edf4ee77'}} contentStyle={{fontSize:10,border:'1px solid #dce6dc',borderRadius:8}}/>
      <Bar dataKey="monthlyGrossValue" name="Mensal bruto" fill="#b5cdbb" radius={[3,3,0,0]} maxBarSize={19} isAnimationActive={false}/><Bar dataKey="monthlyNetValue" name="Mensal líquido" fill="#4e8463" radius={[3,3,0,0]} maxBarSize={19} isAnimationActive={false}/>
      <Line type="monotone" dataKey="accumulatedGrossValue" name="Acumulado bruto" stroke="#b48c45" strokeWidth={2} strokeDasharray="4 3" dot={{r:2.5,fill:'#fff',strokeWidth:1.5}} connectNulls={false} isAnimationActive={false}/><Line type="monotone" dataKey="accumulatedNetValue" name="Acumulado líquido" stroke="#4d7e9d" strokeWidth={2} dot={{r:2.5,fill:'#fff',strokeWidth:1.5}} connectNulls={false} isAnimationActive={false}/>
     </ComposedChart></ResponsiveContainer>
    </div>
-   <dl className="dashboard-atr-legend">{atrSeries.map(series=><div key={series.key}><dt><i className={`is-${series.kind}`} style={{'--atr-series-color':series.color} as CSSProperties}/>{series.label}</dt><dd title={atrQuote(record[series.key])}>{atrQuote(record[series.key])}</dd></div>)}</dl>
+   <dl className="dashboard-atr-legend">{atrSeries.map(series=><div key={series.key}><dt><i className={`is-${series.kind}`} style={{'--atr-series-color':series.color} as CSSProperties}/>{series.label}</dt><dd title={quote(record[series.key])}>{quote(record[series.key])}</dd></div>)}</dl>
    {atr.error&&<p className="dashboard-atr-note">Atualização indisponível · última referência disponível</p>}
   </>:<div className="dashboard-atr-empty" role="status">{atr.loading?<><Loader2 size={20} className="animate-spin"/><p>Consultando o ATR cadastrado…</p></>:<><p>{atr.error?'Não foi possível consultar o ATR.':'Aguardando o cadastro das cotações.'}</p><small>Mensal e acumulado, bruto e líquido.</small></>}</div>}
  </aside>;

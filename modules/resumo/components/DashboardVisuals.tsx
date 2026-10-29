@@ -3,7 +3,8 @@ import {useState,useSyncExternalStore,type ReactNode} from 'react';
 import {ArrowUpRight,ChevronLeft,ChevronRight,Layers3,Leaf,Target} from 'lucide-react';
 import {Bar,CartesianGrid,Cell,ComposedChart,Pie,PieChart,ResponsiveContainer,Tooltip,XAxis,YAxis} from 'recharts';
 import {ModuleLink} from '@/shared/navigation/ModuleNavigation';
-import {decimalLabel,moneyLabel} from '@/shared/utils/presentation';
+import {decimalLabel} from '@/shared/utils/presentation';
+import {useDashboardValues} from '../dashboardValues';
 import type {ExecutiveDimension,ExecutiveSummaryData} from '../types';
 
 const geometry={width:1,height:1};
@@ -31,9 +32,10 @@ export function DashboardBars({rows,title,eyebrow='VOLUME CARREGADO',subtitle}:{
 }
 
 export function DashboardDimensionList({rows,title}:{rows:ExecutiveDimension[];title:string}){
+ const {money}=useDashboardValues();
  const [page,setPage]=useState(0),size=3,pages=Math.max(1,Math.ceil(rows.length/size)),current=Math.min(page,pages-1),shown=rows.slice(current*size,(current+1)*size);
  return <DashboardPanel eyebrow="PARTICIPAÇÃO E RESULTADO" title={title} subtitle="Volumes, qualidade e valores do mesmo período." actions={pages>1?<PageControls page={current} pages={pages} onChange={setPage} label={title}/>:undefined}>
-  <div className="executive-dimension-list">{shown.length?shown.map((row,index)=><article key={row.id}><div className="executive-dimension-title"><span className="executive-rank">{String(current*size+index+1).padStart(2,'0')}</span><strong title={row.name}>{row.name}</strong><b>{decimalLabel(row.sharePercent)}<small>%</small></b></div><div className="executive-track"><i style={{width:`${Math.min(100,Math.max(0,Number(row.sharePercent)))}%`}}/></div><dl><div><dt>Produção</dt><dd>{decimalLabel(row.loadedVolume)} <small>t</small></dd></div><div><dt>ATR médio</dt><dd>{decimalLabel(row.averageAtr)} <small>kg/t</small></dd></div><div><dt>Líquido</dt><dd>{moneyLabel(row.netAmount)}</dd></div></dl><footer><span>{row.contractCount} contrato(s) · {row.loadCount} carga(s)</span>{row.billingPending&&<span className="executive-pending-tag">ATR ou cotação pendente</span>}</footer></article>):<DashboardEmpty text="Nenhum registro nesta seleção" detail="Altere o período ou os filtros para consultar outros registros."/>}</div>
+  <div className="executive-dimension-list">{shown.length?shown.map((row,index)=><article key={row.id}><div className="executive-dimension-title"><span className="executive-rank">{String(current*size+index+1).padStart(2,'0')}</span><strong title={row.name}>{row.name}</strong><b>{decimalLabel(row.sharePercent)}<small>%</small></b></div><div className="executive-track"><i style={{width:`${Math.min(100,Math.max(0,Number(row.sharePercent)))}%`}}/></div><dl><div><dt>Produção</dt><dd>{decimalLabel(row.loadedVolume)} <small>t</small></dd></div><div><dt>ATR médio</dt><dd>{decimalLabel(row.averageAtr)} <small>kg/t</small></dd></div><div><dt>Líquido</dt><dd>{money(row.netAmount)}</dd></div></dl><footer><span>{row.contractCount} contrato(s) · {row.loadCount} carga(s)</span>{row.billingPending&&<span className="executive-pending-tag">ATR ou cotação pendente</span>}</footer></article>):<DashboardEmpty text="Nenhum registro nesta seleção" detail="Altere o período ou os filtros para consultar outros registros."/>}</div>
  </DashboardPanel>;
 }
 
@@ -46,9 +48,10 @@ export function DashboardHarvest({data}:{data:ExecutiveSummaryData}){
 }
 
 export function DashboardContractList({data}:{data:ExecutiveSummaryData}){
+ const {money}=useDashboardValues();
  const [page,setPage]=useState(0),size=3,pages=Math.max(1,Math.ceil(data.contracts.length/size)),current=Math.min(page,pages-1),rows=data.contracts.slice(current*size,(current+1)*size),performance=new Map(data.contractPerformance.map(row=>[row.id,row]));
  return <DashboardPanel eyebrow="ENTREGA DO CONTRATO" title="Andamento da carteira" subtitle="Entrega acumulada em todas as datas." actions={pages>1?<PageControls page={current} pages={pages} onChange={setPage} label="Contratos"/>:undefined}>
-  <div className="executive-contract-list">{rows.length?rows.map(row=>{const detail=performance.get(row.id);return <article key={row.id}><div><span className="executive-contract-status">{row.status}</span><ModuleLink href={`/contratos?contrato=${row.id}`} aria-label={`Abrir contrato ${row.contractNumber||row.title}`} title="Abrir contrato"><ArrowUpRight size={17}/></ModuleLink></div><h4 title={row.clientName}>{row.clientName}</h4><p title={row.title}>{row.contractNumber||row.title}</p><div className="executive-contract-progress"><span>{detail?`${decimalLabel(detail.totalLoadedVolume)} / ${decimalLabel(detail.contractedVolume)} t`:'Sem meta informada'}</span><strong>{detail?`${decimalLabel(detail.deliveryPercent)}%`:'—'}</strong></div><div className="executive-track"><i style={{width:`${Math.min(100,Math.max(0,Number(detail?.deliveryPercent??0)))}%`}}/></div><footer><span>No período: <b>{decimalLabel(row.loadedVolume)} t</b></span><span>Líquido: <b>{moneyLabel(row.netAmount)}</b></span></footer></article>;}):<DashboardEmpty text="Nenhum contrato nesta seleção" detail="Consulte outra empresa ou ajuste os filtros."/>}</div>
+  <div className="executive-contract-list">{rows.length?rows.map(row=>{const detail=performance.get(row.id);return <article key={row.id}><div><span className="executive-contract-status">{row.status}</span><ModuleLink href={`/contratos?contrato=${row.id}`} aria-label={`Abrir contrato ${row.contractNumber||row.title}`} title="Abrir contrato"><ArrowUpRight size={17}/></ModuleLink></div><h4 title={row.clientName}>{row.clientName}</h4><p title={row.title}>{row.contractNumber||row.title}</p><div className="executive-contract-progress"><span>{detail?`${decimalLabel(detail.totalLoadedVolume)} / ${decimalLabel(detail.contractedVolume)} t`:'Sem meta informada'}</span><strong>{detail?`${decimalLabel(detail.deliveryPercent)}%`:'—'}</strong></div><div className="executive-track"><i style={{width:`${Math.min(100,Math.max(0,Number(detail?.deliveryPercent??0)))}%`}}/></div><footer><span>No período: <b>{decimalLabel(row.loadedVolume)} t</b></span><span>Líquido: <b>{money(row.netAmount)}</b></span></footer></article>;}):<DashboardEmpty text="Nenhum contrato nesta seleção" detail="Consulte outra empresa ou ajuste os filtros."/>}</div>
  </DashboardPanel>;
 }
 
