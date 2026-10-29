@@ -3,7 +3,11 @@ import "./globals.css";
 // Keep dashboard styles mounted while its modules change during navigation/HMR.
 import "@/modules/resumo/styles.css";
 import "@/modules/resumo/dashboard.css";
+import "@/modules/resumo/financialChart.css";
+import "@/modules/resumo/financial-composition.css";
 import "@/modules/dashboard-market/market.css";
+import "@/modules/dashboard-news/news.css";
+import "@/modules/dashboard-news/weather.css";
 import {DataProvider} from "@/shared/query/DataProvider";
 import { AppProvider } from "@/shared/state/AppProvider";
 import {WorkspaceCompanyProvider} from "@/shared/state/WorkspaceCompanyProvider";

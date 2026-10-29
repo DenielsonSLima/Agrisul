@@ -28,6 +28,7 @@ export type ExecutiveSummaryTotals = ExecutiveFinancialMetrics & {
 };
 
 export type ExecutiveSummaryMonth = ExecutiveFinancialMetrics & {month:string};
+export type ExecutiveFinancialDay={date:string;loadCount:number;pendingLoadCount:number;billingPending:boolean;grossAmount:string;netAmount:string;receivedAmount:string};
 
 export type ExecutiveSummaryComparison = {
  from:string;to:string;loadCount:number;loadedVolume:string;netAmount:string;receivedAmount:string;
@@ -86,6 +87,7 @@ export type ExecutivePlanningSummary = {
 };
 
 export type ExecutiveSummaryData = {
+ financialTimeline?:ExecutiveFinancialDay[];
  dimensions?:{partners:ExecutiveDimension[];contractTypes:ExecutiveDimension[]};
  harvestMethods?:{code:'1'|'2'|'unknown';label:string;loadCount:number;loadedVolume:string}[];
  filters?:SummarySelection & {companyId:string;contractLabel:string};

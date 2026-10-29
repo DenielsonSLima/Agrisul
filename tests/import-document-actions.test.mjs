@@ -32,6 +32,7 @@ const {state}=await import(fixturesUrl);
 const sharedUrl=dataUrl(transpile('../shared/utils/presentation.ts'));
 const presentationUrl=dataUrl(transpile('../modules/importacoes/utils/presentation.ts').replace(/from ['"]@\/shared\/utils\/presentation['"]/g,`from ${JSON.stringify(sharedUrl)}`));
 const modules={'../utils/cellNavigation':dataUrl(transpile('../modules/importacoes/utils/cellNavigation.ts')),'../navigation':dataUrl(transpile('../modules/importacoes/navigation.ts')),'../utils/columnSelection':dataUrl(transpile('../modules/importacoes/utils/columnSelection.ts')),'../utils/profileSelection':dataUrl(transpile('../modules/importacoes/utils/profileSelection.ts')),'../utils/presentation':presentationUrl,'@/shared/utils/presentation':sharedUrl};
+modules['../utils/equipmentFields']=dataUrl(transpile('../modules/importacoes/utils/equipmentFields.ts'));
 let source=transpile('../modules/importacoes/components/ImportacoesPage.tsx');
 source=source.replace(/from ['"]react['"]/g,`from ${JSON.stringify(reactUrl)}`).replace(/from ['"]react\/jsx-runtime['"]/g,`from ${JSON.stringify(jsxUrl)}`)
  .replace(/from ['"]([^'"]+)['"]/g,(match,path)=>path.startsWith('file:')?match:`from ${JSON.stringify(modules[path]??fixturesUrl)}`)

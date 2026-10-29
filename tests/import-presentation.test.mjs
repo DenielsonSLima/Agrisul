@@ -17,9 +17,9 @@ test('presentation formats exact decimal strings in pt-BR without losing precisi
 });
 test('main columns keep all original field types and reveal a selected hidden column',()=>{
  const fields=createTaquariProfile().fields;const original=JSON.stringify(fields);const visible=mainImportFields(fields,'COD_ENTRADA');
- assert.equal(visible.length,10);assert.equal(visible[0].key,'COD_ENTRADA');assert.equal(fields.length,46);
- const hidden=fields.find(field=>field.key==='COD_EQUIPAMENTO_COMPARTIMENTO');const expanded=mainImportFields(fields,hidden.key);
- assert.equal(expanded.length,11);assert.equal(expanded.at(-1),hidden);assert.equal(JSON.stringify(fields),original);
+ assert.equal(visible.length,12);assert.equal(visible[0].key,'COD_ENTRADA');assert.ok(visible.some(field=>field.key==='COD_TIPOCOLHEITA'));assert.ok(visible.some(field=>field.column==='S'));assert.ok(visible.some(field=>field.column==='Y'));assert.equal(fields.length,46);
+ const hidden=fields.find(field=>field.key==='NUMERO_ANALISE');const expanded=mainImportFields(fields,hidden.key);
+ assert.equal(expanded.length,13);assert.equal(expanded.at(-1),hidden);assert.equal(JSON.stringify(fields),original);
 });
 test('human column titles are presentation only and retain a configured custom label',()=>{
  assert.equal(importFieldLabel({key:'COD_FAZENDA',label:'COD FAZENDA'}),'Fazenda');

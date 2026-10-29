@@ -9,18 +9,19 @@ const settingsUrl=dataUrl(await transpile('../modules/resumo/presentationSetting
 const {DASHBOARD_SCENES,DASHBOARD_SCENE_IDS,PRESENTATION_INTERVALS,defaultPresentationMinutes,isPresentationMinutes,isDashboardSceneIndex,presentationSettingsKey,readPresentationSettings,serializePresentationSettings,updateSceneMinutes,updateAllSceneMinutes}=await import(settingsUrl);
 
 test('every scene defaults to two minutes and only supported intervals and scene indices are accepted',()=>{
- assert.deepEqual(PRESENTATION_INTERVALS,[1,2,5,10]);assert.equal(DASHBOARD_SCENES.length,5);
+ assert.deepEqual(PRESENTATION_INTERVALS,[1,2,5,10]);assert.equal(DASHBOARD_SCENES.length,6);assert.equal(DASHBOARD_SCENES.at(-1).label,'Notícias');
  assert.deepEqual(Object.keys(defaultPresentationMinutes()),DASHBOARD_SCENE_IDS);assert.equal(Object.values(defaultPresentationMinutes()).every(value=>value===2),true);
  for(const value of [1,2,5,10])assert.equal(isPresentationMinutes(value),true);
  for(const value of [0,3,-1,Infinity,NaN,'2',null])assert.equal(isPresentationMinutes(value),false);
- for(const value of [-1,0.5,5,Infinity,NaN,'0',null])assert.equal(isDashboardSceneIndex(value),false);
- for(const value of [0,1,2,3,4])assert.equal(isDashboardSceneIndex(value),true);
+ for(const value of [-1,0.5,6,Infinity,NaN,'0',null])assert.equal(isDashboardSceneIndex(value),false);
+ for(const value of [0,1,2,3,4,5])assert.equal(isDashboardSceneIndex(value),true);
 });
 test('preferences serialize by canonical scene ID and partial valid settings fill remaining defaults',()=>{
  const values=updateSceneMinutes(defaultPresentationMinutes(),1,5);values['dashboard-types']=10;
  const raw=serializePresentationSettings(values);assert.deepEqual(readPresentationSettings(raw),values);assert.equal(JSON.parse(raw).version,1);
  const partial=readPresentationSettings(JSON.stringify({version:1,minutesByScene:{'dashboard-general':1}}));
- assert.equal(partial['dashboard-general'],1);assert.equal(partial['dashboard-production'],2);assert.equal(Object.keys(partial).length,5);
+ assert.equal(partial['dashboard-general'],1);assert.equal(partial['dashboard-production'],2);assert.equal(partial['dashboard-news'],2);assert.equal(Object.keys(partial).length,6);
+ const oldFive={...values};delete oldFive['dashboard-news'];const migrated=readPresentationSettings(JSON.stringify({version:1,minutesByScene:oldFive}));assert.equal(migrated['dashboard-production'],5);assert.equal(migrated['dashboard-types'],10);assert.equal(migrated['dashboard-news'],2);
  const withUnknown={...values,unknown:999};assert.equal('unknown' in JSON.parse(serializePresentationSettings(withUnknown)).minutesByScene,false);
 });
 test('malformed JSON, unknown versions, keys and unsupported values never enter presentation state',()=>{
@@ -31,7 +32,7 @@ test('malformed JSON, unknown versions, keys and unsupported values never enter 
 test('editing one scene preserves all others and global compatibility updates all scenes without mutating prior state',()=>{
  const previous=defaultPresentationMinutes();const next=updateSceneMinutes(previous,3,10);
  assert.equal(next['dashboard-contracts'],10);assert.equal(next['dashboard-general'],2);assert.equal(previous['dashboard-contracts'],2);
- for(const index of [-1,5,NaN])assert.equal(updateSceneMinutes(previous,index,1),null);
+ for(const index of [-1,6,NaN])assert.equal(updateSceneMinutes(previous,index,1),null);
  assert.equal(updateSceneMinutes(previous,1,3),null);assert.equal(updateAllSceneMinutes(3),null);
  assert.equal(Object.values(updateAllSceneMinutes(5)).every(value=>value===5),true);
 });

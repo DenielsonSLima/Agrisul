@@ -45,8 +45,8 @@ test('authoritative group entry numbering: import continuity, overlap reuse, ato
   assert.equal(next.pendingCount,pendingBeforeFinish,'Finalization keeps missing equipment and review warnings');
   assert.equal(next.entries.every(e=>!e.reviewed),true);
   next=(await action('reopen',next)).document;
-  for(const entry of [...next.entries]) next=(await action('save-entry',next,{entryId:entry.id,date:entry.date,values:{...entry.values,COD_EQUIPAMENTO_TRANSPORTE:'308',COD_EQUIPAMENTO_COMPARTIMENTO:'309'},reviewed:true})).document;
-  next=(await action('save-entry',next,{date:'2026-10-24',values:{COD_ENTRADA:'810',COD_TIPOCARGA:'2',COD_TIPOCOLHEITA:'2',COD_EQUIPAMENTO_TRANSPORTE:'308',COD_EQUIPAMENTO_COMPARTIMENTO:'309',OBS:'manual'},reviewed:true})).document;
+  for(const entry of [...next.entries]) next=(await action('save-entry',next,{entryId:entry.id,date:entry.date,values:{...entry.values,COD_EQUIPAMENTO_TRANSPORTE:'308',COD_EQUIPAMENTO_COMPARTIMENTO:'308'},reviewed:true})).document;
+  next=(await action('save-entry',next,{date:'2026-10-24',values:{COD_ENTRADA:'810',COD_TIPOCARGA:'2',COD_TIPOCOLHEITA:'2',COD_EQUIPAMENTO_TRANSPORTE:'308',COD_EQUIPAMENTO_COMPARTIMENTO:'308',OBS:'manual'},reviewed:true})).document;
   const manualPin=next.entries.find(e=>e.groupKey===null);
   next=(await action('save-entry',next,{entryId:manualPin.id,date:manualPin.date,values:{...manualPin.values,COD_ENTRADA:'811'},reviewed:true})).document;
   assert.equal(next.entries.find(e=>e.id===manualPin.id).values.COD_ENTRADA,'811','A manual entry without source identity keeps the normal editing contract');

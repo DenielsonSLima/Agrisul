@@ -4,6 +4,7 @@ export const DASHBOARD_SCENES=[
  {id:'dashboard-suppliers',label:'Fornecedor'},
  {id:'dashboard-contracts',label:'Contrato'},
  {id:'dashboard-types',label:'Tipo'},
+ {id:'dashboard-news',label:'Notícias'},
 ] as const;
 export const PRESENTATION_INTERVALS=[1,2,5,10] as const;
 export type DashboardSceneId=typeof DASHBOARD_SCENES[number]['id'];

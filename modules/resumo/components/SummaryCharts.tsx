@@ -13,10 +13,7 @@ const shortMonth=(value:string)=>`${monthLabel(value).slice(0,3)}/${value.slice(
 type Exploration={onSelectMonth?:(month:string)=>void;disabled?:boolean};
 type ChartRow={month:string;gross:number|null;discount:number|null;net:number|null;received:number;volume:number;loads:number;atr:number|null;pending:boolean};
 
-export function FinancialEvolution({data,onSelectMonth,disabled}: {data:ExecutiveSummaryData['months']} & Exploration){
- const rows:ChartRow[]=data.map(item=>({month:item.month,gross:item.billingPending?null:Number(item.grossAmount),discount:Number(item.discountAmount),net:item.billingPending?null:Number(item.netAmount),received:Number(item.receivedAmount),volume:Number(item.loadedVolume),loads:item.loadCount,atr:null,pending:item.billingPending}));
- return <EvolutionChart rows={rows} mode="money" onSelectMonth={onSelectMonth} disabled={disabled}/>;
-}
+export {FinancialEvolution} from './DashboardFinancialChart';
 export function OperationalEvolution({data,onSelectMonth,disabled}:{data:ExecutiveSummaryData['monthlyOperations']} & Exploration){
  const rows:ChartRow[]=data.map(item=>({month:item.month,gross:null,discount:null,net:null,received:0,volume:Number(item.loadedVolume),loads:item.loadCount,atr:item.averageAtr===''?null:Number(item.averageAtr),pending:false}));
  return <EvolutionChart rows={rows} mode="production" onSelectMonth={onSelectMonth} disabled={disabled}/>;
@@ -48,16 +45,7 @@ function SummaryTooltip({active,row,mode,showAtr}:{active?:boolean;row?:ChartRow
  return <div className="summary-tooltip"><strong>{monthLabel(row.month)}</strong>{mode==='money'?<><span>Bruto <b>{moneyLabel(row.gross)}</b></span><span>Líquido <b>{moneyLabel(row.net)}</b></span><span>Entradas <b>{moneyLabel(row.received)}</b></span></>:<><span>Volume <b>{decimalLabel(row.volume)} t</b></span><span>{showAtr?'ATR médio':'Carregamentos'} <b>{showAtr?`${decimalLabel(row.atr)} kg/t`:row.loads}</b></span></>}</div>;
 }
 
-export function FinancialComposition({totals}:{totals:ExecutiveSummaryData['totals']}){
- const id=useId();
- const data=totals.billingPending?[]:[{name:'Líquido',value:Number(totals.netAmount),color:'#2d8a63'},{name:'Descontos',value:Number(totals.discountAmount),color:'#bd8f46'}];
- const visible=data.every(item=>item.value>=0)&&data.some(item=>item.value>0);
- return <section className="summary-panel summary-composition" aria-labelledby={id}>
-  <header className="summary-panel-heading"><div><span className="summary-kicker"><ChartPie size={15}/>COMPOSIÇÃO NO PERÍODO</span><h3 id={id}>Do bruto ao líquido</h3><p>Descontos aplicados às entregas da seleção.</p></div></header>
-  <div className="summary-donut" role="img" aria-label={`Bruto ${moneyLabel(totals.grossAmount)}; líquido ${moneyLabel(totals.netAmount)}; descontos ${moneyLabel(totals.discountAmount)}.`}>{visible?<ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={INITIAL_CHART_SIZE}><PieChart><Pie data={data} dataKey="value" innerRadius="73%" outerRadius="93%" paddingAngle={2} cornerRadius={5} stroke="none" startAngle={90} endAngle={-270} isAnimationActive={false}>{data.map(item=><Cell key={item.name} fill={item.color}/>)}</Pie><Tooltip formatter={value=>moneyLabel(String(value))} contentStyle={{border:'1px solid #dce6df',borderRadius:12,fontSize:13}}/></PieChart></ResponsiveContainer>:<svg viewBox="0 0 200 200" aria-hidden="true"><circle cx="100" cy="100" r="80" fill="none" stroke="#edf2ee" strokeWidth="19"/></svg>}<div><span>Faturamento bruto</span><strong>{moneyLabel(totals.grossAmount)}</strong><small>{totals.billingPending?'Valores a apurar':visible?'No período':'Sem composição proporcional'}</small></div></div>
-  <dl className="summary-donut-legend"><div><dt><i className="net"/>Líquido</dt><dd>{moneyLabel(totals.netAmount)}</dd></div><div><dt><i className="discount"/>Descontos</dt><dd>{moneyLabel(totals.discountAmount)}</dd></div></dl>
- </section>;
-}
+export {FinancialComposition} from './FinancialComposition';
 
 export function FarmVolumeChart({farms}:{farms:ExecutiveSummaryData['farms']}){
  const id=useId(),[all,setAll]=useState(false);

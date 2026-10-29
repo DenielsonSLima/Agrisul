@@ -37,5 +37,9 @@ test('Pinheiro numeric farm bulk fill persists in detail, filtered table and exp
   assert.deepEqual((await docs('get',{id:document.id})).document.entries.map(entry=>entry.values.COD_FAZENDA),Array(4).fill('5011'));
   assert.deepEqual((await docs('export',{id:document.id})).rows.map(entry=>entry.values.F),Array(4).fill('5011'));
   assert.deepEqual(document.profileSnapshot.fields,originalFields);assert.deepEqual(document.entries.map(entry=>entry.source),originalEntries.map(entry=>entry.source));
+  const beforePlot=structuredClone(document.entries);
+  document=(await docs('save-bulk',{id:document.id,entryIds:selected,fieldKeys:['COD_TALHAO'],value:'3',expectedUpdatedAt:document.updatedAt})).document;
+  assert.deepEqual(document.entries.map(entry=>entry.values.COD_TALHAO),['3','21','3','21'],'Plot updates honor the selected IDs, including within a shared trip');
+  for(const [index,entry] of document.entries.entries())if(!selected.includes(entry.id))assert.deepEqual(entry,beforePlot[index],'Unchecked rows remain unchanged');
  }finally{await db.close();}
 });

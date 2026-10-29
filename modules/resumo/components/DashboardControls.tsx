@@ -1,11 +1,11 @@
 'use client';
 import {useEffect,useRef,useSyncExternalStore,type ReactNode} from 'react';
-import {Building2,ChartNoAxesCombined,ChevronLeft,ChevronRight,Layers3,LayoutDashboard,FileChartColumn,Settings2,X} from 'lucide-react';
+import {Building2,ChartNoAxesCombined,ChevronLeft,ChevronRight,Layers3,LayoutDashboard,FileChartColumn,Newspaper,Settings2,X} from 'lucide-react';
 import {notifications} from '@/shared/feedback';
 import {DASHBOARD_SCENES,PRESENTATION_INTERVALS,useDashboardPresentation} from '../hooks/useDashboardPresentation';
 
 export type Presentation=ReturnType<typeof useDashboardPresentation>;
-const sceneIcons=[LayoutDashboard,ChartNoAxesCombined,Building2,FileChartColumn,Layers3];
+const sceneIcons=[LayoutDashboard,ChartNoAxesCombined,Building2,FileChartColumn,Layers3,Newspaper];
 const clockTime=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
 const clockDate=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',year:'numeric'});
 const clockCalendar=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'short',year:'numeric'});
@@ -38,7 +38,7 @@ export function DashboardSettings({presentation,open,onToggle,onClose}:{presenta
  return <div className="executive-settings-anchor"><button ref={trigger} className="executive-settings-trigger" type="button" aria-label="Configurações do Dashboard" aria-expanded={open} aria-controls="dashboard-settings" onClick={onToggle}><Settings2 size={18}/></button>
   {open&&<DashboardPopover title="Configurações do Dashboard" id="dashboard-settings" onClose={onClose} onReturnFocus={()=>trigger.current?.focus({preventScroll:true})} settings>
    <p className="executive-setting-caption">Defina quanto tempo cada aba permanece na tela durante a apresentação.</p>
-   <label className="executive-setting-field">Aplicar o mesmo tempo às cinco abas<select aria-label="Intervalo de troca dos painéis" value={commonMinutes} onChange={event=>feedback(presentation.setMinutes(Number(event.target.value)))}><option value="" disabled>Personalizado por aba</option>{PRESENTATION_INTERVALS.map(minutes=><option key={minutes} value={minutes}>{minutes} {minutes===1?'minuto':'minutos'}</option>)}</select></label>
+   <label className="executive-setting-field">Aplicar o mesmo tempo a todas as abas<select aria-label="Intervalo de troca dos painéis" value={commonMinutes} onChange={event=>feedback(presentation.setMinutes(Number(event.target.value)))}><option value="" disabled>Personalizado por aba</option>{PRESENTATION_INTERVALS.map(minutes=><option key={minutes} value={minutes}>{minutes} {minutes===1?'minuto':'minutos'}</option>)}</select></label>
    <fieldset className="executive-duration-list"><legend>Tempo por aba</legend>{DASHBOARD_SCENES.map((scene,index)=><label className="executive-duration-row" key={scene.id} htmlFor={`duration-${scene.id}`}><span>{scene.label}</span><select id={`duration-${scene.id}`} aria-label={`Tempo da aba ${scene.label}`} value={presentation.minutesByScene[scene.id]} onChange={event=>feedback(presentation.setSceneMinutes(index,Number(event.target.value)))}>{PRESENTATION_INTERVALS.map(minutes=><option key={minutes} value={minutes}>{minutes} {minutes===1?'minuto':'minutos'}</option>)}</select></label>)}</fieldset>
    {presentation.settingsError&&<p className="executive-settings-error" role="alert">{presentation.settingsError}</p>}
    <p className="executive-setting-note">As alterações são aplicadas imediatamente e salvas neste navegador. Esc encerra a tela cheia.</p>
@@ -66,7 +66,7 @@ export function DashboardClock(){
  const dayMonth=parts.filter(part=>part.type==='day'||part.type==='month').map(part=>part.value.replace(/\.$/,'')).join(' ')||'— —';
  const year=parts.find(part=>part.type==='year')?.value??'————';
  return <time className="executive-clock" dateTime={now?.toISOString()} title={now?`${date}, horário de Brasília`:'Data e horário de Brasília'} aria-label={now?`${date} às ${time}, horário de Brasília`:'Data e horário de Brasília'}>
+  <strong><small aria-hidden="true">H</small><span>{time}</span></strong>
   <span className="executive-clock-date" aria-hidden="true"><b>{dayMonth}</b><small>{year}</small></span>
-  <strong>{time}</strong>
  </time>;
 }

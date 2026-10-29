@@ -1,8 +1,8 @@
 import type {ImportEntry,ImportField} from '../types';
 import {dateLabel} from '@/shared/utils/presentation';
 const counts=new Intl.NumberFormat('pt-BR');
-export const MAIN_IMPORT_COLUMNS=['COD_ENTRADA','COD_FAZENDA','COD_TALHAO','AREA','COD_TIPOCARGA','COD_EQUIPAMENTO_TRANSPORTE','HORACHEGADA','PESOBRUTO','TARA','NR_ORDEM_COLHEITA'];
-const labels:Record<string,string>={COD_ENTRADA:'Entrada',COD_FAZENDA:'Fazenda',COD_TALHAO:'Talhão',AREA:'Área (ha)',COD_TIPOCARGA:'Tipo de carga',COD_EQUIPAMENTO_TRANSPORTE:'Equipamento',HORACHEGADA:'Chegada',PESOBRUTO:'Peso bruto',TARA:'Tara',NR_ORDEM_COLHEITA:'Ordem de colheita'};
+export const MAIN_IMPORT_COLUMNS=['COD_ENTRADA','COD_FAZENDA','COD_TALHAO','AREA','COD_TIPOCOLHEITA','COD_TIPOCARGA','COD_EQUIPAMENTO_TRANSPORTE','COD_EQUIPAMENTO_COMPARTIMENTO','HORACHEGADA','PESOBRUTO','TARA','NR_ORDEM_COLHEITA'];
+const labels:Record<string,string>={COD_ENTRADA:'Entrada',COD_FAZENDA:'Fazenda',COD_TALHAO:'Talhão',AREA:'Área (ha)',COD_TIPOCARGA:'Tipo de carga',COD_EQUIPAMENTO_TRANSPORTE:'Equipamento',COD_EQUIPAMENTO_COMPARTIMENTO:'Compartimento',HORACHEGADA:'Chegada',PESOBRUTO:'Peso bruto',TARA:'Tara',NR_ORDEM_COLHEITA:'Ordem de colheita'};
 export function importFieldLabel(field:Pick<ImportField,'key'|'label'>){
  if(field.label.replaceAll('_',' ').toUpperCase()!==field.key.replaceAll('_',' ').toUpperCase())return field.label;
  return labels[field.key]??field.label.replaceAll('_',' ').toLowerCase().replace(/^./,letter=>letter.toUpperCase());
