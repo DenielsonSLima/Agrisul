@@ -1,11 +1,12 @@
 'use client';
 import {useState,useSyncExternalStore,type ReactNode} from 'react';
 import {ArrowUpRight,ChevronLeft,ChevronRight,Layers3,Leaf,Target} from 'lucide-react';
-import {Bar,CartesianGrid,Cell,ComposedChart,Pie,PieChart,ResponsiveContainer,Tooltip,XAxis,YAxis} from 'recharts';
+import {Bar,CartesianGrid,Cell,ComposedChart,LabelList,Pie,PieChart,ResponsiveContainer,Tooltip,XAxis,YAxis} from 'recharts';
 import {ModuleLink} from '@/shared/navigation/ModuleNavigation';
 import {decimalLabel} from '@/shared/utils/presentation';
 import {useDashboardValues} from '../dashboardValues';
 import type {ExecutiveDimension,ExecutiveSummaryData} from '../types';
+import {usePlotSize} from '../hooks/usePlotSize';
 
 const geometry={width:1,height:1};
 const palette=['#187653','#b58a43','#91a39d'];
@@ -23,12 +24,22 @@ export function DashboardPanel({eyebrow,title,subtitle,children,actions,classNam
  return <section className={`executive-panel ${className}`}><header className="executive-panel-header"><div><span className="executive-panel-eyebrow">{eyebrow}</span><h3>{title}</h3>{subtitle&&<p>{subtitle}</p>}</div>{actions}</header>{children}</section>;
 }
 
-export function DashboardBars({rows,title,eyebrow='VOLUME CARREGADO',subtitle}:{rows:{id:string;name:string;loadedVolume:string}[];title:string;eyebrow?:string;subtitle?:string}){
+export function DashboardBars({rows,title,eyebrow='VOLUME CARREGADO',subtitle,showValues=false}:{rows:{id:string;name:string;loadedVolume:string}[];title:string;eyebrow?:string;subtitle?:string;showValues?:boolean}){
+ const {ref,size:plotSize}=usePlotSize(),nameWidth=showValues?Math.max(80,Math.min(145,plotSize.width*.28)):145;
  const [page,setPage]=useState(0),size=4,pages=Math.max(1,Math.ceil(rows.length/size)),current=Math.min(page,pages-1),shown=rows.slice(current*size,(current+1)*size);
  return <DashboardPanel title={title} eyebrow={eyebrow} subtitle={subtitle} actions={pages>1?<PageControls page={current} pages={pages} onChange={setPage} label={title}/>:undefined}>
-  {shown.some(row=>Number(row.loadedVolume)>0)?<div className="executive-bar-plot" role="img" aria-label={shown.map(row=>`${row.name}: ${decimalLabel(row.loadedVolume)} t`).join('. ')}><ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={geometry}><ComposedChart data={shown.map(row=>({...row,volume:Number(row.loadedVolume),shortName:row.name.length>26?row.name.slice(0,24)+'…':row.name}))} layout="vertical" margin={{left:0,right:24,top:16,bottom:4}}><CartesianGrid horizontal={false} stroke="#e9eeeb" strokeDasharray="3 4"/><XAxis type="number" tickFormatter={compact} axisLine={false} tickLine={false} tick={{fill:'#819087',fontSize:11}}/><YAxis dataKey="shortName" type="category" width={145} axisLine={false} tickLine={false} tick={{fill:'#53665b',fontSize:11}}/><Tooltip cursor={{fill:'#f4f8f5'}} formatter={value=>[`${decimalLabel(String(value))} t`,'Volume']} labelFormatter={(_label,payload)=>payload?.[0]?.payload?.name??''} contentStyle={{borderRadius:10,border:'1px solid #e3eae5',fontSize:12}}/><Bar dataKey="volume" fill="#287e5a" radius={[0,5,5,0]} maxBarSize={28} isAnimationActive={false}/></ComposedChart></ResponsiveContainer></div>:<DashboardEmpty text="Nenhum carregamento neste recorte" detail="Os valores aparecem quando as cargas são vinculadas aos contratos."/>}
+  {shown.some(row=>Number(row.loadedVolume)>0)?<div ref={showValues?ref:undefined} className="executive-bar-plot" role="img" aria-label={shown.map(row=>`${row.name}: ${decimalLabel(row.loadedVolume)} t`).join('. ')}><ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={geometry}><ComposedChart data={shown.map(row=>({...row,volume:Number(row.loadedVolume),shortName:row.name.length>26?row.name.slice(0,24)+'…':row.name}))} layout="vertical" margin={{left:0,right:24,top:16,bottom:4}}><CartesianGrid horizontal={false} stroke="#e9eeeb" strokeDasharray="3 4"/><XAxis type="number" tickFormatter={compact} axisLine={false} tickLine={false} tick={{fill:'#819087',fontSize:11}}/><YAxis dataKey="shortName" type="category" width={nameWidth} axisLine={false} tickLine={false} tick={{fill:'#53665b',fontSize:11}}/><Tooltip cursor={{fill:'#f4f8f5'}} formatter={value=>[`${decimalLabel(String(value))} t`,'Volume']} labelFormatter={(_label,payload)=>payload?.[0]?.payload?.name??''} contentStyle={{borderRadius:10,border:'1px solid #e3eae5',fontSize:12}}/><Bar dataKey="volume" fill="#287e5a" radius={[0,5,5,0]} maxBarSize={28} isAnimationActive={false}>{showValues&&<LabelList dataKey="loadedVolume" content={props=><VolumeBarLabel {...props} chartWidth={plotSize.width}/>}/>}</Bar></ComposedChart></ResponsiveContainer></div>:<DashboardEmpty text="Nenhum carregamento neste recorte" detail="Os valores aparecem quando as cargas são vinculadas aos contratos."/>}
   <div className="executive-card-caption"><span>Toneladas líquidas · período selecionado</span><span>{rows.length} {rows.length===1?'registro':'registros'}</span></div>
  </DashboardPanel>;
+}
+
+function VolumeBarLabel({x,y,width,height,value,chartWidth}:{x?:number|string;y?:number|string;width?:number|string;height?:number|string;value?:unknown;chartWidth:number}){
+ if(chartWidth<=0||value===undefined||value===null)return null;
+ const left=Number(x??0),top=Number(y??0),barWidth=Number(width??0),barHeight=Number(height??0),text=`${decimalLabel(String(value))} t`,preferred=chartWidth>=450?13:11;
+ const outsideSpace=Math.max(0,chartWidth-left-barWidth-13),textWidth=text.length*preferred*.62;
+ const inside=barWidth>=textWidth+16||barWidth-14>=outsideSpace;
+ const room=Math.max(1,inside?barWidth-14:outsideSpace),font=Math.min(preferred,room/(Math.max(1,text.length)*.62));
+ return <text className={`executive-volume-label ${inside?'is-inside':'is-outside'}`} x={inside?left+barWidth-8:left+barWidth+7} y={top+barHeight/2} dy=".35em" textAnchor={inside?'end':'start'} fontSize={font} fontWeight={650} fill={inside?'#fff':'#203e2e'}>{text}</text>;
 }
 
 export function DashboardDimensionList({rows,title}:{rows:ExecutiveDimension[];title:string}){

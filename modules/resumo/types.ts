@@ -89,6 +89,7 @@ export type ExecutivePlanningSummary = {
 };
 
 export type ExecutiveSummaryData = {
+ averageGrossPricePerTon?:string;
  dailyProductivity?:{productionDayCount:number;averageLoadedVolume:string;averageNetAmount:string;billingPending:boolean;pendingLoadCount:number};
  financialTimeline?:ExecutiveFinancialDay[];
  financialGroupings?:{week:ExecutiveFinancialPeriod[];fortnight:ExecutiveFinancialPeriod[]};

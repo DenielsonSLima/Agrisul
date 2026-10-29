@@ -20,6 +20,9 @@ test('financial timeline and production-day averages use server valuations, scop
   assert.equal(daily[0].grossAmount,valued[0].gross);assert.equal(daily[0].netAmount,valued[0].net);assert.equal(daily[2].grossAmount,valued[1].gross);assert.equal(summary.months.length,1);assert.equal(summary.months[0].billingPending,true);assert.equal(summary.totals.receivedAmount,'145.57');
   assert.deepEqual(daily.map(row=>row.loadedVolume),['30','0','10','10']);assert.equal(summary.months[0].loadedVolume,'50');
   const selected=await rpc('summary','dashboard',{...scope,contractId:a});assert.equal(selected.financialTimeline.length,3);assert.equal(selected.financialTimeline.every(row=>!row.billingPending),true);
+  assert.equal(summary.averageGrossPricePerTon,'','Incomplete billing never becomes a partial average price');
+  await db.exec('RESET ROLE');const expectedGrossPrice=(await db.query('SELECT billing_private.decimal_text(round(sum(f.gross_amount)/sum(l.volume),2)) price FROM public.billing_contracts c CROSS JOIN LATERAL billing_private.contract_load_financials(c) f JOIN public.billing_contract_loads l ON l.id=f.load_id AND l.owner_id=c.owner_id WHERE c.id=$1',[a])).rows[0].price;await setActor();assert.equal(selected.averageGrossPricePerTon,expectedGrossPrice);assert.equal(typeof selected.averageGrossPricePerTon,'string');
+  assert.equal(selected.averageGrossPricePerTon,'155.86','Unequal 10/20/10-ton loads require the volume-weighted price, not the simple 154.32 mean');
   assert.equal(selected.financialTimeline[0].grossChangeReason,'initial');assert.equal(selected.financialTimeline[1].grossChangeFrom,'2026-09-15');assert.equal(selected.financialTimeline[1].grossChangePercent,'-100');assert.equal(selected.financialTimeline[2].grossChangeReason,'zero-base');assert.equal(summary.financialTimeline[3].grossChangeReason,'pending');
   const weekly=summary.financialGroupings.week,fortnightly=summary.financialGroupings.fortnight;
   assert.equal(weekly.length,1);assert.equal(weekly[0].date,'2026-09-14');assert.equal(weekly[0].endDate,'2026-09-20');assert.equal(weekly[0].loadCount,4);assert.equal(weekly[0].grossAmount,'');assert.equal(weekly[0].receivedAmount,'145.57');
@@ -36,8 +39,10 @@ test('financial timeline and production-day averages use server valuations, scop
   const empty=await rpc('summary','dashboard',{...scope,from:'2026-09-19',to:'2026-09-19'});assert.deepEqual(empty.financialTimeline,[]);
   assert.deepEqual(empty.financialGroupings,{week:[],fortnight:[]});
   assert.deepEqual(empty.dailyProductivity,singleDay.dailyProductivity);
+  assert.equal(empty.averageGrossPricePerTon,'0');assert.equal(singleDay.averageGrossPricePerTon,'0','Cash-only days never create a selling price');
   await db.exec('RESET ROLE');await load(b,'2026-09-15','125','30');await setActor();const sameDate=await rpc('summary','dashboard',scope);assert.equal(sameDate.dailyProductivity.productionDayCount,3,'A shared date across contracts is counted once');assert.equal(sameDate.dailyProductivity.averageLoadedVolume,'26.667');
   await db.exec('RESET ROLE');await db.query("UPDATE public.billing_contracts SET status='Concluído' WHERE id=$1",[b]);await setActor();const active=await rpc('summary','dashboard',{...scope,status:'Ativo'});assert.deepEqual(active.dailyProductivity,selected.dailyProductivity,'Status excludes the other contract from both averages and production dates');
+  assert.equal(active.averageGrossPricePerTon,selected.averageGrossPricePerTon);
   await assert.rejects(()=>rpc('summary','dashboard',{...scope,contractId:sibling}),error=>error.code==='42501');await setActor(ids.otherOwner);await assert.rejects(()=>rpc('summary','dashboard',scope));const other=await rpc('summary','dashboard',{...scope,companyId:ids.otherCompany});assert.deepEqual(other.financialTimeline,[]);assert.deepEqual(other.dailyProductivity,empty.dailyProductivity);await setActor(ids.reader);await assert.rejects(()=>rpc('summary','dashboard',scope),error=>error.code==='42501');await setActor(null);await assert.rejects(()=>rpc('summary','dashboard',scope),error=>error.code==='28000');
  }finally{await db.close();}
 });
