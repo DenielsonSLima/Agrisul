@@ -1,8 +1,9 @@
-import type {ExecutiveFinancialDay,ExecutiveSummaryMonth} from '../types';
-export type FinancialChartRow={key:string;granularity:'day'|'month';loadCount:number;billingPending:boolean;grossAmount:string;netAmount:string;receivedAmount:string};
+import type {ExecutiveFinancialDay,ExecutiveFinancialPeriod,ExecutiveSummaryMonth} from '../types';
+import type {FinancialGrouping} from '../financialGrouping';
+export type FinancialChartRow={key:string;endDate?:string;granularity:FinancialGrouping;loadCount:number;billingPending:boolean;grossAmount:string;netAmount:string;receivedAmount:string};
 const nonzero=(value:string)=>/[1-9]/.test(value);
-export function financialChartRows(months:readonly ExecutiveSummaryMonth[],days?:readonly ExecutiveFinancialDay[]):FinancialChartRow[]{
- return (days===undefined?months.map(row=>({...row,key:row.month,granularity:'month' as const})):days.map(row=>({...row,key:row.date,granularity:'day' as const})))
+export function financialChartRows(months:readonly ExecutiveSummaryMonth[],days?:readonly ExecutiveFinancialDay[],grouping:FinancialGrouping=days===undefined?'month':'day',periods?:readonly ExecutiveFinancialPeriod[]):FinancialChartRow[]{
+ return (grouping==='month'?months.map(row=>({...row,key:row.month,granularity:'month' as const})):(grouping==='day'?days??[]:periods??[]).map(row=>({...row,key:row.date,granularity:grouping})))
   .filter(row=>row.loadCount>0||row.billingPending||nonzero(row.grossAmount)||nonzero(row.netAmount)||nonzero(row.receivedAmount));
 }
 /** Geometry only: choose a readable number of periods without aggregating money. */

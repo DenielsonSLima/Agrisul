@@ -12,7 +12,8 @@ const reactUrl=pathToFileURL(require.resolve('react')).href,jsxUrl=pathToFileURL
 const transpile=path=>ts.transpileModule(readFileSync(new URL(path,import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
 const chartsUrl=dataUrl(`import {createElement} from ${JSON.stringify(reactUrl)};const Box=({children})=>createElement('div',null,children);export const Cell=()=>null,ChartPie=()=>null,Pie=Box,PieChart=Box,ResponsiveContainer=Box;`);
 const sharedUrl=dataUrl(transpile('../shared/utils/presentation.ts'));
-const valuesUrl=dataUrl(transpile('../modules/resumo/dashboardValues.tsx').replace(/from ['"]react['"]/g,`from ${JSON.stringify(reactUrl)}`).replace(/from ['"]react\/jsx-runtime['"]/g,`from ${JSON.stringify(jsxUrl)}`).replace(/from ['"]@\/shared\/utils\/presentation['"]/g,`from ${JSON.stringify(sharedUrl)}`));
+const groupingUrl=dataUrl(transpile('../modules/resumo/financialGrouping.ts'));
+const valuesUrl=dataUrl(transpile('../modules/resumo/dashboardValues.tsx').replace(/from ['"]react['"]/g,`from ${JSON.stringify(reactUrl)}`).replace(/from ['"]react\/jsx-runtime['"]/g,`from ${JSON.stringify(jsxUrl)}`).replace(/from ['"]@\/shared\/utils\/presentation['"]/g,`from ${JSON.stringify(sharedUrl)}`).replace(/from ['"]\.\/financialGrouping['"]/g,`from ${JSON.stringify(groupingUrl)}`));
 const {DashboardValuesProvider,dashboardValuesKey,DASHBOARD_MONEY_MASK}=await import(valuesUrl);
 const source=transpile('../modules/resumo/components/FinancialComposition.tsx').replace(/from ['"]react['"]/g,`from ${JSON.stringify(reactUrl)}`).replace(/from ['"]react\/jsx-runtime['"]/g,`from ${JSON.stringify(jsxUrl)}`).replace(/from ['"](?:lucide-react|recharts)['"]/g,`from ${JSON.stringify(chartsUrl)}`).replace(/from ['"]\.\.\/dashboardValues['"]/g,`from ${JSON.stringify(valuesUrl)}`);
 const {FinancialComposition}=await import(dataUrl(source));
@@ -37,6 +38,6 @@ test('pending or non-proportional totals retain exact labels and a neutral ring'
 test('dashboard visibility preferences isolate accounts and hidden SSR output contains no financial amount or accessible label',()=>{
  assert.notEqual(dashboardValuesKey('owner-a'),dashboardValuesKey('owner-b'));assert.equal(dashboardValuesKey(null),null);
  const html=renderToStaticMarkup(createElement(DashboardValuesProvider,{userId:'owner-a'},createElement(FinancialComposition,{totals})));
- assert.match(html,/R\$ \*\*\*,\*\*/);for(const value of ['519.190,29','270.683,04','248.507,25'])assert.equal(html.includes(value),false,'Hidden amounts are absent from text and accessibility labels');
- assert.equal(DASHBOARD_MONEY_MASK,'R$ ***,**');assert.match(render(),/R\$ 519\.190,29/,'Masking is scoped to the Dashboard provider');
+ assert.ok(html.includes(DASHBOARD_MONEY_MASK));for(const value of ['519.190,29','270.683,04','248.507,25'])assert.equal(html.includes(value),false,'Hidden amounts are absent from text and accessibility labels');
+ assert.match(DASHBOARD_MONEY_MASK,/^•+$/);assert.doesNotMatch(html,/R\$/);assert.match(render(),/R\$ 519\.190,29/,'Masking is scoped to the Dashboard provider');
 });

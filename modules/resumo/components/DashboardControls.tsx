@@ -1,4 +1,5 @@
 'use client';
+import {FINANCIAL_GROUPINGS,readFinancialGrouping,type FinancialGrouping} from '../financialGrouping';
 import {useEffect,useRef,useSyncExternalStore,type ReactNode} from 'react';
 import {Building2,ChartNoAxesCombined,ChevronLeft,ChevronRight,Layers3,LayoutDashboard,FileChartColumn,Newspaper,Settings2,X} from 'lucide-react';
 import {notifications} from '@/shared/feedback';
@@ -31,16 +32,18 @@ export function DashboardSceneNavigation({presentation}:{presentation:Presentati
  </div>;
 }
 
-export function DashboardSettings({presentation,open,onToggle,onClose}:{presentation:Presentation;open:boolean;onToggle:()=>void;onClose:()=>void}){
+export function DashboardSettings({presentation,open,onToggle,onClose,financialGrouping,onFinancialGroupingChange}:{presentation:Presentation;open:boolean;onToggle:()=>void;onClose:()=>void;financialGrouping:FinancialGrouping;onFinancialGroupingChange:(value:FinancialGrouping)=>boolean}){
  const trigger=useRef<HTMLButtonElement>(null);
  const commonMinutes=DASHBOARD_SCENES.every(scene=>presentation.minutesByScene[scene.id]===presentation.minutesByScene[DASHBOARD_SCENES[0].id])?presentation.minutesByScene[DASHBOARD_SCENES[0].id]:'';
  const feedback=(saved:boolean)=>saved?notifications.saved('Tempos de apresentação salvos neste navegador.'):notifications.error('Não foi possível salvar os tempos neste navegador.');
  return <div className="executive-settings-anchor"><button ref={trigger} className="executive-settings-trigger" type="button" aria-label="Configurações do Dashboard" aria-expanded={open} aria-controls="dashboard-settings" onClick={onToggle}><Settings2 size={18}/></button>
   {open&&<DashboardPopover title="Configurações do Dashboard" id="dashboard-settings" onClose={onClose} onReturnFocus={()=>trigger.current?.focus({preventScroll:true})} settings>
-   <p className="executive-setting-caption">Defina quanto tempo cada aba permanece na tela durante a apresentação.</p>
+   <p className="executive-setting-caption">Ajuste os tempos da apresentação e o agrupamento financeiro.</p>
    <label className="executive-setting-field">Aplicar o mesmo tempo a todas as abas<select aria-label="Intervalo de troca dos painéis" value={commonMinutes} onChange={event=>feedback(presentation.setMinutes(Number(event.target.value)))}><option value="" disabled>Personalizado por aba</option>{PRESENTATION_INTERVALS.map(minutes=><option key={minutes} value={minutes}>{minutes} {minutes===1?'minuto':'minutos'}</option>)}</select></label>
    <fieldset className="executive-duration-list"><legend>Tempo por aba</legend>{DASHBOARD_SCENES.map((scene,index)=><label className="executive-duration-row" key={scene.id} htmlFor={`duration-${scene.id}`}><span>{scene.label}</span><select id={`duration-${scene.id}`} aria-label={`Tempo da aba ${scene.label}`} value={presentation.minutesByScene[scene.id]} onChange={event=>feedback(presentation.setSceneMinutes(index,Number(event.target.value)))}>{PRESENTATION_INTERVALS.map(minutes=><option key={minutes} value={minutes}>{minutes} {minutes===1?'minuto':'minutos'}</option>)}</select></label>)}</fieldset>
    {presentation.settingsError&&<p className="executive-settings-error" role="alert">{presentation.settingsError}</p>}
+   <label className="executive-setting-field">Agrupamento do gráfico financeiro<select aria-label="Agrupamento do gráfico financeiro" value={financialGrouping} onChange={event=>{const saved=onFinancialGroupingChange(readFinancialGrouping(event.target.value));if(saved)notifications.saved('Agrupamento financeiro salvo neste navegador.');else notifications.error('Agrupamento aplicado nesta sessão; não foi possível salvar neste navegador.');}}>{FINANCIAL_GROUPINGS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+   <p className="executive-setting-caption">Semanas de segunda a domingo. Quinzenas: 1 a 15 e 16 ao fim do mês.</p>
    <p className="executive-setting-note">As alterações são aplicadas imediatamente e salvas neste navegador. Esc encerra a tela cheia.</p>
   </DashboardPopover>}
  </div>;
