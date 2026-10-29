@@ -122,3 +122,6 @@
  }
 }
 @media(max-height:660px){.executive-metric dt{min-height:20px}}
+.executive-tabs{flex-wrap:wrap;row-gap:3px}
+@media(max-width:1200px) and (min-width:761px){.executive-tabs{gap:3px 10px}.executive-tabs>button{font-size:11px;gap:5px}.executive-page-controls>span{margin-right:4px}}
+@media(max-width:760px){.executive-navigation{min-height:56px}.executive-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0 4px;width:100%}.executive-tabs>button{justify-content:center;min-height:26px;white-space:normal}.executive-tabs>button>span{white-space:normal;line-height:1.2}}

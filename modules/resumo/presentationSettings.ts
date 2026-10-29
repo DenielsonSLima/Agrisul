@@ -1,6 +1,7 @@
 export const DASHBOARD_SCENES=[
  {id:'dashboard-general',label:'Geral'},
  {id:'dashboard-production',label:'Produção e ATR'},
+ {id:'dashboard-financial',label:'Faturamento'},
  {id:'dashboard-suppliers',label:'Fornecedor'},
  {id:'dashboard-contracts',label:'Contrato'},
  {id:'dashboard-types',label:'Tipo'},

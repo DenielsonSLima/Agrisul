@@ -1,6 +1,6 @@
 import type {ExecutiveFinancialDay,ExecutiveFinancialPeriod,ExecutiveSummaryMonth,ExecutiveGrossVariation} from '../types';
 import type {FinancialGrouping} from '../financialGrouping';
-export type FinancialChartRow=ExecutiveGrossVariation&{key:string;endDate?:string;granularity:FinancialGrouping;loadCount:number;billingPending:boolean;grossAmount:string;netAmount:string;receivedAmount:string};
+export type FinancialChartRow=ExecutiveGrossVariation&{key:string;endDate?:string;granularity:FinancialGrouping;loadCount:number;billingPending:boolean;grossAmount:string;netAmount:string;receivedAmount:string;loadedVolume?:string};
 /** Format the percentage supplied by Postgres; no client-side variation math. */
 export function grossChangeLabel(row:ExecutiveGrossVariation){
  if(row.grossChangePercent===undefined)return 'A apurar';
