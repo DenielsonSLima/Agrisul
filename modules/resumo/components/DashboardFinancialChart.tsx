@@ -1,17 +1,15 @@
 'use client';
 import {useEffect,useId,useMemo,useRef,useState} from 'react';
 import {BarChart3,ChevronLeft,ChevronRight} from 'lucide-react';
-import {dateLabel,decimalLabel,moneyLabel,monthLabel} from '@/shared/utils/presentation';
+import {decimalLabel,moneyLabel} from '@/shared/utils/presentation';
 import type {ExecutiveFinancialDay,ExecutiveFinancialPeriod,ExecutiveSummaryData} from '../types';
 import {FINANCIAL_GROUPINGS,type FinancialGrouping} from '../financialGrouping';
 import {DASHBOARD_MONEY_MASK,useDashboardValues} from '../dashboardValues';
 import {financialChartCapacity,financialChartPage,financialChartRows,grossChangeLabel,type FinancialChartRow} from '../utils/financialChart';
+import {chartPeriodLabel as periodLabel,fullChartPeriod as fullPeriod} from '../utils/chartPeriod';
 
-type Props={data:ExecutiveSummaryData['months'];dailyData?:ExecutiveFinancialDay[];periodData?:ExecutiveFinancialPeriod[];grouping?:FinancialGrouping;compareVolume?:boolean;onSelectMonth?:(month:string)=>void;disabled?:boolean;presenting?:boolean;slideDurationMs?:number};
+type Props={data:ExecutiveSummaryData['months'];dailyData?:ExecutiveFinancialDay[];periodData?:ExecutiveFinancialPeriod[];grouping?:FinancialGrouping;compareVolume?:boolean;title?:string;onSelectMonth?:(month:string)=>void;disabled?:boolean;presenting?:boolean;slideDurationMs?:number};
 const compact=(value:number)=>new Intl.NumberFormat('pt-BR',{notation:'compact',maximumFractionDigits:1}).format(value);
-const shortDay=(value:string)=>value.slice(8,10)+'/'+value.slice(5,7);
-const periodLabel=(row:FinancialChartRow)=>row.granularity==='month'?monthLabel(row.key).slice(0,3)+'/'+row.key.slice(2,4):row.endDate?shortDay(row.key)+'–'+shortDay(row.endDate):shortDay(row.key);
-const fullPeriod=(row:FinancialChartRow)=>row.granularity==='month'?monthLabel(row.key):row.endDate?dateLabel(row.key)+' a '+dateLabel(row.endDate):dateLabel(row.key);
 type BarKey='grossAmount'|'netAmount'|'loadedVolume';
 const rawQuote=(row:FinancialChartRow,key:BarKey)=>key==='loadedVolume'?row.loadedVolume===undefined?'A apurar':`${decimalLabel(row.loadedVolume)} t`:row.billingPending?'A apurar':moneyLabel(row[key]);
 const coordinate=(value:string)=>Number.isFinite(Number(value))?Number(value):0;
@@ -24,7 +22,7 @@ function placeChangeBadge(x:number,lineY:number,width:number,height:number,frame
  return positions.find(point=>{const a=box(point);return avoid.every(b=>Math.min(a.right,b.right)-Math.max(a.left,b.left)<=0||Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)<=0);})??positions[0];
 }
 
-export function FinancialEvolution({data,dailyData,periodData,grouping='month',compareVolume=false,onSelectMonth,disabled,presenting=false,slideDurationMs=120000}:Props){
+export function FinancialEvolution({data,dailyData,periodData,grouping='month',compareVolume=false,title,onSelectMonth,disabled,presenting=false,slideDurationMs=120000}:Props){
  const {visible,money}=useDashboardValues(),quote=(row:FinancialChartRow,key:BarKey)=>key==='loadedVolume'||visible?rawQuote(row,key):DASHBOARD_MONEY_MASK;
  const secondary:BarKey=compareVolume?'loadedVolume':'netAmount';
  const id=useId(),plot=useRef<HTMLDivElement>(null),[size,setSize]=useState({width:0,height:0}),[navigation,setNavigation]=useState({signature:'',page:0}),[detailsOpen,setDetailsOpen]=useState(false);
@@ -36,8 +34,8 @@ export function FinancialEvolution({data,dailyData,periodData,grouping='month',c
  useEffect(()=>{const node=plot.current;if(!node)return;const observer=new ResizeObserver(entries=>{const box=entries[0]?.contentRect;if(box){const next={width:Math.round(box.width),height:Math.round(box.height)};setSize(previous=>previous.width===next.width&&previous.height===next.height?previous:next);}});observer.observe(node);return()=>observer.disconnect();},[]);
  useEffect(()=>{if(!presenting||pages<2)return;const timer=window.setTimeout(()=>setNavigation({signature,page:(page+1)%pages}),Math.max(8000,slideDurationMs/pages));return()=>window.clearTimeout(timer);},[presenting,pages,page,signature,slideDurationMs]);
  const select=(row:FinancialChartRow)=>{if(!disabled)onSelectMonth?.(row.key.slice(0,7));};
- return <section className="summary-panel summary-evolution dashboard-financial" aria-labelledby={id} data-chart-mode={compareVolume?'gross-volume':'financial'} data-financial-grouping={grouping} data-visible-periods={shown.length} data-total-periods={rows.length}>
-  <header className="summary-panel-heading"><div><span className="summary-kicker"><BarChart3 size={15}/>{compareVolume?'CARREGAMENTOS NO PERÍODO':'RESULTADOS FINANCEIROS'}</span><h3 id={id}>{compareVolume?'Bruto e volume carregado':'Entregas que viram receita'}</h3><p>{FINANCIAL_GROUPINGS.find(item=>item.id===grouping)?.label} · {compareVolume?'bruto (R$) e volume (t)':'bruto e líquido'} pela data do carregamento.</p></div></header>
+ return <section className="summary-panel summary-evolution dashboard-financial" aria-labelledby={id} data-chart-mode={compareVolume?'gross-volume':'financial'} data-chart-grouping={grouping} data-financial-grouping={grouping} data-visible-periods={shown.length} data-total-periods={rows.length}>
+  <header className="summary-panel-heading"><div><span className="summary-kicker"><BarChart3 size={15}/>{compareVolume?'CARREGAMENTOS NO PERÍODO':'RESULTADOS FINANCEIROS'}</span><h3 id={id}>{title??(compareVolume?'Bruto e volume carregado':'Entregas que viram receita')}</h3><p>{FINANCIAL_GROUPINGS.find(item=>item.id===grouping)?.label} · {compareVolume?'bruto (R$) e volume (t)':'bruto e líquido'} pela data do carregamento.</p></div></header>
   <div className="summary-chart-legend dashboard-financial-legend" aria-label="Legenda"><span><i className="gross"/>{compareVolume?'Bruto (R$)':'Bruto'}</span><span><i className="net"/>{compareVolume?'Volume (t)':'Líquido'}</span><span><i className="trend"/>Evolução do bruto · %{compareVolume?'':' entre períodos'}</span></div>
   <div ref={plot} className="summary-chart dashboard-financial-plot">
    {rows.length?size.width>0&&size.height>0&&<FinancialPlot compareVolume={compareVolume} rows={shown} width={size.width} height={size.height} onSelect={onSelectMonth&&!disabled?select:undefined}/>:<div className="summary-chart-empty"><span><BarChart3 size={25}/></span><strong>Nenhuma movimentação nesta seleção</strong><p>Ajuste os filtros para explorar outro recorte.</p></div>}
@@ -83,7 +81,7 @@ function FinancialPlot({rows,width,height,compareVolume,onSelect}:{rows:Financia
   {rows.map((row,index)=>{
    const single=rows.length===1&&!!row.grossChangeFrom;
    if(!knownGross(row)||index===0&&!single||index>0&&!knownGross(rows[index-1]))return null;
-   const previous=single?(row.granularity==='month'?monthLabel(row.grossChangeFrom!).slice(0,3)+'/'+row.grossChangeFrom!.slice(2,4):shortDay(row.grossChangeFrom!)):fullPeriod(rows[index-1]);
+   const previous=single?periodLabel({...row,key:row.grossChangeFrom!,endDate:undefined}):fullPeriod(rows[index-1]);
    const text=changeQuote(row)+(single?` vs ${previous}`:''),labelFont=compactHeight?9:preferredFont,labelWidth=Math.max(66,Math.min(slot*.8,text.length*labelFont*.62+20)),labelHeight=compactHeight?20:28;
    const lineX=single?centers[index]:(centers[index-1]+centers[index])/2,lineY=single?scale(coordinate(row.grossAmount)):(scale(coordinate(rows[index-1].grossAmount))+scale(coordinate(row.grossAmount)))/2;
    const {x,y}=placeChangeBadge(lineX,lineY,labelWidth,labelHeight,{left,right:width-right,top,bottom:height-bottom-3},labelBoxes);

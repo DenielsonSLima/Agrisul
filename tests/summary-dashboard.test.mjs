@@ -11,7 +11,7 @@ try{
  const calls=[];globalThis.__summaryRpc=async(...args)=>{calls.push(args);return {range:{from:'2025-09-18',to:'2026-09-17'}};};
  const servicePath=join(directory,'service.mjs');
  await build({entryPoints:['modules/resumo/services/summaryService.ts'],outfile:servicePath,bundle:true,platform:'node',format:'esm',plugins:[{name:'rpc-fixture',setup(builder){builder.onResolve({filter:/shared\/supabase\/rpc$/},()=>({path:'rpc',namespace:'fixture'}));builder.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:'export const rpcRequest=(...args)=>globalThis.__summaryRpc(...args);',loader:'js'}));}}]});
- const {fetchExecutiveSummary}=await import(pathToFileURL(servicePath).href),controller=new AbortController();
+ const {fetchExecutiveSummary,normalizeSummarySelection}=await import(pathToFileURL(servicePath).href),controller=new AbortController();
  await fetchExecutiveSummary('company-a','2025-09-18','2026-09-17',controller.signal);
  assert.deepEqual(calls,[['summary','dashboard',{companyId:'company-a',from:'2025-09-18',to:'2026-09-17'},controller.signal]]);
  globalThis.__summaryRpc=async(...args)=>{calls.push(args);return {filters:{companyId:'company-a',contractId:'contract-a',status:'Ativo'}};};
@@ -21,6 +21,64 @@ try{
  await assert.rejects(fetchExecutiveSummary('company-a','2025-09-18','2026-09-17',controller.signal,{contractId:'contract-a',status:'Ativo'}),/Não foi possível aplicar/);
  globalThis.__summaryRpc=async()=>({});
  await assert.rejects(fetchExecutiveSummary('company-a','2025-09-18','2026-09-17',controller.signal,{contractId:'contract-a',status:''}),/Não foi possível aplicar/);
+ const combinedSelection={contractId:'contract-a',status:'Ativo',partnerId:'partner-a',farmId:'farm-a',plotId:'plot-a'};
+ globalThis.__summaryRpc=async(...args)=>{calls.push(args);return {filters:{companyId:'company-a',...combinedSelection}};};
+ await fetchExecutiveSummary('company-a','2025-09-18','2026-09-17',controller.signal,combinedSelection);
+ assert.deepEqual(calls.at(-1),['summary','dashboard',{companyId:'company-a',from:'2025-09-18',to:'2026-09-17',...combinedSelection},controller.signal]);
+ for(const field of ['partnerId','farmId','plotId']){
+  const selection={contractId:'',status:'',...(field==='plotId'?{farmId:'farm-a'}:{}),[field]:combinedSelection[field]};
+  globalThis.__summaryRpc=async(...args)=>{calls.push(args);return {filters:{companyId:'company-a',...selection}};};
+  await fetchExecutiveSummary('company-a','2025-09-18','2026-09-17',controller.signal,selection);
+  assert.deepEqual(calls.at(-1)[2],{companyId:'company-a',from:'2025-09-18',to:'2026-09-17',...(field==='plotId'?{farmId:'farm-a'}:{}),[field]:selection[field]});
+  const missingField={companyId:'company-a',...selection};delete missingField[field];
+  for(const filters of [undefined,missingField,{companyId:'company-a',...selection,[field]:'different-id'},{companyId:'company-other',...selection}]){
+   globalThis.__summaryRpc=async()=>({filters});
+   await assert.rejects(fetchExecutiveSummary('company-a','2025-09-18','2026-09-17',controller.signal,selection),/Não foi possível aplicar/,`${field} must be echoed for the correct company`);
+  }
+ }
+ globalThis.__summaryRpc=async(...args)=>{calls.push(args);return {filters:{companyId:'company-a',contractId:'contract-a',status:'',partnerId:'',farmId:'farm-a',plotId:''}};};
+ await fetchExecutiveSummary('company-a','2025-09-18','2026-09-17',controller.signal,{contractId:'contract-a',status:'',farmId:'farm-a',plotId:''});
+ assert.deepEqual(calls.at(-1)[2],{companyId:'company-a',from:'2025-09-18',to:'2026-09-17',contractId:'contract-a',farmId:'farm-a'});
+ globalThis.__summaryRpc=async()=>({filters:{companyId:'company-a',contractId:'',status:'',partnerId:'partner-a',farmId:'farm-a',plotId:'plot-other'}});
+ await assert.rejects(fetchExecutiveSummary('company-a','2025-09-18','2026-09-17',controller.signal,{contractId:'',status:'',partnerId:'partner-a',farmId:'farm-a',plotId:''}),/Não foi possível aplicar/,'A farm-only selection must not silently become a plot selection');
+ const multiSelection={contractId:'',status:'Ativo',partnerIds:['partner-b','partner-a','partner-a'],contractIds:['contract-b','contract-a'],farmIds:['farm-b','farm-a','farm-b'],plotIds:['plot-z','plot-a','plot-z']};
+ const multiBefore=structuredClone(multiSelection),multiEcho={companyId:'company-a',contractId:'',status:'Ativo',partnerId:'',farmId:'',plotId:'',partnerIds:['partner-a','partner-b'],contractIds:['contract-a','contract-b'],farmIds:['farm-a','farm-b'],plotIds:['plot-a','plot-z']};
+ globalThis.__summaryRpc=async(...args)=>{calls.push(args);return {filters:multiEcho};};
+ await fetchExecutiveSummary('company-a','2025-09-18','2026-09-17',controller.signal,multiSelection);
+ assert.deepEqual(calls.at(-1)[2],{companyId:'company-a',from:'2025-09-18',to:'2026-09-17',status:'Ativo',partnerIds:multiEcho.partnerIds,contractIds:multiEcho.contractIds,farmIds:multiEcho.farmIds,plotIds:multiEcho.plotIds});
+ assert.deepEqual(multiSelection,multiBefore,'Canonicalizing selections must not mutate the applied state');
+ assert.deepEqual(normalizeSummarySelection({...multiSelection,partnerIds:['partner-a','partner-b']}),normalizeSummarySelection(multiSelection),'Equivalent multiselections have the same query parameters');
+ globalThis.__summaryRpc=async()=>({filters:{...multiEcho,partnerIds:['partner-b','partner-a','partner-a'],plotIds:['plot-z','plot-a']}});
+ await fetchExecutiveSummary('company-a','2025-09-18','2026-09-17',controller.signal,multiSelection);
+ for(const field of ['partnerIds','contractIds','farmIds','plotIds']){
+  for(const echo of [undefined,[],['different-id'],'wrong-type']){
+   globalThis.__summaryRpc=async()=>({filters:{...multiEcho,[field]:echo}});
+   await assert.rejects(fetchExecutiveSummary('company-a','2025-09-18','2026-09-17',controller.signal,multiSelection),/Não foi possível aplicar/,`${field} must confirm every selected ID`);
+  }
+ }
+ globalThis.__summaryRpc=async()=>({filters:{...multiEcho,companyId:'company-other'}});
+ await assert.rejects(fetchExecutiveSummary('company-a','2025-09-18','2026-09-17',controller.signal,multiSelection),/Não foi possível aplicar/);
+ globalThis.__summaryRpc=async(...args)=>{calls.push(args);return {};};
+ await fetchExecutiveSummary('company-a','2025-09-18','2026-09-17',controller.signal,{contractId:'',status:'',partnerIds:[],contractIds:[],farmIds:[],plotIds:[]});
+ assert.deepEqual(calls.at(-1)[2],{companyId:'company-a',from:'2025-09-18',to:'2026-09-17'},'Empty arrays restore the unfiltered RPC payload');
+ const mixedSelection={contractId:'contract-a',status:'',contractIds:['contract-b','contract-b']};
+ globalThis.__summaryRpc=async(...args)=>{calls.push(args);return {filters:{companyId:'company-a',contractId:'contract-a',status:'',contractIds:['contract-b','contract-a']}};};
+ await fetchExecutiveSummary('company-a','2025-09-18','2026-09-17',controller.signal,mixedSelection);
+ assert.deepEqual(calls.at(-1)[2],{companyId:'company-a',from:'2025-09-18',to:'2026-09-17',contractId:'contract-a',contractIds:['contract-b']},'Legacy scalar and multiselection are sent without dropping either');
+ globalThis.__summaryRpc=async()=>({filters:{companyId:'company-a',contractId:'contract-a',status:'',contractIds:['contract-b']}});
+ await assert.rejects(fetchExecutiveSummary('company-a','2025-09-18','2026-09-17',controller.signal,mixedSelection),/Não foi possível aplicar/,'Mixed input echo must include the legacy scalar in the effective set');
+ const legacyPlot={contractId:'',status:'',farmId:'farm-a',plotId:'plot-a',plotIds:['plot-b']};
+ globalThis.__summaryRpc=async()=>({filters:{companyId:'company-a',...legacyPlot,farmIds:[],plotIds:['plot-b','plot-a']}});
+ await fetchExecutiveSummary('company-a','2025-09-18','2026-09-17',controller.signal,legacyPlot);
+ globalThis.__summaryRpc=async()=>({filters:{companyId:'company-a',...legacyPlot,farmIds:['farm-a'],plotIds:['plot-b','plot-a']}});
+ await assert.rejects(fetchExecutiveSummary('company-a','2025-09-18','2026-09-17',controller.signal,legacyPlot),/Não foi possível aplicar/,'A legacy plot selection must not broaden into its entire farm');
+ const hookPath=join(directory,'hook.mjs');
+ await build({entryPoints:['modules/resumo/hooks/useSummary.ts'],outfile:hookPath,bundle:true,platform:'node',format:'esm',plugins:[{name:'query-fixture',setup(builder){builder.onResolve({filter:/shared\/query\/useBillingQuery$/},()=>({path:'query',namespace:'fixture'}));builder.onResolve({filter:/shared\/supabase\/rpc$/},()=>({path:'rpc',namespace:'fixture'}));builder.onLoad({filter:/.*/,namespace:'fixture'},args=>({contents:args.path==='query'?'export const useBillingQuery=(...args)=>globalThis.__summaryQuery(...args);':'export const rpcRequest=(...args)=>globalThis.__summaryRpc(...args);',loader:'js'}));}}]});
+ const {useExecutiveSummary}=await import(pathToFileURL(hookPath).href);globalThis.__summaryQuery=(resource,params,fetcher)=>({resource,params,fetcher});
+ const firstQuery=useExecutiveSummary('2025-09-18','2026-09-17',multiSelection),sameQuery=useExecutiveSummary('2025-09-18','2026-09-17',{...multiSelection,partnerIds:['partner-a','partner-b'],farmIds:['farm-a','farm-b']});
+ assert.deepEqual(firstQuery.params,sameQuery.params,'Selecting the same IDs in a different order reuses the cache');assert.ok(Object.values(firstQuery.params).every(value=>typeof value==='string'),'Cache parameters stay serializable strings');
+ const otherQuery=useExecutiveSummary('2025-09-18','2026-09-17',{...multiSelection,plotIds:['plot-other']});assert.notDeepEqual(otherQuery.params,firstQuery.params,'Different plots occupy independent cache entries');
+ globalThis.__summaryRpc=async(...args)=>{calls.push(args);return {filters:multiEcho};};await firstQuery.fetcher('company-a',controller.signal);assert.deepEqual(calls.at(-1)[2].partnerIds,['partner-a','partner-b']);
  for(const table of ['billing_contracts','billing_contract_loads','billing_contract_payments','billing_contract_discounts','billing_farms','billing_farm_plots','billing_planning_periods','billing_planning_allocations','billing_planning_harvest_targets','billing_planning_field_logs'])assert.ok(realtimeResources[table].includes('summary'),`${table} must refresh the executive summary`);
 
  const months=Array.from({length:25},(_,index)=>{const date=new Date(2024,8+index,1),month=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;return {month,loadCount:index+1,loadedVolume:String((index+1)*10),billingPending:index===24,pendingLoadCount:index===24?1:0,grossAmount:index===24?'':String((index+1)*1000),discountAmount:String((index+1)*10),netAmount:index===24?'':String((index+1)*990),advanceAmount:'0',receiptAmount:String(index*100),receivedAmount:String(index*100),pendingAmount:index===24?'':String(index*890),creditAmount:'0'};});
@@ -52,6 +110,7 @@ try{
  console.log('PASS: executive summary RPC client, Realtime dependencies, 365-day UI and complete multipage immutable PDF.');
 }finally{
  delete globalThis.__summaryRpc;
+ delete globalThis.__summaryQuery;
  if(!resolve(directory).startsWith(join(resolve(tmpdir()),'summary-dashboard-')))throw Error('Unsafe test cleanup path');
  await rm(directory,{recursive:true,force:true});
 }

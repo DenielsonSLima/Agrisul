@@ -2,12 +2,16 @@ export const DASHBOARD_SCENES=[
  {id:'dashboard-general',label:'Geral'},
  {id:'dashboard-production',label:'Produção e ATR'},
  {id:'dashboard-financial',label:'Faturamento'},
- {id:'dashboard-suppliers',label:'Fornecedor'},
+ {id:'dashboard-suppliers',label:'Clientes'},
  {id:'dashboard-contracts',label:'Contrato'},
  {id:'dashboard-types',label:'Tipo'},
  {id:'dashboard-news',label:'Notícias'},
 ] as const;
-export const PRESENTATION_INTERVALS=[1,2,5,10] as const;
+// Keep values in minutes to preserve existing browser preferences.
+export const PRESENTATION_INTERVALS=[10/60,20/60,30/60,1,2,5,10] as const;
+export function formatPresentationInterval(minutes:number){
+ return minutes<1?Math.round(minutes*60)+' segundos':minutes+' '+(minutes===1?'minuto':'minutos');
+}
 export type DashboardSceneId=typeof DASHBOARD_SCENES[number]['id'];
 export type PresentationMinutes=typeof PRESENTATION_INTERVALS[number];
 export type PresentationMinutesByScene=Record<DashboardSceneId,PresentationMinutes>;

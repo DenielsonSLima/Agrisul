@@ -38,8 +38,19 @@ Novos lançamentos usam `requestId` para impedir duplicação em reenvios simult
 
 O cache `['billing', userId, 'contracts', ...]` é cancelado antes das mutations e invalidado com espera após a gravação. Eventos Realtime de pagamentos, descontos, carregamentos e cotações atualizam os indicadores por nova consulta.
 
+## ATR e vínculos dos PDFs
+
+`import-documents/pending-loads` retorna as partes de cada origem, seus pesos líquidos e o ATR salvo na importação. No vínculo, `atrMode` aceita `pending`, `source`, `general` ou `parts`. O modo `source` usa exclusivamente as medições internas salvas no documento e vem selecionado quando elas existem. O modo `general` recebe `atr`; o modo `parts` recebe `atrParts` com `entryId` e `atr` de cada parte da origem selecionada. `atr-preview` calcula no Postgres a média ponderada pelos pesos originais e retorna `complete: false` enquanto faltarem medições. O navegador apenas apresenta essa prévia.
+
+`link-load` recalcula a mesma média na transação, grava o ATR com até seis casas e preserva as entradas individuais em `billing_import_load_links.atr_input`. Reenvios do mesmo vínculo retornam o carregamento existente sem alterar seu ATR. A média geral refere-se à origem selecionada; outras origens do conjunto mantêm seus próprios vínculos.
+
+Alterações no ATR interno recalculam vínculos `source` de contratos ativos e completam vínculos antigos que ainda aguardavam ATR. Médias ou partes informadas explicitamente no contrato são preservadas. Editar o ATR de um carregamento vinculado transforma essa medição em média manual. Atualizar um ATR interno que altere valores vinculados exige também `contracts.write`; a transação mantém origem e média consistentes.
+
+As projeções de carregamentos incluem `imported`. Para esses registros, `unlink-load` exige contrato/empresa e `expectedUpdatedAt`, aplica as mesmas regras de exclusão de carregamentos e retorna somente a origem escolhida à fila. O carregamento e os ATRs desse vínculo são removidos; o PDF continua finalizado. A confirmação informa esse efeito antes da operação. Mutations aguardam a atualização dos caches de importações, contratos e seus indicadores.
+
 ## Verificação
 
 - `npm test`: inclui `supabase/tests/contract_finance.sql` e `supabase/tests/contract_closure_refunds.sql`, executados em Postgres local via PGlite.
+- `tests/import-load-atr-unlink-rpc.test.mjs`: média ponderada, exatidão, validação das partes, reenvio, remoção de vínculo, isolamento e retorno à fila.
 - `tests/contract-finance-supabase-live.test.mjs`: requer `BILLING_RUN_LIVE_TESTS=1` e a configuração MCP do projeto `ykounjabfsrtkzostbbz`; usa e remove duas contas temporárias.
 - Com `BILLING_BROWSER_CDP`, a mesma verificação testa os formulários no servidor local e salva capturas em `.sites-runtime/finance`.

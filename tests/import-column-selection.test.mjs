@@ -53,6 +53,8 @@ const fixture=await import(fixtureUrl);
 const compile=(value,jsx=false)=>ts.transpileModule(value,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022,jsx:jsx?ts.JsxEmit.ReactJSX:undefined}}).outputText;
 const presentationUrl=dataUrl(compile(readFileSync(new URL('../modules/importacoes/utils/presentation.ts',import.meta.url),'utf8')).replace(/from ['"]@\/shared\/utils\/presentation['"]/g,`from ${JSON.stringify(fixtureUrl)}`));
 const tableFile=readFileSync(new URL('../modules/importacoes/components/ImportacoesPage.tsx',import.meta.url),'utf8');
+const internalAtrSource=tableFile.match(/^const INTERNAL_ATR_FIELD:ImportField=.*$/m)?.[0];
+assert.ok(internalAtrSource);
 const tableStart=tableFile.indexOf('function ImportDayTable('),tableEnd=tableFile.indexOf('\nfunction EntryEditor(',tableStart);
 assert.ok(tableStart>=0&&tableEnd>tableStart);
 const tableSource=`import {useState,useRef,useMounted,useImportMutations,useConfirmation,notifications,message,dateLabel,Field,CalendarDays,Pencil,Loader2,Check,Trash2,FileText,Settings2,EntrySourceNotes,ImportColumnFilter,ImportEditableCell} from ${JSON.stringify(fixtureUrl)};
@@ -60,6 +62,7 @@ import {resolveColumnType,visibleImportSelection,toggleVisibleImportSelection} f
 import {MAIN_IMPORT_COLUMNS,mainImportFields,importFieldLabel,importCount,importGroupDecoration} from ${JSON.stringify(presentationUrl)};
 import {importValueFields} from ${JSON.stringify(dataUrl(compile(readFileSync(new URL('../modules/importacoes/utils/equipmentFields.ts',import.meta.url),'utf8'))))};
 const typeLabel={text:'Texto',decimal:'Número',date:'Data'},entrySequenceHelp='Entradas por conjunto';
+${internalAtrSource}
 export ${tableFile.slice(tableStart,tableEnd)}`;
 const jsxUrl=pathToFileURL(createRequire(import.meta.url).resolve('react/jsx-runtime')).href;
 const {ImportDayTable}=await import(dataUrl(compile(tableSource,true).replace(/from ['"]react\/jsx-runtime['"]/g,`from ${JSON.stringify(jsxUrl)}`)));

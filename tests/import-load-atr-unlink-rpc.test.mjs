@@ -1,0 +1,75 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createCaneWeighingDb} from '../supabase/tests/helpers/cane-weighing-db.mjs';
+
+test('PDF links calculate ATR from exact source parts and unlink only the selected imported origin',async()=>{
+ const {db,ids,setActor}=await createCaneWeighingDb();
+ const rpc=async(resource,action,payload={})=>(await db.query('select public.billing_rpc($1,$2,$3::jsonb) result',[resource,action,JSON.stringify(payload)])).rows[0].result;
+ const docs=(action,payload)=>rpc('import-documents',action,payload);
+ const deny=(fn,code)=>assert.rejects(fn,error=>error.code===code);
+ try{
+  await db.exec('RESET ROLE');
+  const farm=(await db.query("INSERT INTO public.billing_farms(owner_id,name,area_ha,city,state) VALUES($1,'ATR origem',100,'Capela','SE') RETURNING id",[ids.owner])).rows[0].id;
+  const type=(await db.query("INSERT INTO public.billing_contract_types(owner_id,name,stages) VALUES($1,'MANUAL','[]') RETURNING id",[ids.owner])).rows[0].id;
+  const contract=(await db.query("INSERT INTO public.billing_contracts(owner_id,title,company_id,client_id,type_id,type_name,stages,status,start_date,contracted_volume) VALUES($1,'ATR por parte',$2,$3,$4,'MANUAL','[]','Ativo','2026-10-01',1000) RETURNING id",[ids.owner,ids.company,ids.partner,type])).rows[0].id;
+  await setActor();
+  const scope={companyId:ids.company,contractId:contract};
+  const field=(key,column,type='text')=>({key,column,type,label:key,source:'manual',sourceKey:'',required:false,defaultValue:'',mappings:{},pattern:''});
+  const profile=(await rpc('import-profiles','save',{name:'ATR por partes',clientId:ids.partner,parser:'taquari-equipment-v1',sheetName:'Plan1',startRow:2,fields:[field('COD_ENTRADA','L'),field('COD_TIPOCOLHEITA','K'),field('COD_FAZENDA','F'),field('COD_TALHAO','H'),field('PESOBRUTO','AA','decimal'),field('TARA','AB','decimal')]})).profile;
+  const row=(seq,plot,gross)=>({date:'2026-10-29',source:{entrada:'1156',sequencia:String(seq),numeroAnalise:String(500+seq),dataMovimento:'2026-10-29'},values:{COD_ENTRADA:'1156',COD_TIPOCOLHEITA:'1',COD_FAZENDA:'5030',COD_TALHAO:plot,PESOBRUTO:gross,TARA:'1'},sourcePage:1,sourceLine:'ATR teste'});
+  let doc=(await docs('import',{profileId:profile.id,clientId:ids.partner,sourceName:'atr.pdf',sourceHash:'e'.repeat(64),entries:[row(1,'1','21'),row(2,'1','11'),row(3,'4','6')]})).document;
+  doc=(await docs('finalize',{id:doc.id,expectedUpdatedAt:doc.updatedAt})).document;
+  let queue=(await docs('pending-loads',scope)).loads;
+  const origin=queue.find(q=>q.plotCode==='1'),other=queue.find(q=>q.plotCode==='4');
+  assert.deepEqual(origin.parts.map(p=>p.volume),['20','10']);assert.equal(other.parts.length,1);
+  assert.match(origin.parts[0].label,/501/);assert.equal(origin.groupVolume,'35');
+  const request={...scope,id:doc.id,tripKey:origin.tripKey,expectedUpdatedAt:doc.updatedAt};
+  const parts={atrMode:'parts',atr:'',atrParts:origin.parts.map((p,i)=>({entryId:p.entryId,atr:i?'160':'100'}))};
+  const preview=await docs('atr-preview',{...request,...parts});
+  assert.equal(preview.average,'120');assert.equal(preview.complete,true,'Average is weighted by tonnes, not the arithmetic mean of 130');
+  const incomplete={...parts,atrParts:[parts.atrParts[0]]};
+  assert.equal((await docs('atr-preview',{...request,...incomplete})).average,null);
+  await deny(()=>docs('link-load',{...request,...incomplete,farmId:farm,plotId:''}),'22023');
+  for(const atr of ['0','-1','1e2','1.1234567','NaN']){
+   await deny(()=>docs('atr-preview',{...request,atrMode:'general',atr,atrParts:[]}),'22023');
+  }
+  assert.equal((await docs('atr-preview',{...request,atrMode:'general',atr:'143,470001',atrParts:[]})).average,'143.470001');
+  await deny(()=>docs('atr-preview',{...request,...parts,atrParts:[parts.atrParts[0],parts.atrParts[0]]}),'22023');
+  await deny(()=>docs('atr-preview',{...request,...parts,atrParts:[...parts.atrParts,{entryId:other.parts[0].entryId,atr:'100'}]}),'22023');
+  await deny(()=>docs('atr-preview',{...request,...parts,atrParts:[{...parts.atrParts[0],volume:'900'}]}),'22023');
+  await deny(()=>docs('atr-preview',{...request,...parts,ownerId:ids.otherOwner}),'22023');
+  await deny(()=>docs('atr-preview',{...request,...parts,expectedUpdatedAt:'2000-01-01'}),'40001');
+  const linked=await docs('link-load',{...request,...parts,farmId:farm,plotId:''});
+  assert.equal(linked.load.atr,'120');assert.equal(linked.load.volume,'30');assert.equal(linked.load.imported,true);
+  const repeated=await docs('link-load',{...request,atrMode:'general',atr:'999',atrParts:[],farmId:farm,plotId:''});
+  assert.equal(repeated.created,false);assert.equal(repeated.load.atr,'120','Retry never changes the recorded average');
+  await db.exec('RESET ROLE');
+  const stored=(await db.query('SELECT atr_input FROM public.billing_import_load_links WHERE load_id=$1',[linked.load.id])).rows[0].atr_input;
+  assert.equal(stored.average,'120');assert.equal(stored.parts.length,2);await setActor();
+  const second=await docs('link-load',{...request,tripKey:other.tripKey,farmId:farm,plotId:'',atrMode:'general',atr:'150,25',atrParts:[]});
+  assert.equal(second.load.atr,'150.25');
+  const manual=(await rpc('contracts','save-load',{...scope,loadedAt:'2026-10-29',farmId:farm,plotId:'',volume:'2',atr:'140',document:'Manual',notes:''})).load;
+  assert.equal(manual.imported,false);
+  const listing=await rpc('contracts','list',{...scope,view:'loads',search:'',from:'',to:'',groupBy:'month'});
+  assert.equal(listing.groups.flatMap(g=>g.loads).find(l=>l.id===linked.load.id).imported,true);
+  assert.equal(listing.groups.flatMap(g=>g.loads).find(l=>l.id===manual.id).imported,false);
+  const unlink={...scope,loadId:linked.load.id,expectedUpdatedAt:linked.load.updatedAt};
+  await deny(()=>docs('unlink-load',{...unlink,loadId:manual.id,expectedUpdatedAt:manual.updatedAt}),'P0002');
+  await deny(()=>docs('unlink-load',{...unlink,expectedUpdatedAt:'2000-01-01'}),'40001');
+  await deny(()=>docs('unlink-load',{...unlink,companyId:ids.siblingCompany}),'P0002');
+  await deny(()=>db.query("UPDATE public.billing_import_load_links SET atr_input='{}' WHERE load_id=$1",[linked.load.id]),'42501');
+  await setActor(ids.reader);await deny(()=>docs('unlink-load',unlink),'42501');
+  await setActor(ids.otherOwner);await deny(()=>docs('unlink-load',unlink),'P0002');
+  await setActor(null);await deny(()=>docs('unlink-load',unlink),'28000');await setActor();
+  await db.exec('RESET ROLE');await db.query("UPDATE public.billing_contracts SET status='Concluído' WHERE id=$1",[contract]);await setActor();
+  await deny(()=>docs('unlink-load',unlink),'22023');
+  await db.exec('RESET ROLE');await db.query("UPDATE public.billing_contracts SET status='Ativo' WHERE id=$1",[contract]);await setActor();
+  assert.equal((await docs('unlink-load',unlink)).unlinked,true);
+  queue=(await docs('pending-loads',scope)).loads;assert.equal(queue.length,1);assert.equal(queue[0].tripKey,origin.tripKey);assert.equal(queue[0].groupVolume,'35');
+  const detail=(await rpc('contracts','get',{companyId:ids.company,id:contract})).contract;
+  assert.equal(detail.loadedVolume,'7','Only selected origin is removed; manual and other imported origins remain');
+  assert.ok(detail.loads.some(l=>l.id===second.load.id));assert.ok(detail.loads.some(l=>l.id===manual.id));
+  await deny(()=>docs('unlink-load',unlink),'P0002');
+  const pending=await docs('link-load',{...request,farmId:farm,plotId:''});assert.equal(pending.load.atr,'','Existing callers may still link with pending ATR');
+ }finally{await db.close();}
+});

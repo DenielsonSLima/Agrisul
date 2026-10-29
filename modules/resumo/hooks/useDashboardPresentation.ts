@@ -49,7 +49,7 @@ export function useDashboardPresentation(rootRef:RefObject<HTMLElement|null>){
  },[rootRef]);
  useEffect(()=>{
   if(!presenting||paused)return;
-  const timer=setTimeout(()=>setScene(value=>(value+1)%DASHBOARD_SCENES.length),minutes*60000);
+  const timer=setTimeout(()=>setScene(value=>(value+1)%DASHBOARD_SCENES.length),Math.round(minutes*60000));
   return()=>clearTimeout(timer);
  },[presenting,paused,minutes,scene,settingsKey]);
  async function enterFullscreen(){
@@ -71,7 +71,7 @@ export function useDashboardPresentation(rootRef:RefObject<HTMLElement|null>){
   if(isDashboardSceneIndex(index))setScene(index);
  }
  function saveSettings(next:PresentationMinutesByScene|null){
-  if(!next){setSettingsFailure({key:settingsKey,message:'Escolha 1, 2, 5 ou 10 minutos para cada aba.'});return false;}
+  if(!next){setSettingsFailure({key:settingsKey,message:'Escolha 10, 20 ou 30 segundos, ou 1, 2, 5 ou 10 minutos para cada aba.'});return false;}
   if(!settingsKey){setSettingsFailure({key:null,message:'Entre para salvar as preferências da apresentação.'});return false;}
   const raw=serializePresentationSettings(next);let persisted=true;
   try{window.localStorage.setItem(settingsKey,raw);fallbackSettings.delete(settingsKey);setSettingsFailure({key:settingsKey,message:''});}

@@ -1,0 +1,15 @@
+import {Field} from '@/shared/components/Common';
+import {formatAtr} from '../../utils/contractFormat';
+import type {ImportedAtrInput,ImportedLoadPart} from '../../hooks/useImportedLoads';
+
+const volume=new Intl.NumberFormat('pt-BR',{minimumFractionDigits:3,maximumFractionDigits:3});
+export function ImportedLoadAtrFields({parts,value,onChange,preview}:{parts:ImportedLoadPart[];value:ImportedAtrInput;onChange:(value:ImportedAtrInput)=>void;preview:{average:string|null|undefined;complete:boolean;loading:boolean;error:string}}){
+ return <section className="imported-load-atr" aria-label="ATR da origem">
+  <Field label="Como deseja informar o ATR?"><select aria-label="Modo de ATR" value={value.atrMode} onChange={event=>onChange({atrMode:event.target.value as ImportedAtrInput['atrMode'],atr:'',atrParts:event.target.value==='parts'?parts.map(part=>({entryId:part.entryId,atr:part.atr??''})):[]})}><option value="source">Usar ATR salvo na importação</option><option value="pending">Deixar pendente</option><option value="general">Informar média geral</option><option value="parts">Informar por parte da viagem</option></select></Field>
+  {value.atrMode==='source'&&<><p className="field-help">ATRs das partes já salvos em Importações. A média usa o peso líquido de cada parte desta origem.</p><div className="imported-load-atr-parts">{parts.map(part=><Field key={part.entryId} label={part.label+' · '+(part.volume===null?'peso pendente':volume.format(Number(part.volume))+' t')}><input readOnly aria-label={'ATR importado '+part.label} value={part.atr?formatAtr(part.atr)+' kg/t':'Pendente'}/></Field>)}</div></>}
+  {value.atrMode==='general'&&<Field label="ATR médio desta origem (kg/t)"><input name="atr" aria-label="ATR médio desta origem (kg/t)" required inputMode="decimal" maxLength={18} placeholder="Ex.: 143,47" value={value.atr} onChange={event=>onChange({...value,atr:event.target.value})}/></Field>}
+  {value.atrMode==='parts'&&<><p className="field-help">Informe o ATR de cada parte desta origem. A média é ponderada pelo peso líquido de cada parte.</p><div className="imported-load-atr-parts">{parts.map(part=><Field key={part.entryId} label={part.label+' · '+(part.volume===null?'peso pendente':volume.format(Number(part.volume))+' t')}><input aria-label={'ATR '+part.label} data-atr-entry={part.entryId} required inputMode="decimal" maxLength={18} placeholder="ATR (kg/t)" value={value.atrParts.find(item=>item.entryId===part.entryId)?.atr??''} onChange={event=>onChange({...value,atrParts:parts.map(item=>({entryId:item.entryId,atr:item.entryId===part.entryId?event.target.value:value.atrParts.find(v=>v.entryId===item.entryId)?.atr??''}))})}/></Field>)}</div></>}
+  {value.atrMode==='pending'?<p className="field-help">O vínculo pode ser salvo agora. Informe o ATR depois para calcular o faturamento.</p>:<p className="imported-load-atr-average" aria-live="polite" role="status">ATR médio desta origem: <strong>{preview.loading?'Calculando…':preview.complete?formatAtr(preview.average??'')+' kg/t':'Preencha todos os valores'}</strong></p>}
+  {preview.error&&<p role="alert" className="form-error">{preview.error}</p>}
+ </section>;
+}

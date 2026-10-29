@@ -66,6 +66,21 @@ try{
  assert.ok(realtimeResources.billing_import_load_links.includes('summary'));
  assert.ok(realtimeResources.billing_contract_loads.includes('import-documents'));
 
+ // The pending PDF queue embeds farm/plot code matches. Registry edits must
+ // recompute those matches through RPC, including when Realtime is unavailable.
+ // Keep queues for every contract of the actor fresh without affecting another
+ // account or treating a registry event as a replacement candidate payload.
+ const aOtherImports=key('owner-a','import-documents',{view:'pending-loads',contractId:'contract-two'});
+ for(const resources of [mutationResources('farms'),mutationResources('plots'),realtimeResources.billing_farms,realtimeResources.billing_farm_plots]){
+  for(const queryKey of [aImports,aOtherImports,bImports,aCompanies])client.setQueryData(queryKey,{saved:true});
+  for(const resource of resources)await client.invalidateQueries({queryKey:billingKeys.resource('owner-a',resource),refetchType:'none'});
+  assert.equal(client.getQueryState(aImports).isInvalidated,true);
+  assert.equal(client.getQueryState(aOtherImports).isInvalidated,true);
+  assert.equal(client.getQueryState(bImports).isInvalidated,false);
+  assert.equal(client.getQueryState(aCompanies).isInvalidated,false);
+  assert.deepEqual(client.getQueryData(aImports),{saved:true});
+ }
+
  // ATR quotations feed contract billing. The mutation fallback must update
  // contract projections without touching another signed-in account.
  for(const queryKey of [aContracts,bContracts])client.setQueryData(queryKey,{saved:true});

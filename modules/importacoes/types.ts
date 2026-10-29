@@ -15,6 +15,7 @@ export interface ImportEntry {
   id: string; date: string; values: Record<string,string>; source: Record<string,string>; sourcePage: number;
   sourceLine: string; reviewed: boolean;
   groupKey?: string | null; groupOrdinal?: number | null;
+  atr?: string;
 }
 export interface ImportDocument {
   id: string; clientId: string; clientName: string; profileId: string; profileSnapshot: ImportProfile;
@@ -30,6 +31,7 @@ export interface ImportEntryInput {
   id: string; entryId?: string; date: string; values: Record<string,string>; reviewed: boolean; expectedUpdatedAt: string;
 }
 export interface ImportRevisionInput { id: string; expectedUpdatedAt: string }
+export interface ImportAtrInput extends ImportRevisionInput {entries:Array<{entryId:string;atr:string}>}
 export interface ImportNumberGroupsInput extends ImportRevisionInput { start?: string; anchorEntryId?: string }
 export interface ImportBulkInput extends ImportRevisionInput { entryIds: string[]; fieldKey?: string; fieldKeys?: string[]; value: string }
 export interface ImportColumnTypeInput extends ImportRevisionInput { fieldKey?: string; fieldKeys?: string[]; type: ImportField['type'] }

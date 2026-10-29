@@ -36,6 +36,33 @@ test('partial source failure does not discard other publishers or retain full ar
  const feed=createNewsFeed({now:()=>at,fetchImpl:async url=>{if(url===NEWS_SOURCES[1].url)throw Error('offline');const provider=NEWS_SOURCES.find(source=>source.url===url);return new Response(rss(provider));}});
  const result=await feed();assert.ok(result.articles.length);assert.equal(result.sources[1].status,'unavailable');assert.equal(result.sources[0].status,'current');assert.equal('content' in result.articles[0],false);
 });
+
+test('a source ignoring cancellation cannot block the shared feed or its next attempt',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ let stalled=true,bodyStalled=false;
+ const signals=[];
+ const feed=createNewsFeed({now:()=>at,fetchImpl:async(url,options)=>{
+  const provider=NEWS_SOURCES.find(source=>source.url===url);
+  if(provider.id===source.id){
+   signals.push(options.signal);
+   if(stalled)return new Promise(()=>{});
+   if(bodyStalled)return new Response(new ReadableStream({start(){}}));
+  }
+  return new Response(rss(provider));
+ }});
+ try{
+  const first=feed();await new Promise(setImmediate);t.mock.timers.tick(6000);
+  const partial=await first;
+  assert.equal(partial.sources[0].status,'unavailable');assert.ok(partial.articles.length);
+  assert.equal(signals[0].aborted,true);
+  stalled=false;bodyStalled=true;
+  const second=feed();await new Promise(setImmediate);t.mock.timers.tick(6000);
+  assert.equal((await second).sources[0].status,'unavailable');
+  bodyStalled=false;
+  const recovered=await feed();assert.equal(recovered.sources[0].status,'current');
+  assert.ok(recovered.articles.some(article=>article.sourceId===source.id));
+ }finally{t.mock.timers.reset();}
+});
 test('specialist headlines remain available when general feeds publish more recent stories',async()=>{
  const feed=createNewsFeed({now:()=>at,fetchImpl:async url=>{const provider=NEWS_SOURCES.find(source=>source.url===url),cane=provider.cane;const items=Array.from({length:cane?10:40},(_,index)=>`<item><title>${cane?'Cana especializada':'Soja '+provider.id} ${index}</title><link>https://${provider.domain}/${index}</link><pubDate>${new Date(at-(cane?3600000:0)-index*1000).toUTCString()}</pubDate></item>`).join('');return new Response('<rss><channel>'+items+'</channel></rss>');}});
  const result=await feed();assert.equal(result.articles.length,24);assert.equal(result.articles.filter(article=>article.sourceId==='jornalcana').length,10);assert.equal(new Set(result.articles.map(article=>article.id)).size,24);

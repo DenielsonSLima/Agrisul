@@ -10,11 +10,16 @@ export type SummaryData = {month: string; totals: {
 }; contracts: SummaryContract[]};
 
 export type SummaryRange = {from:string;to:string;dayCount:number;generatedAt:string};
-export type SummarySelection = {contractId:string;status:string};
+export type SummarySelection = {
+ contractId:string;status:string;partnerId?:string;farmId?:string;plotId?:string;
+ partnerIds?:string[];contractIds?:string[];farmIds?:string[];plotIds?:string[];
+};
 export type SummaryFilters = SummarySelection & {from:string;to:string};
 export type SummaryFilterOptions = {
- contracts:{id:string;clientName:string;contractNumber:string;title:string;status:string}[];
+ contracts:{id:string;clientId?:string;clientName:string;contractNumber:string;title:string;status:string}[];
  statuses:string[];
+ partners?:{id:string;name:string}[];
+ farms?:{id:string;name:string;plots:{id:string;name:string}[]}[];
 };
 
 export type ExecutiveFinancialMetrics = {
@@ -54,6 +59,7 @@ export type ExecutiveOperationalTotals = {
 };
 
 export type ExecutiveMonthlyOperation = ExecutiveOperationalTotals & {month:string};
+export type ExecutiveOperationalPeriod = ExecutiveOperationalTotals & {date:string;endDate:string};
 
 export type ExecutiveFarmPerformance = {
  id:string;name:string;areaHa:string;loadCount:number;loadedVolume:string;averageAtr:string;
@@ -89,13 +95,16 @@ export type ExecutivePlanningSummary = {
 };
 
 export type ExecutiveSummaryData = {
+ contractComparison?:ExecutiveContractComparison;
  averageGrossPricePerTon?:string;
  dailyProductivity?:{productionDayCount:number;averageLoadedVolume:string;averageNetAmount:string;billingPending:boolean;pendingLoadCount:number};
  financialTimeline?:ExecutiveFinancialDay[];
  financialGroupings?:{week:ExecutiveFinancialPeriod[];fortnight:ExecutiveFinancialPeriod[]};
+ operationalTimeline?:ExecutiveOperationalPeriod[];
+ operationalGroupings?:{week:ExecutiveOperationalPeriod[];fortnight:ExecutiveOperationalPeriod[]};
  dimensions?:{partners:ExecutiveDimension[];contractTypes:ExecutiveDimension[]};
  harvestMethods?:{code:'1'|'2'|'unknown';label:string;loadCount:number;loadedVolume:string}[];
- filters?:SummarySelection & {companyId:string;contractLabel:string};
+ filters?:SummarySelection & {companyId:string;contractLabel:string;partnerLabel?:string;farmLabel?:string;plotLabel?:string};
  filterOptions?:SummaryFilterOptions;
  range:SummaryRange;totals:ExecutiveSummaryTotals;comparison:ExecutiveSummaryComparison;
  months:ExecutiveSummaryMonth[];contractStatus:{status:string;count:number}[];
@@ -114,4 +123,20 @@ export type ExecutiveSummarySnapshot = {data:ExecutiveSummaryData;companyId:stri
 export type ExecutiveDimension = {
  id:string;name:string;contractCount:number;loadCount:number;loadedVolume:string;averageAtr:string;
  netAmount:string;receivedAmount:string;pendingAmount:string;billingPending:boolean;sharePercent:string;
+};
+
+export type ExecutiveContractComparisonCode='1'|'2'|'unknown';
+export type ExecutiveContractComparisonStats={
+ loadedVolume:string;averageAtr:string;loadCount:number;contractCount:number;
+};
+export type ExecutiveContractComparisonType=ExecutiveContractComparisonStats&{
+ code:ExecutiveContractComparisonCode;label:string;sharePercent:string;
+};
+export type ExecutiveContractComparisonClient={
+ id:string;name:string;overall:ExecutiveContractComparisonStats;types:ExecutiveContractComparisonType[];
+};
+export type ExecutiveContractComparison={
+ overall:ExecutiveContractComparisonStats;types:ExecutiveContractComparisonType[];
+ clients:ExecutiveContractComparisonClient[];
+ contracts:{id:string;clientId:string;typeCode:ExecutiveContractComparisonCode;typeName:string}[];
 };

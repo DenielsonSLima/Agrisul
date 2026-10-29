@@ -1,0 +1,77 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createCaneWeighingDb} from '../supabase/tests/helpers/cane-weighing-db.mjs';
+
+test('internal ATR survives import/review, stays out of Excel and supplies linked averages without depending on operational codes',async()=>{
+ const {db,ids,setActor}=await createCaneWeighingDb();
+ const rpc=async(resource,action,payload={})=>(await db.query('select public.billing_rpc($1,$2,$3::jsonb) result',[resource,action,JSON.stringify(payload)])).rows[0].result;
+ const docs=(action,payload)=>rpc('import-documents',action,payload),deny=(fn,code)=>assert.rejects(fn,e=>e.code===code);
+ const field=(key,column,type='text',sourceKey='',required=false)=>({key,column,type,sourceKey,source:sourceKey?'pdf':'manual',label:key,required,defaultValue:'',mappings:{},pattern:''});
+ try{
+  const fields=[field('COD_ENTRADA','A'),field('COD_TIPOCOLHEITA','B'),field('COD_FAZENDA','C','text','',true),field('COD_TALHAO','D'),field('PESOBRUTO','E','decimal','pesoBrutoConvencional'),field('TARA','F','decimal','taraConvencional')];
+  const profile=(await rpc('import-profiles','save',{name:'ATR interno USJP',clientId:ids.partner,parser:'pinheiro-usjp-v1',sheetName:'Plan1',startRow:2,fields})).profile;
+  const row=(ba,time,weight,atr)=>({date:'2026-10-29',source:{periodoInicio:'2026-10-28T06:00',periodoFim:'2026-10-29T05:59',dataHoraBA:'2026-10-28T'+time,dataHoraTara:'2026-10-28T'+(time==='08:00'?'09:00':'11:00'),numeroAnalise:ba,fazendaOrigem:'311273',fazendaNome:'VARZEA',pesoAnalisado:weight,atr},values:{COD_ENTRADA:'',COD_TIPOCOLHEITA:'9',COD_FAZENDA:'',COD_TALHAO:'',PESOBRUTO:'',TARA:''},sourcePage:1,sourceLine:'Análise original '+ba});
+  const input={profileId:profile.id,clientId:ids.partner,sourceName:'atr-interno.pdf',sourceHash:'f'.repeat(64),entries:[row('945572','08:00','20','100.123456'),row('945573','08:00','10','160'),row('945574','10:00','5','')]};
+  let doc=(await docs('import',input)).document;
+  assert.deepEqual(doc.entries.map(e=>e.atr),['100.123456','160','']);
+  const before=doc.entries.map(e=>({values:e.values,source:e.source,reviewed:e.reviewed,groupKey:e.groupKey}));
+  const save=async entries=>(await docs('save-atrs',{id:doc.id,expectedUpdatedAt:doc.updatedAt,entries})).document;
+  doc=(await docs('finalize',{id:doc.id,expectedUpdatedAt:doc.updatedAt})).document;
+  assert.equal(doc.status,'finished');assert.ok(doc.pendingCount>0);
+  doc=await save([{entryId:doc.entries[0].id,atr:'110,000001'},{entryId:doc.entries[1].id,atr:'170'},{entryId:doc.entries[2].id,atr:'75'}]);
+  assert.equal(doc.status,'finished');assert.deepEqual(doc.entries.map(e=>({values:e.values,source:e.source,reviewed:e.reviewed,groupKey:e.groupKey})),before,'Missing farm/plot and wrong K are preserved for later review');
+  const table=await docs('table',{id:doc.id});assert.equal(table.entries[0].atr,'110.000001');
+  const exported=await docs('export',{id:doc.id});
+  assert.equal(exported.columns.length,6);assert.ok(exported.columns.every(c=>!['atr','$atr','ATR'].includes(c.key)));
+  assert.deepEqual(Object.keys(exported.rows[0].values).sort(),['A','B','C','D','E','F']);
+  const filtered=await docs('export-filtered',{id:doc.id,expectedUpdatedAt:doc.updatedAt});
+  assert.deepEqual(filtered.columns,exported.columns);assert.deepEqual(filtered.rows,exported.rows);
+  await deny(()=>docs('save-atrs',{id:doc.id,expectedUpdatedAt:'2000-01-01',entries:[{entryId:doc.entries[0].id,atr:'150'}]}),'40001');
+  for(const atr of ['0','-1','1.1234567','1e2','9999999999','NaN']){
+   await deny(()=>save([{entryId:doc.entries[0].id,atr}]),'22023');
+  }
+  await deny(()=>save([{entryId:doc.entries[0].id,atr:'150'},{entryId:doc.entries[0].id,atr:'151'}]),'22023');
+  await deny(()=>save([{entryId:ids.otherPartner,atr:'150'}]),'P0002');
+  await deny(()=>docs('save-atrs',{id:doc.id,expectedUpdatedAt:doc.updatedAt,ownerId:ids.otherOwner,entries:[]}),'22023');
+  await deny(()=>db.query('UPDATE public.billing_import_entries SET atr=500 WHERE id=$1',[doc.entries[0].id]),'42501');
+  await setActor(ids.reader);await deny(()=>docs('save-atrs',{id:doc.id,expectedUpdatedAt:doc.updatedAt,entries:[{entryId:doc.entries[0].id,atr:'150'}]}),'42501');
+  await setActor(ids.otherOwner);await deny(()=>docs('save-atrs',{id:doc.id,expectedUpdatedAt:doc.updatedAt,entries:[{entryId:doc.entries[0].id,atr:'150'}]}),'P0002');
+  await setActor(null);await deny(()=>docs('save-atrs',{}),'28000');await setActor();
+  doc=(await docs('reopen',{id:doc.id,expectedUpdatedAt:doc.updatedAt})).document;
+  doc=(await docs('save-bulk',{id:doc.id,entryIds:doc.entries.map(e=>e.id),fieldKey:'COD_TIPOCOLHEITA',value:'1',expectedUpdatedAt:doc.updatedAt})).document;
+  assert.equal(doc.entries[0].atr,'110.000001','Ordinary edits do not overwrite internal ATR with original source evidence');
+  doc=(await docs('finalize',{id:doc.id,expectedUpdatedAt:doc.updatedAt})).document;
+  await db.exec('RESET ROLE');
+  const farm=(await db.query("INSERT INTO public.billing_farms(owner_id,name,area_ha,city,state) VALUES($1,'Origem ATR',100,'Capela','SE') RETURNING id",[ids.owner])).rows[0].id;
+  const type=(await db.query("INSERT INTO public.billing_contract_types(owner_id,name,stages) VALUES($1,'MANUAL','[]') RETURNING id",[ids.owner])).rows[0].id;
+  const contract=(await db.query("INSERT INTO public.billing_contracts(owner_id,title,company_id,client_id,type_id,type_name,stages,status,start_date,contracted_volume) VALUES($1,'ATR importado',$2,$3,$4,'MANUAL','[]','Ativo','2026-10-01',1000) RETURNING id",[ids.owner,ids.company,ids.partner,type])).rows[0].id;
+  await setActor();
+  const scope={companyId:ids.company,contractId:contract},queue=(await docs('pending-loads',scope)).loads;
+  const trip=queue.find(e=>e.parts.length===2),other=queue.find(e=>e.parts.length===1);
+  assert.equal(trip.parts[0].atr,'110.000001');
+  const request={...scope,id:doc.id,expectedUpdatedAt:doc.updatedAt,tripKey:trip.tripKey};
+  const preview=await docs('atr-preview',{...request,atrMode:'source',atr:'',atrParts:[]});
+  assert.equal(preview.average,'130.000001');
+  await deny(()=>docs('atr-preview',{...request,atrMode:'source',atr:'999',atrParts:[]}),'22023');
+  const first=(await docs('link-load',{...request,farmId:farm,plotId:'',atrMode:'source',atr:'',atrParts:[]})).load;
+  const manual=(await docs('link-load',{...request,tripKey:other.tripKey,farmId:farm,plotId:'',atrMode:'general',atr:'200',atrParts:[]})).load;
+  await db.exec('RESET ROLE');
+  await db.query("UPDATE public.billing_access_profiles SET permissions=ARRAY['registrations.read','registrations.write','contracts.read'] WHERE id=$1",[ids.readerProfile]);
+  await setActor(ids.reader);
+  await deny(()=>docs('save-atrs',{id:doc.id,expectedUpdatedAt:doc.updatedAt,entries:[{entryId:doc.entries[0].id,atr:'500'}]}),'42501');
+  assert.equal((await docs('get',{id:doc.id})).document.entries[0].atr,'110.000001','A registrations-only writer cannot change a linked financial average; its source write rolls back');
+  await setActor();
+  doc=await save([{entryId:doc.entries[0].id,atr:'120'},{entryId:doc.entries[1].id,atr:'180'},{entryId:doc.entries[2].id,atr:'80'}]);
+  let loads=(await rpc('contracts','get',{companyId:ids.company,id:contract})).contract.loads;
+  assert.equal(loads.find(l=>l.id===first.id).atr,'140');
+  assert.equal(loads.find(l=>l.id===manual.id).atr,'200','Explicit contract average remains authoritative');
+  doc=await save([{entryId:doc.entries[0].id,atr:''}]);
+  loads=(await rpc('contracts','get',{companyId:ids.company,id:contract})).contract.loads;
+  assert.equal(loads.find(l=>l.id===first.id).atr,'','Never calculate a partial imported average');
+  await rpc('contracts','save-load',{...scope,id:first.id,loadedAt:first.loadedAt,farmId:farm,plotId:'',volume:first.volume,atr:'199',document:first.document,notes:first.notes});
+  doc=await save([{entryId:doc.entries[0].id,atr:'300'}]);
+  loads=(await rpc('contracts','get',{companyId:ids.company,id:contract})).contract.loads;
+  assert.equal(loads.find(l=>l.id===first.id).atr,'199','Editing the contract ATR explicitly stops automatic source updates');
+  assert.equal((await docs('import',input)).created,false,'Same PDF remains idempotent');
+ }finally{await db.close();}
+});

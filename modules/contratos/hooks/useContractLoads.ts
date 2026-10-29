@@ -6,7 +6,7 @@ import type {ContractLoadFilters} from '../types';
 export const defaultLoadFilters:ContractLoadFilters={search:'',from:'',to:'',groupBy:'month'};
 export function useContractLoads(contractId:string,filters:ContractLoadFilters,enabled=true){
  const {activeCompanyId}=useWorkspaceCompany();
- // Refresh snapshots created before filtered financial KPIs were available.
- return useCadastroQuery('contracts',{view:'loads',snapshotVersion:3,contractId,companyId:activeCompanyId,...filters},
+ // Include import-link metadata used to return a source origin to pending.
+ return useCadastroQuery('contracts',{view:'loads',snapshotVersion:4,contractId,companyId:activeCompanyId,...filters},
   signal=>fetchContractLoads(contractId,activeCompanyId,filters,signal),enabled&&!!activeCompanyId);
 }

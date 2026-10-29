@@ -196,3 +196,17 @@ test('blank cells keep explicit template column formats beyond the original rows
  assert.equal(actual.getCell('A2').type,ExcelJS.ValueType.String);assert.equal(actual.getCell('A2').value,'000123');
  assert.equal(actual.getCell('B2').type,ExcelJS.ValueType.Number);assert.equal(actual.getCell('C2').type,ExcelJS.ValueType.Date);
 });
+test('internal entry ATR and original analytical evidence never add an Excel column',async()=>{
+ const bytes=await createImportWorkbook({
+  document:{sourceName:'ATR interno.pdf',entries:[{id:'one',atr:'143.47',source:{atr:'141.25'}}],profileSnapshot:{}},
+  sheetName:'Plan1',startRow:2,
+  columns:[{key:'COD_ENTRADA',column:'A',type:'text',label:'Entrada'},{key:'COD_FAZENDA',column:'B',type:'text',label:'Fazenda'}],
+  rows:[{entryId:'one',values:{A:'1155',B:'5030'}}],
+ });
+ const workbook=new ExcelJS.Workbook();await workbook.xlsx.load(bytes.buffer);
+ const sheet=workbook.getWorksheet('Plan1');
+ assert.equal(sheet.columnCount,2);assert.equal(sheet.getCell('C1').value,null);assert.equal(sheet.getCell('C2').value,null);
+ assert.equal(sheet.getCell('A2').value,'1155');assert.equal(sheet.getCell('B2').value,'5030');
+ const values=[];sheet.eachRow(row=>row.eachCell(cell=>values.push(cell.value)));
+ assert.ok(!values.some(value=>String(value).includes('143.47')||String(value).includes('141.25')));
+});

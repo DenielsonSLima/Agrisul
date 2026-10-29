@@ -73,7 +73,7 @@ test('table retains prior results only for the same account and PDF and exposes 
  state.user={id:'owner-one'};state.queryFetching=true;state.queryPlaceholder=true;
  const view=useImportTable('pdf-one',{columnFilters:{COD_TALHAO:['8']}});
  const options=state.queryOptions;const previous={entries:[{id:'row-one'}]};
- assert.deepEqual(options.queryKey,['billing','owner-one','import-documents',{view:'table',id:'pdf-one',columnFilters:{COD_TALHAO:['8']}}]);
+ assert.deepEqual(options.queryKey,['billing','owner-one','import-documents',{view:'table',snapshotVersion:2,id:'pdf-one',columnFilters:{COD_TALHAO:['8']}}]);
  assert.equal(options.placeholderData(previous,{queryKey:['billing','owner-one','import-documents',{view:'table',id:'pdf-one'}]}),previous);
  assert.equal(options.placeholderData(previous,{queryKey:['billing','other-owner','import-documents',{view:'table',id:'pdf-one'}]}),undefined);
  assert.equal(options.placeholderData(previous,{queryKey:['billing','owner-one','import-documents',{view:'table',id:'other-pdf'}]}),undefined);

@@ -67,7 +67,7 @@ async function limitedText(response){
  return new TextDecoder().decode(bytes);
 }
 
-export function createNewsFeed({fetchImpl=globalThis.fetch,now=Date.now}={}){
+export function createNewsFeed({fetchImpl=(...args)=>globalThis.fetch(...args),now=Date.now}={}){
  const cache=new Map(),pending=new Map();
  function sourceFeed(source){
   const saved=cache.get(source.id);
@@ -75,13 +75,23 @@ export function createNewsFeed({fetchImpl=globalThis.fetch,now=Date.now}={}){
   if(saved&&now()-saved.at<NEWS_REFRESH_SECONDS*1000)return Promise.resolve(result(saved.articles,'current',saved.at));
   if(pending.has(source.id))return pending.get(source.id);
   const task=Promise.resolve().then(async()=>{
+   const controller=new AbortController();let timer;
    try{
-    const response=await fetchImpl(source.url,{headers:{Accept:'application/rss+xml, application/xml, text/xml','User-Agent':'AgrisulDashboard/1.0 RSS reader'},signal:AbortSignal.timeout(6000)});
-    if(!response.ok||response.url&&!safeNewsUrl(response.url,source.domain))throw Error('Feed indisponível.');
-    const articles=parseNewsRss(await limitedText(response),source,now());if(!articles.length)throw Error('Feed sem notícias válidas.');
+    // Some development fetch wrappers do not settle when their signal aborts.
+    // Release the shared pending entry even if transport or body reading stalls.
+    const deadline=new Promise((_,reject)=>{timer=setTimeout(()=>{
+     const error=new Error('Tempo de consulta da fonte esgotado.');controller.abort(error);reject(error);
+    },6000);});
+    const articles=await Promise.race([deadline,(async()=>{
+     const response=await fetchImpl(source.url,{cache:'no-store',headers:{Accept:'application/rss+xml, application/xml, text/xml','User-Agent':'AgrisulDashboard/1.0 RSS reader'},signal:controller.signal});
+     controller.signal.throwIfAborted();
+     if(!response.ok||response.url&&!safeNewsUrl(response.url,source.domain))throw Error('Feed indisponível.');
+     const articles=parseNewsRss(await limitedText(response),source,now());if(!articles.length)throw Error('Feed sem notícias válidas.');
+     return articles;
+    })()]);
     const at=now();cache.set(source.id,{articles,at});return result(articles,'current',at);
    }catch{return saved&&now()-saved.at<=MAX_CACHE_AGE?result(saved.articles,'cached',saved.at):result([],'unavailable',null);}
-   finally{pending.delete(source.id);}
+   finally{clearTimeout(timer);pending.delete(source.id);}
   });
   pending.set(source.id,task);return task;
  }

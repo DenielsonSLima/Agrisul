@@ -1,7 +1,7 @@
 'use client';
-import {useState,useSyncExternalStore,type ReactNode} from 'react';
+import {useEffect,useState,useSyncExternalStore,type CSSProperties,type ReactNode} from 'react';
 import {ArrowUpRight,ChevronLeft,ChevronRight,Layers3,Leaf,Target} from 'lucide-react';
-import {Bar,CartesianGrid,Cell,ComposedChart,LabelList,Pie,PieChart,ResponsiveContainer,Tooltip,XAxis,YAxis} from 'recharts';
+import {Bar,CartesianGrid,ComposedChart,LabelList,ResponsiveContainer,Tooltip,XAxis,YAxis} from 'recharts';
 import {ModuleLink} from '@/shared/navigation/ModuleNavigation';
 import {decimalLabel} from '@/shared/utils/presentation';
 import {useDashboardValues} from '../dashboardValues';
@@ -24,13 +24,40 @@ export function DashboardPanel({eyebrow,title,subtitle,children,actions,classNam
  return <section className={`executive-panel ${className}`}><header className="executive-panel-header"><div><span className="executive-panel-eyebrow">{eyebrow}</span><h3>{title}</h3>{subtitle&&<p>{subtitle}</p>}</div>{actions}</header>{children}</section>;
 }
 
-export function DashboardBars({rows,title,eyebrow='VOLUME CARREGADO',subtitle,showValues=false}:{rows:{id:string;name:string;loadedVolume:string}[];title:string;eyebrow?:string;subtitle?:string;showValues?:boolean}){
- const {ref,size:plotSize}=usePlotSize(),nameWidth=showValues?Math.max(80,Math.min(145,plotSize.width*.28)):145;
- const [page,setPage]=useState(0),size=4,pages=Math.max(1,Math.ceil(rows.length/size)),current=Math.min(page,pages-1),shown=rows.slice(current*size,(current+1)*size);
+export function DashboardBars({rows,title,eyebrow='VOLUME CARREGADO',subtitle,showValues=false,showAtr=false,minRowHeight=0,presenting=false,slideDurationMs=120000}:{rows:{id:string;name:string;loadedVolume:string;averageAtr?:string}[];title:string;eyebrow?:string;subtitle?:string;showValues?:boolean;showAtr?:boolean;minRowHeight?:number;presenting?:boolean;slideDurationMs?:number}){
+ const measured=showValues||showAtr||minRowHeight>0;
+ const {ref,size:plotSize}=usePlotSize(),nameWidth=measured?Math.max(80,Math.min(145,plotSize.width*.25)):145,atrWidth=showAtr?Math.min(115,plotSize.width*.3):0;
+ const [page,setPage]=useState(0),size=minRowHeight>0&&plotSize.height>0?Math.max(1,Math.min(4,Math.floor((plotSize.height-48)/minRowHeight))):4,pages=Math.max(1,Math.ceil(rows.length/size)),current=Math.min(page,pages-1),shown=rows.slice(current*size,(current+1)*size);
+ useEffect(()=>{
+  if(!presenting||pages<2)return;
+  const timer=window.setTimeout(()=>setPage((current+1)%pages),Math.max(1000,slideDurationMs/pages));
+  return()=>window.clearTimeout(timer);
+ },[presenting,pages,current,slideDurationMs]);
  return <DashboardPanel title={title} eyebrow={eyebrow} subtitle={subtitle} actions={pages>1?<PageControls page={current} pages={pages} onChange={setPage} label={title}/>:undefined}>
-  {shown.some(row=>Number(row.loadedVolume)>0)?<div ref={showValues?ref:undefined} className="executive-bar-plot" role="img" aria-label={shown.map(row=>`${row.name}: ${decimalLabel(row.loadedVolume)} t`).join('. ')}><ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={geometry}><ComposedChart data={shown.map(row=>({...row,volume:Number(row.loadedVolume),shortName:row.name.length>26?row.name.slice(0,24)+'…':row.name}))} layout="vertical" margin={{left:0,right:24,top:16,bottom:4}}><CartesianGrid horizontal={false} stroke="#e9eeeb" strokeDasharray="3 4"/><XAxis type="number" tickFormatter={compact} axisLine={false} tickLine={false} tick={{fill:'#819087',fontSize:11}}/><YAxis dataKey="shortName" type="category" width={nameWidth} axisLine={false} tickLine={false} tick={{fill:'#53665b',fontSize:11}}/><Tooltip cursor={{fill:'#f4f8f5'}} formatter={value=>[`${decimalLabel(String(value))} t`,'Volume']} labelFormatter={(_label,payload)=>payload?.[0]?.payload?.name??''} contentStyle={{borderRadius:10,border:'1px solid #e3eae5',fontSize:12}}/><Bar dataKey="volume" fill="#287e5a" radius={[0,5,5,0]} maxBarSize={28} isAnimationActive={false}>{showValues&&<LabelList dataKey="loadedVolume" content={props=><VolumeBarLabel {...props} chartWidth={plotSize.width}/>}/>}</Bar></ComposedChart></ResponsiveContainer></div>:<DashboardEmpty text="Nenhum carregamento neste recorte" detail="Os valores aparecem quando as cargas são vinculadas aos contratos."/>}
-  <div className="executive-card-caption"><span>Toneladas líquidas · período selecionado</span><span>{rows.length} {rows.length===1?'registro':'registros'}</span></div>
+  {shown.some(row=>Number(row.loadedVolume)>0)?<div ref={measured?ref:undefined} className="executive-bar-plot" role="img" aria-label={shown.map(row=>`${row.name}: ${decimalLabel(row.loadedVolume)} t${showAtr?`; ${farmAtrLabel(row.averageAtr)}`:''}`).join('. ')}>
+   <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={geometry}>
+    <ComposedChart data={shown.map(row=>({...row,volume:Number(row.loadedVolume),shortName:row.name.length>26?row.name.slice(0,24)+'…':row.name}))} layout="vertical" margin={{left:0,right:24+atrWidth,top:16,bottom:4}}>
+     <CartesianGrid horizontal={false} stroke="#e9eeeb" strokeDasharray="3 4"/>
+     <XAxis type="number" tickFormatter={compact} axisLine={false} tickLine={false} tick={{fill:'#819087',fontSize:11}}/>
+     <YAxis dataKey="shortName" type="category" width={nameWidth} axisLine={false} tickLine={false} tick={{fill:'#53665b',fontSize:11}}/>
+     <Tooltip cursor={{fill:'#f4f8f5'}} formatter={(value,_name,item)=>[`${decimalLabel(String(value))} t${showAtr?` · ${farmAtrLabel(item.payload?.averageAtr)}`:''}`,'Volume']} labelFormatter={(_label,payload)=>payload?.[0]?.payload?.name??''} contentStyle={{borderRadius:10,border:'1px solid #e3eae5',fontSize:12}}/>
+     <Bar dataKey="volume" fill="#287e5a" radius={[0,5,5,0]} maxBarSize={28} isAnimationActive={false}>
+      {showValues&&<LabelList dataKey="loadedVolume" content={props=><VolumeBarLabel {...props} chartWidth={plotSize.width-atrWidth}/>}/>}
+      {showAtr&&<LabelList dataKey="averageAtr" content={props=><FarmAtrLabel {...props} chartWidth={plotSize.width} columnWidth={atrWidth}/>}/>}
+     </Bar>
+    </ComposedChart>
+   </ResponsiveContainer>
+  </div>:<DashboardEmpty text={pages>1&&rows.some(row=>Number(row.loadedVolume)>0)?'Sem carregamentos nesta página':'Nenhum carregamento neste recorte'} detail={pages>1?'Navegue pelas páginas para consultar os outros registros.':'Os valores aparecem quando as cargas são vinculadas aos contratos.'}/>}
+  <div className="executive-card-caption"><span>{showAtr?'Toneladas líquidas · ATR ponderado (kg/t)':'Toneladas líquidas · período selecionado'}</span><span>{rows.length} {rows.length===1?'registro':'registros'}</span></div>
  </DashboardPanel>;
+}
+
+const farmAtrLabel=(value:unknown)=>value===undefined||value===null||value===''?'ATR a apurar':`ATR ${decimalLabel(String(value))} kg/t`;
+function FarmAtrLabel({y,height,value,chartWidth,columnWidth}:{y?:number|string;height?:number|string;value?:unknown;chartWidth:number;columnWidth:number}){
+ if(chartWidth<=0||columnWidth<=0)return null;
+ const text=farmAtrLabel(value),left=chartWidth-columnWidth+6,top=Number(y??0)+Number(height??0)/2,width=Math.max(1,columnWidth-8);
+ const font=Math.min(chartWidth>=450?11:10,(width-10)/(text.length*.59));
+ return <g data-farm-atr="true"><title>{text}</title><rect x={left} y={top-12} width={width} height={24} rx={5} fill="#fff4e4"/><text x={left+width/2} y={top} dy=".35em" textAnchor="middle" fill="#99611b" fontSize={font} fontWeight={600}>{text}</text></g>;
 }
 
 function VolumeBarLabel({x,y,width,height,value,chartWidth}:{x?:number|string;y?:number|string;width?:number|string;height?:number|string;value?:unknown;chartWidth:number}){
@@ -51,10 +78,14 @@ export function DashboardDimensionList({rows,title}:{rows:ExecutiveDimension[];t
 }
 
 export function DashboardHarvest({data}:{data:ExecutiveSummaryData}){
- const methods=data.harvestMethods??[],hasVolume=methods.some(item=>Number(item.loadedVolume)>0);
+ const methods=data.harvestMethods??[];
+ const columns=[{code:'1',label:'Manual'},{code:'2',label:'Mecanizada'},{code:'unknown',label:'Não informado'}];
  return <DashboardPanel eyebrow="MODALIDADE DA COLHEITA" title="Manual e mecanizada" subtitle="Classificação registrada nos carregamentos.">
-  <div className="executive-harvest-plot"><div className="executive-donut"><ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={geometry}><PieChart><Pie data={hasVolume?methods.map(row=>({...row,value:Number(row.loadedVolume)})):[{code:'empty',value:1}]} dataKey="value" nameKey="label" innerRadius="72%" outerRadius="94%" paddingAngle={hasVolume?3:0} stroke="none" isAnimationActive={false}>{(hasVolume?methods:[{code:'empty'}]).map((row,index)=><Cell key={row.code} fill={hasVolume?palette[index%palette.length]:'#edf1ef'}/>)}</Pie>{hasVolume&&<Tooltip formatter={value=>[`${decimalLabel(String(value))} t`,'Volume']} contentStyle={{borderRadius:10,fontSize:12}}/>}</PieChart></ResponsiveContainer><div className="executive-donut-center"><small>Volume no período</small><strong>{decimalLabel(data.totals.loadedVolume)}</strong><span>toneladas</span></div></div></div>
-  <dl className="executive-harvest-legend">{methods.map((row,index)=><div key={row.code}><dt><i style={{background:palette[index%palette.length]}}/>{row.label}</dt><dd>{decimalLabel(row.loadedVolume)} <small>t</small><span>{row.loadCount} carga(s)</span></dd></div>)}</dl>
+  <dl className="executive-harvest-columns">{columns.map((column,index)=>{
+   const row=methods.find(method=>method.code===column.code),volume=row?decimalLabel(row.loadedVolume):'—';
+   return <div key={column.code} style={{'--harvest-color':palette[index],'--harvest-value-width':Math.max(1,volume.length*.62)} as CSSProperties}><dt><i/>{column.label}</dt><dd><strong>{volume}</strong><small>toneladas</small><span>{row?`${row.loadCount} carga(s)`:'Sem classificação disponível'}</span></dd></div>;
+  })}</dl>
+  <p className="executive-harvest-total"><span>Volume no período</span><strong>{decimalLabel(data.totals.loadedVolume)} <small>t</small></strong></p>
  </DashboardPanel>;
 }
 
