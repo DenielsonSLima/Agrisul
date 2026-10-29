@@ -92,7 +92,7 @@ try{
  const {doc,fileName}=await createSummaryPdf(snapshot,{company:null,header:{variant:'compact',logoAlignment:'left',showCnpj:true,showContact:true},watermark:{imageUrl:null,opacity:15,size:60},issuer:{id:'user',name:'Teste',email:''},issuedAt:new Date('2026-09-17T12:00:00Z')});
  assert.equal(fileName,'resumo-gerencial-2024-09-01-a-2026-09-30.pdf');assert.ok(doc.getNumberOfPages()>=7,'Long series and tables must paginate');
  const commands=doc.internal.pages.slice(1).flat().join('\n');assert.ok(commands.includes('DASH-41'),'Final contract must reach the PDF');assert.ok(commands.includes('Cliente final do painel'));assert.ok(commands.includes('Safra PDF'));assert.ok(commands.includes('Talhão PDF'));assert.ok(commands.includes('Meses com carregamentos'));assert.deepEqual(snapshot,before,'PDF generation must not mutate its snapshot');
- const source=await readFile('modules/resumo/components/ResumoPage.tsx','utf8'),operationsSource=await readFile('modules/resumo/components/SummaryOperational.tsx','utf8');assert.match(source,/defaultRange/);assert.doesNotMatch(source,/Exportar PDF completo/);assert.match(source,/Ocultar valores financeiros/);assert.match(source,/365 dias por padrão/);assert.match(operationsSource,/filter\(row=>row\.loadCount>0\|\|Number\(row\.loadedVolume\)>0\)/);
+ const source=await readFile('modules/resumo/components/ResumoPage.tsx','utf8'),operationsSource=await readFile('modules/resumo/components/SummaryOperational.tsx','utf8');assert.match(source,/defaultRange/);assert.doesNotMatch(source,/Exportar PDF completo/);assert.match(source,/Ocultar valores financeiros/);assert.match(source,/DASHBOARD_DEFAULT_PERIODS/);assert.match(operationsSource,/filter\(row=>row\.loadCount>0\|\|Number\(row\.loadedVolume\)>0\)/);
  const filtered=structuredClone(snapshot);filtered.data.filters={companyId:'company-a',contractId:'contract-a',contractLabel:'TEST-A · Cliente filtro',status:'Ativo'};
  const filteredBefore=structuredClone(filtered),filteredPdf=await createSummaryPdf(filtered,{company:null,header:{variant:'compact',logoAlignment:'left',showCnpj:true,showContact:true},watermark:{imageUrl:null,opacity:15,size:60},issuer:{id:'user',name:'Teste',email:''},issuedAt:new Date('2026-09-17T12:00:00Z')});
  assert.equal(filteredPdf.fileName,'resumo-gerencial-2024-09-01-a-2026-09-30-filtrado.pdf');
@@ -107,7 +107,7 @@ try{
  assert.deepEqual(monthRange('2026-09',applied),{...applied,to:'2026-09-30'});assert.deepEqual(monthRange('2026-10',applied),{...applied,from:'2026-10-01'});
  assert.equal(monthRange('2026-11',applied),null);assert.equal(monthRange('2026-13',applied),null);assert.equal(rangeDays({from:'2026-09-01',to:'2026-09-01'}),1);
  assert.equal(validRange({from:'2026-10-01',to:'2026-09-01'}),false);assert.equal(validRange({from:'2020-01-01',to:'2026-01-01'}),false);assert.equal(validRange({from:'2026-09-01',to:'2026-09-30'}),true);assert.equal(validRange({from:'2026-02-30',to:'2026-03-02'}),false);
- console.log('PASS: executive summary RPC client, Realtime dependencies, 365-day UI and complete multipage immutable PDF.');
+ console.log('PASS: executive summary RPC client, Realtime dependencies, configurable default-period UI and complete multipage immutable PDF.');
 }finally{
  delete globalThis.__summaryRpc;
  delete globalThis.__summaryQuery;

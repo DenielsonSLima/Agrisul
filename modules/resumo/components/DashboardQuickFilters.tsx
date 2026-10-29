@@ -5,6 +5,7 @@ import {Building2,CalendarDays,Check,ChevronDown,ChevronRight,FileText,MapPin,Se
 import {defaultRange,validRange} from '../filters';
 import type {SummaryFilters,SummaryFilterOptions} from '../types';
 import {DashboardPopover} from './DashboardControls';
+import {useDashboardValues} from '../dashboardValues';
 
 export type QuickFilterMenu='partner'|'contract'|'origin'|null;
 type Selection={partnerIds:string[];contractIds:string[];farmIds:string[];plotIds:string[]};
@@ -21,6 +22,7 @@ function FilterCheckbox({checked,partial=false,onChange,children,label}:{checked
 }
 
 export function DashboardQuickFilters({filters,options,onChange,onOpen,open,onMenuChange}:{filters:SummaryFilters;options?:SummaryFilterOptions;onChange:(filters:SummaryFilters)=>void;onOpen:()=>void;open:QuickFilterMenu;onMenuChange:(value:QuickFilterMenu)=>void}){
+ const {defaultPeriod}=useDashboardValues();
  const [search,setSearch]=useState(''),[expanded,setExpanded]=useState<string[]>([]);
  const [collapsedSearch,setCollapsedSearch]=useState<string[]>([]);
  const [draft,setDraft]=useState<Selection>(()=>selectionOf(filters));
@@ -73,7 +75,7 @@ export function DashboardQuickFilters({filters,options,onChange,onOpen,open,onMe
  const partnerLabel=selected.partnerIds.length===1?partners.find(item=>item.id===selected.partnerIds[0])?.name||'1 cliente':selected.partnerIds.length?`${selected.partnerIds.length} clientes`:'Cliente';
  const contractLabel=selected.contractIds.length===1?(()=>{const item=contracts.find(item=>item.id===selected.contractIds[0]);return item?contractName(item):'1 contrato';})():selected.contractIds.length?`${selected.contractIds.length} contratos`:'Contrato';
  const originLabel=selected.farmIds.length+selected.plotIds.length===1?(selected.farmIds.length?farms.find(item=>item.id===selected.farmIds[0])?.name||'1 fazenda':(()=>{const farm=farms.find(item=>item.plots.some(plot=>plot.id===selected.plotIds[0]));return farm?`${farm.name} · ${farm.plots.find(plot=>plot.id===selected.plotIds[0])?.name}`:'1 talhão';})()):[selected.farmIds.length?`${selected.farmIds.length} fazendas`:'',selected.plotIds.length?`${selected.plotIds.length} talhões`:''].filter(Boolean).join(' · ')||'Fazenda / talhão';
- const datesChanged=dates.from!==filters.from||dates.to!==filters.to,datesValid=validRange(dates),defaults=defaultRange();
+ const datesChanged=dates.from!==filters.from||dates.to!==filters.to,datesValid=validRange(dates),defaults=defaultRange(defaultPeriod);
  const filtered=!!(selected.partnerIds.length||selected.contractIds.length||selected.farmIds.length||selected.plotIds.length||filters.status||filters.from!==defaults.from||filters.to!==defaults.to);
  return <div className="dashboard-quick-filters" aria-label="Filtros rápidos do Dashboard">
   <form className="dashboard-period-filter" onSubmit={event=>{event.preventDefault();if(datesValid&&datesChanged)onChange({...filters,...dates});}}>
@@ -124,6 +126,6 @@ export function DashboardQuickFilters({filters,options,onChange,onOpen,open,onMe
     </div>{footer}
    </DashboardPopover>}
   </div>
-  {(filtered||datesChanged)&&<button type="button" className="dashboard-clear-filters" aria-label="Limpar filtros" onClick={()=>{setDates(defaultRange());onChange(defaultRange());close();}} title="Limpar filtros e restaurar o período padrão"><X size={12}/><span>Limpar</span></button>}
+  {(filtered||datesChanged)&&<button type="button" className="dashboard-clear-filters" aria-label="Limpar filtros" onClick={()=>{const cleared=defaultRange(defaultPeriod);setDates(cleared);onChange(cleared);close();}} title="Limpar filtros e restaurar o período padrão"><X size={12}/><span>Limpar</span></button>}
  </div>;
 }

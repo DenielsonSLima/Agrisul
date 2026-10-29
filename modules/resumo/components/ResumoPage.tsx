@@ -12,8 +12,10 @@ import {useDashboardAtr} from '@/modules/dashboard-news/useDashboardAtr';
 import {useExecutiveSummary} from '../hooks/useSummary';
 import {DASHBOARD_SCENES,useDashboardPresentation} from '../hooks/useDashboardPresentation';
 import {useDashboardSceneTransition} from '../hooks/useDashboardSceneTransition';
+import {useDashboardFilters} from '../hooks/useDashboardFilters';
+import {DASHBOARD_DEFAULT_PERIODS} from '../defaultPeriod';
 import {defaultRange,shiftDay,validRange} from '../filters';
-import type {ExecutiveSummaryData,SummaryFilters} from '../types';
+import type {ExecutiveSummaryData} from '../types';
 import {DashboardValuesProvider,useDashboardValues} from '../dashboardValues';
 import {FinancialComposition,FinancialEvolution,OperationalEvolution} from './SummaryCharts';
 import {DashboardAnalysis,DashboardBars,DashboardHarvest} from './DashboardVisuals';
@@ -25,12 +27,12 @@ import {DashboardQuickFilters,type QuickFilterMenu} from './DashboardQuickFilter
 export function ResumoPage(){const workspace=useWorkspaceCompany(),{user}=useAuth();return <DashboardValuesProvider key={user?.id} userId={user?.id}><SummaryDashboard key={workspace.activeCompanyId}/></DashboardValuesProvider>;}
 
 function SummaryDashboard(){
- const {visible,toggle,financialGrouping,setFinancialGrouping}=useDashboardValues();
+ const {visible,toggle,financialGrouping,setFinancialGrouping,defaultPeriod,setDefaultPeriod}=useDashboardValues();
  const rootRef=useRef<HTMLElement>(null),filterTrigger=useRef<HTMLButtonElement>(null);
  const presentation=useDashboardPresentation(rootRef);
  const transition=useDashboardSceneTransition(presentation.scene);
  const news=useAgroNews(),atr=useDashboardAtr();
- const [filters,setFilters]=useState<SummaryFilters>(defaultRange),[draft,setDraft]=useState<SummaryFilters>(defaultRange);
+ const {filters,setFilters,draft,setDraft}=useDashboardFilters(defaultPeriod);
  const [filtersOpen,setFiltersOpen]=useState(false),[settingsOpen,setSettingsOpen]=useState(false);
  const [quickMenu,setQuickMenu]=useState<QuickFilterMenu>(null);
  const closeSettings=useCallback(()=>setSettingsOpen(false),[]),closeFilters=useCallback(()=>setFiltersOpen(false),[]);
@@ -41,17 +43,17 @@ function SummaryDashboard(){
  const start=()=>{closeSettings();closeFilters();setQuickMenu(null);void presentation.startPresentation();};
  const preset=(days:number)=>{const to=localDay();setDraft(value=>({...value,from:shiftDay(to,-days+1),to}));};
  return <section ref={rootRef} className={`dashboard-page executive-dashboard ${presentation.presenting?'executive-presenting':''}`} aria-label="Dashboard de acompanhamento">
-  <MarketTicker actions={<DashboardSettings financialGrouping={financialGrouping} onFinancialGroupingChange={setFinancialGrouping} presentation={presentation} open={settingsOpen} onToggle={()=>{closeFilters();setQuickMenu(null);setSettingsOpen(value=>!value);}} onClose={closeSettings}/>}/>
+  <MarketTicker actions={<DashboardSettings defaultPeriod={defaultPeriod} onDefaultPeriodChange={setDefaultPeriod} financialGrouping={financialGrouping} onFinancialGroupingChange={setFinancialGrouping} presentation={presentation} open={settingsOpen} onToggle={()=>{closeFilters();setQuickMenu(null);setSettingsOpen(value=>!value);}} onClose={closeSettings}/>}/>
   <header className="executive-header"><div className="executive-heading"><span className="executive-eyebrow">INTELIGÊNCIA DA OPERAÇÃO</span><div><h2>Dashboard</h2><span className="executive-company" title={model.company?.name}><Building2 size={13}/>{model.company?.name||'Selecione uma empresa'}</span></div></div>
    <div className="executive-actions"><DashboardClock/>
     <div className="executive-filter-anchor"><button ref={filterTrigger} type="button" disabled={newsScene} className={`executive-button ${filtersOpen?'is-active':''}`} aria-label="Filtros do Dashboard" aria-expanded={filtersOpen} aria-controls="dashboard-filters" onClick={()=>{closeSettings();setQuickMenu(null);setDraft(filters);setFiltersOpen(value=>!value);}}><Filter size={15}/><span>Filtros</span></button>
      {filtersOpen&&<DashboardPopover title="Filtros do Dashboard" id="dashboard-filters" onClose={closeFilters} onReturnFocus={()=>filterTrigger.current?.focus()}><form className="executive-filter-form" onSubmit={event=>{event.preventDefault();if(validRange(draft)){setFilters(draft);closeFilters();}}}>
-      <p>365 dias por padrão · consulte até 5 anos.</p><div className="executive-filter-presets">{[30,90,365].map(days=><button type="button" key={days} onClick={()=>preset(days)}>{days} dias</button>)}</div>
+      <p>Padrão: {DASHBOARD_DEFAULT_PERIODS.find(item=>item.id===defaultPeriod)?.label} · consulte até 5 anos.</p><div className="executive-filter-presets">{[30,90,365].map(days=><button type="button" key={days} onClick={()=>preset(days)}>{days} dias</button>)}</div>
       <div className="executive-filter-grid"><label>De<input type="date" min="1900-01-01" max={draft.to} value={draft.from} onChange={event=>setDraft(value=>({...value,from:event.target.value}))}/></label><label>Até<input type="date" min={draft.from} max="9999-12-31" value={draft.to} onChange={event=>setDraft(value=>({...value,to:event.target.value}))}/></label></div>
       <p>Clientes, contratos e origens podem ser combinados nos seletores da linha do período.</p>
       <label>Status<select value={draft.status} onChange={event=>setDraft(value=>({...value,status:event.target.value}))}><option value="">Todos os status</option>{data?.filterOptions?.statuses.map(status=><option key={status}>{status}</option>)}</select></label>
       {!validRange(draft)&&<p className="executive-form-error" role="alert">Escolha um período entre 1 dia e 5 anos.</p>}
-      <div className="executive-filter-footer"><button type="button" onClick={()=>setDraft(defaultRange())}>Limpar filtros</button><button type="submit" disabled={!validRange(draft)}>Aplicar filtros</button></div>
+      <div className="executive-filter-footer"><button type="button" onClick={()=>setDraft(defaultRange(defaultPeriod))}>Limpar filtros</button><button type="submit" disabled={!validRange(draft)}>Aplicar filtros</button></div>
      </form></DashboardPopover>}
     </div>
     <button type="button" className={`executive-button executive-icon-button ${visible?'':'is-active'}`} aria-label={visible?'Ocultar valores financeiros':'Exibir valores financeiros'} title={visible?'Ocultar valores financeiros':'Exibir valores financeiros'} aria-pressed={!visible} onClick={toggle}>{visible?<Eye size={16}/>:<EyeOff size={16}/>}</button>
