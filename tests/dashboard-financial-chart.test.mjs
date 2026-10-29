@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import ts from 'typescript';
 const source=ts.transpileModule(readFileSync(new URL('../modules/resumo/utils/financialChart.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
-const {financialChartRows,financialChartCapacity,financialChartPage}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+const {financialChartRows,financialChartCapacity,financialChartPage,grossChangeLabel}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 const groupingSource=ts.transpileModule(readFileSync(new URL('../modules/resumo/financialGrouping.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
 const {readFinancialGrouping,financialGroupingKey}=await import('data:text/javascript;base64,'+Buffer.from(groupingSource).toString('base64'));
 test('daily finance uses official exact values and hides only periods without activity',()=>{
@@ -19,4 +19,14 @@ test('financial grouping defaults to month and uses only the selected official p
  assert.notEqual(financialGroupingKey('owner-a'),financialGroupingKey('owner-b'));
  const month=[{month:'2026-09',loadCount:1,billingPending:false,grossAmount:'100',netAmount:'90',receivedAmount:'0'}],day=[{date:'2026-09-15',loadCount:1,billingPending:false,grossAmount:'50',netAmount:'45',receivedAmount:'0'}],period=[{...day[0],date:'2026-09-14',endDate:'2026-09-20',grossAmount:'100',netAmount:'90'}];
  assert.equal(financialChartRows(month,day,'month')[0].key,'2026-09');assert.equal(financialChartRows(month,day,'day')[0].grossAmount,'50');assert.equal(financialChartRows(month,day,'week',period)[0].endDate,'2026-09-20');assert.equal(financialChartRows(month,day,'fortnight',period)[0].granularity,'fortnight');assert.deepEqual(financialChartRows(month,day,'week'),[]);
+});
+
+test('gross variation labels format server percentages and identify unavailable comparisons',()=>{
+ assert.equal(grossChangeLabel({grossChangePercent:'-93.51',grossChangeReason:''}),'-93,51%');
+ assert.equal(grossChangeLabel({grossChangePercent:'25',grossChangeReason:''}),'+25,00%');
+ assert.equal(grossChangeLabel({grossChangePercent:'0',grossChangeReason:''}),'0,00%');
+ assert.equal(grossChangeLabel({grossChangePercent:'',grossChangeReason:'zero-base'}),'Sem base');
+ assert.equal(grossChangeLabel({grossChangePercent:'',grossChangeReason:'pending'}),'A apurar');
+ assert.equal(grossChangeLabel({grossChangePercent:'',grossChangeReason:'initial'}),'—');
+ assert.equal(grossChangeLabel({}),'A apurar');
 });

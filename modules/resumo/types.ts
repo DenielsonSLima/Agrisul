@@ -27,8 +27,9 @@ export type ExecutiveSummaryTotals = ExecutiveFinancialMetrics & {
  contractCount:number;activeContractCount:number;farmCount:number;plotCount:number;
 };
 
-export type ExecutiveSummaryMonth = ExecutiveFinancialMetrics & {month:string};
-export type ExecutiveFinancialDay={date:string;loadCount:number;pendingLoadCount:number;billingPending:boolean;grossAmount:string;netAmount:string;receivedAmount:string};
+export type ExecutiveGrossVariation={grossChangePercent?:string;grossChangeFrom?:string;grossChangeReason?:'initial'|'zero-base'|'pending'|''};
+export type ExecutiveSummaryMonth = ExecutiveFinancialMetrics & ExecutiveGrossVariation & {month:string};
+export type ExecutiveFinancialDay=ExecutiveGrossVariation&{date:string;loadCount:number;pendingLoadCount:number;billingPending:boolean;grossAmount:string;netAmount:string;receivedAmount:string};
 export type ExecutiveFinancialPeriod=ExecutiveFinancialDay&{endDate:string};
 
 export type ExecutiveSummaryComparison = {

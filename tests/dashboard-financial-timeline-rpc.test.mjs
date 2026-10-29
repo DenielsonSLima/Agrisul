@@ -19,6 +19,7 @@ test('financial timeline and production-day averages use server valuations, scop
   await db.exec('RESET ROLE');const valued=(await db.query('SELECT l.loaded_at::text activity_date, billing_private.decimal_text(sum(f.gross_amount)) gross,billing_private.decimal_text(sum(f.net_amount)) net FROM public.billing_contracts c CROSS JOIN LATERAL billing_private.contract_load_financials(c) f JOIN public.billing_contract_loads l ON l.owner_id=c.owner_id AND l.id=f.load_id WHERE c.id=$1 GROUP BY l.loaded_at ORDER BY l.loaded_at',[a])).rows;await setActor();
   assert.equal(daily[0].grossAmount,valued[0].gross);assert.equal(daily[0].netAmount,valued[0].net);assert.equal(daily[2].grossAmount,valued[1].gross);assert.equal(summary.months.length,1);assert.equal(summary.months[0].billingPending,true);assert.equal(summary.totals.receivedAmount,'145.57');
   const selected=await rpc('summary','dashboard',{...scope,contractId:a});assert.equal(selected.financialTimeline.length,3);assert.equal(selected.financialTimeline.every(row=>!row.billingPending),true);
+  assert.equal(selected.financialTimeline[0].grossChangeReason,'initial');assert.equal(selected.financialTimeline[1].grossChangeFrom,'2026-09-15');assert.equal(selected.financialTimeline[1].grossChangePercent,'-100');assert.equal(selected.financialTimeline[2].grossChangeReason,'zero-base');assert.equal(summary.financialTimeline[3].grossChangeReason,'pending');
   const weekly=summary.financialGroupings.week,fortnightly=summary.financialGroupings.fortnight;
   assert.equal(weekly.length,1);assert.equal(weekly[0].date,'2026-09-14');assert.equal(weekly[0].endDate,'2026-09-20');assert.equal(weekly[0].loadCount,4);assert.equal(weekly[0].grossAmount,'');assert.equal(weekly[0].receivedAmount,'145.57');
   assert.deepEqual(fortnightly.map(row=>[row.date,row.endDate]),[['2026-09-01','2026-09-15'],['2026-09-16','2026-09-30']]);assert.equal(fortnightly[0].grossAmount,daily[0].grossAmount);assert.equal(fortnightly[1].billingPending,true);assert.equal(fortnightly[1].receivedAmount,'145.57');
@@ -36,5 +37,20 @@ test('financial timeline and production-day averages use server valuations, scop
   await db.exec('RESET ROLE');await load(b,'2026-09-15','125','30');await setActor();const sameDate=await rpc('summary','dashboard',scope);assert.equal(sameDate.dailyProductivity.productionDayCount,3,'A shared date across contracts is counted once');assert.equal(sameDate.dailyProductivity.averageLoadedVolume,'26.667');
   await db.exec('RESET ROLE');await db.query("UPDATE public.billing_contracts SET status='Concluído' WHERE id=$1",[b]);await setActor();const active=await rpc('summary','dashboard',{...scope,status:'Ativo'});assert.deepEqual(active.dailyProductivity,selected.dailyProductivity,'Status excludes the other contract from both averages and production dates');
   await assert.rejects(()=>rpc('summary','dashboard',{...scope,contractId:sibling}),error=>error.code==='42501');await setActor(ids.otherOwner);await assert.rejects(()=>rpc('summary','dashboard',scope));const other=await rpc('summary','dashboard',{...scope,companyId:ids.otherCompany});assert.deepEqual(other.financialTimeline,[]);assert.deepEqual(other.dailyProductivity,empty.dailyProductivity);await setActor(ids.reader);await assert.rejects(()=>rpc('summary','dashboard',scope),error=>error.code==='42501');await setActor(null);await assert.rejects(()=>rpc('summary','dashboard',scope),error=>error.code==='28000');
+ }finally{await db.close();}
+});
+
+test('gross variation preserves decimal amounts, skips idle buckets and protects missing or zero bases',async()=>{
+ const {db,ids,setActor}=await createCaneWeighingDb();
+ try{
+  await db.exec('RESET ROLE');
+  const row=(month,grossAmount,billingPending=false)=>({month,loadCount:1,grossAmount,netAmount:grossAmount,receivedAmount:'0',billingPending});
+  const idle={month:'2026-09',loadCount:0,grossAmount:'0',netAmount:'0',receivedAmount:'0',billingPending:false};
+  const enrich=async rows=>(await db.query("SELECT billing_private.dashboard_gross_variations($1::jsonb,'month') result",[JSON.stringify(rows)])).rows[0].result;
+  const rows=[row('2026-08','519190.29'),idle,row('2026-10','33681.79'),row('2026-11','0'),row('2026-12','10'),row('2027-01','',true),row('2027-02','20'),row('2027-03','20'),row('2027-04','30')],original=structuredClone(rows),result=await enrich(rows);
+  assert.equal(result.length,rows.length);assert.deepEqual(result[1],idle);assert.equal(result[2].grossChangeFrom,'2026-08');assert.equal(result[2].grossChangePercent,'-93.51');assert.equal(result[3].grossChangePercent,'-100');assert.equal(result[4].grossChangeReason,'zero-base');assert.equal(result[4].grossChangePercent,'');assert.equal(result[5].grossChangeReason,'pending');assert.equal(result[6].grossChangeReason,'pending');assert.equal(result[7].grossChangePercent,'0');assert.equal(result[8].grossChangePercent,'50');
+  for(let i=0;i<rows.length;i++){assert.equal(result[i].grossAmount,original[i].grossAmount);assert.equal(result[i].netAmount,original[i].netAmount);}assert.deepEqual(rows,original);assert.deepEqual(await enrich([]),[]);
+  const precise=await enrich([row('2026-01','100000000000000.000001'),row('2026-02','125000000000000.000001')]);assert.equal(precise[1].grossChangePercent,'25');assert.equal(precise[1].grossAmount,'125000000000000.000001');
+  await setActor(ids.owner);await assert.rejects(()=>db.query("SELECT billing_private.dashboard_gross_variations('[]','month')"),error=>error.code==='42501');
  }finally{await db.close();}
 });

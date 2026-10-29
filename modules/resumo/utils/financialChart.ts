@@ -1,6 +1,13 @@
-import type {ExecutiveFinancialDay,ExecutiveFinancialPeriod,ExecutiveSummaryMonth} from '../types';
+import type {ExecutiveFinancialDay,ExecutiveFinancialPeriod,ExecutiveSummaryMonth,ExecutiveGrossVariation} from '../types';
 import type {FinancialGrouping} from '../financialGrouping';
-export type FinancialChartRow={key:string;endDate?:string;granularity:FinancialGrouping;loadCount:number;billingPending:boolean;grossAmount:string;netAmount:string;receivedAmount:string};
+export type FinancialChartRow=ExecutiveGrossVariation&{key:string;endDate?:string;granularity:FinancialGrouping;loadCount:number;billingPending:boolean;grossAmount:string;netAmount:string;receivedAmount:string};
+/** Format the percentage supplied by Postgres; no client-side variation math. */
+export function grossChangeLabel(row:ExecutiveGrossVariation){
+ if(row.grossChangePercent===undefined)return 'A apurar';
+ if(row.grossChangePercent==='')return row.grossChangeReason==='zero-base'?'Sem base':row.grossChangeReason==='initial'?'—':'A apurar';
+ const value=new Intl.NumberFormat('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2,signDisplay:'exceptZero'}).format(Number(row.grossChangePercent));
+ return `${value}%`;
+}
 const nonzero=(value:string)=>/[1-9]/.test(value);
 export function financialChartRows(months:readonly ExecutiveSummaryMonth[],days?:readonly ExecutiveFinancialDay[],grouping:FinancialGrouping=days===undefined?'month':'day',periods?:readonly ExecutiveFinancialPeriod[]):FinancialChartRow[]{
  return (grouping==='month'?months.map(row=>({...row,key:row.month,granularity:'month' as const})):(grouping==='day'?days??[]:periods??[]).map(row=>({...row,key:row.date,granularity:grouping})))
