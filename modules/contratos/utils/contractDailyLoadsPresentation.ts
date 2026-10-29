@@ -61,6 +61,12 @@ export function defaultContractDailyLoadPeriod(today=new Date()):ContractDailyLo
  return {from:inputDate(start),to:inputDate(end),granularity:'day'};
 }
 
+export function defaultContractSummaryPeriod(startDate:string,today=new Date()):ContractDailyLoadPeriod{
+ const end=inputDate(new Date(Date.UTC(today.getFullYear(),today.getMonth(),today.getDate())));
+ const from=startDate||end;
+ return {from,to:from>end?from:end,granularity:'day'};
+}
+
 export function contractDailyLoadPeriodError({from,to}:Pick<ContractDailyLoadPeriod,'from'|'to'>){
  if(!from||!to)return 'Informe a data inicial e a data final.';
  if(from>to)return 'A data inicial deve ser igual ou anterior à data final.';

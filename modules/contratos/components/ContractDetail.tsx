@@ -20,11 +20,13 @@ import type {BillingContract} from '../types';
 import {notifications,useConfirmation} from '@/shared/feedback';
 import {formatContractBilling,formatContractVolume} from '../utils/contractFormat';
 import {contractMonthlyPeriodFromDateRange} from '../utils/contractMonthlyPeriod';
-import {defaultContractDailyLoadPeriod,type ContractDailyLoadPeriod} from '../utils/contractDailyLoadsPresentation';
+import {defaultContractSummaryPeriod,type ContractDailyLoadPeriod} from '../utils/contractDailyLoadsPresentation';
 
 export function ContractDetail({id,editing,saved}:{id:string;editing:boolean;saved:boolean}){
  const m=useContracts(id),c=m.contract,loadedId=c?.id,lifecycle=useContractLifecycleMutation(),deletion=useContractDeletionMutation(),confirm=useConfirmation();
- const [childBusy,setChildBusy]=useState(false),[reportOpen,setReportOpen]=useState(false),[dailyPeriod,setDailyPeriod]=useState<ContractDailyLoadPeriod>(()=>defaultContractDailyLoadPeriod()),[deleting,setDeleting]=useState(false),[deleteError,setDeleteError]=useState('');const titleRef=useRef<HTMLHeadingElement>(null),closing=useRef(false),removing=useRef(false);
+ const [childBusy,setChildBusy]=useState(false),[reportOpen,setReportOpen]=useState(false),[selectedPeriod,setSelectedPeriod]=useState<{contractId:string;startDate:string;period:ContractDailyLoadPeriod}|null>(null),[deleting,setDeleting]=useState(false),[deleteError,setDeleteError]=useState('');const titleRef=useRef<HTMLHeadingElement>(null),closing=useRef(false),removing=useRef(false);
+ const startDate=c?.startDate??'';
+ const dailyPeriod=selectedPeriod&&selectedPeriod.contractId===loadedId&&selectedPeriod.startDate===startDate?selectedPeriod.period:defaultContractSummaryPeriod(startDate);
  const monthlyPeriod=contractMonthlyPeriodFromDateRange(dailyPeriod);
  const busy=childBusy||lifecycle.isPending||deleting||deletion.isPending;
  const {searchParams,navigate}=useModuleNavigation();
@@ -36,7 +38,7 @@ export function ContractDetail({id,editing,saved}:{id:string;editing:boolean;sav
  const [tabReport,setTabReport]=useState<{contract:BillingContract;model:ContractTabReport}|null>(null);
  const exportCurrent=()=>{if(!c)return;if(tab==='loads'){if(loads.data&&!loads.loading&&!loads.error)setTabReport({contract:c,model:loadsReportModel(loads.data)});}else if(tab==='financial')setTabReport({contract:c,model:financialReportModel(c)});else setReportOpen(true);};
  const onBusy=useCallback((value:boolean)=>setChildBusy(value),[setChildBusy]);
- const changeDailyPeriod=useCallback((period:ContractDailyLoadPeriod)=>setDailyPeriod(period),[setDailyPeriod]);
+ const changeDailyPeriod=useCallback((period:ContractDailyLoadPeriod)=>{if(loadedId)setSelectedPeriod({contractId:loadedId,startDate,period});},[loadedId,startDate]);
  const close=async()=>{
   if(!c||closing.current)return;
   const totals=c.financialSummary?.totals,credit=totals?.creditAmount??'',remaining=c.remainingVolume;
