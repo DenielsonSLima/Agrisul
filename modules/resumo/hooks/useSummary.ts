@@ -6,5 +6,5 @@ export function useSummary(month: string) {
 }
 
 export function useExecutiveSummary(from:string,to:string,selection:SummarySelection={contractId:'',status:''}){
- return useBillingQuery('summary',{from,to,...selection},(companyId,signal)=>fetchExecutiveSummary(companyId,from,to,signal,selection));
+ return useBillingQuery('summary',{from,to,...selection},(companyId,signal)=>fetchExecutiveSummary(companyId,from,to,signal,selection),{refetchInterval:60000});
 }

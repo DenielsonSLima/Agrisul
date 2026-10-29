@@ -28,7 +28,7 @@ test('each menu destination updates the same snapshot consumed by screen and act
   let selected='/',screen='/';
   nav.subscribe(()=>{selected=new URL(nav.getSnapshot(),host.location.origin).pathname});
   nav.subscribe(()=>{screen=new URL(nav.getSnapshot(),host.location.origin).pathname});
-  for(const path of ['/cadastro','/solicitacoes','/cotacao','/pedidos','/contratos','/pesagens','/documentacao','/resumo','/agenda','/relatorios','/configuracoes','/']) {
+  for(const path of ['/cadastro','/solicitacoes','/cotacao','/pedidos','/contratos','/pesagens','/documentacao','/dashboard','/agenda','/relatorios','/configuracoes','/']) {
     nav.navigate(path);
     assert.equal(screen,path);assert.equal(selected,path);assert.equal(host.location.pathname,path);
   }
@@ -45,10 +45,10 @@ test('search can change records within the same module and open a specific agend
 
 test('back and forward restore module and query together',()=>{
   const host=hostAt();const nav=createModuleNavigation('/',host);const disconnect=nav.connect();
-  nav.navigate('/cadastro?busca=Marina');nav.navigate('/resumo');
+  nav.navigate('/cadastro?busca=Marina');nav.navigate('/dashboard');
   host.back();assert.equal(nav.getSnapshot(),'/cadastro?busca=Marina');
-  host.forward();assert.equal(nav.getSnapshot(),'/resumo');
-  disconnect();host.back();assert.equal(nav.getSnapshot(),'/resumo');
+  host.forward();assert.equal(nav.getSnapshot(),'/dashboard');
+  disconnect();host.back();assert.equal(nav.getSnapshot(),'/dashboard');
 });
 
 test('company list, create and edit pages participate in browser history',()=>{

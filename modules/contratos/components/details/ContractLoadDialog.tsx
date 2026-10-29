@@ -51,7 +51,7 @@ export function ContractLoadDialog({contract,load,onClose,returnFocus}:{contract
       {!farms.loading&&!farms.error&&!farms.farms.length&&<p className="contract-origin-help">Use o botão + para cadastrar a primeira fazenda sem sair deste carregamento.</p>}
       {!!data.farmId&&!plots.loading&&!plots.error&&!plots.data?.plots.length&&<p className="contract-origin-notice" role="status">Esta fazenda ainda não possui talhões. Você pode continuar sem talhão ou cadastrá-lo pelo botão +.</p>}
       <div className="form-grid">
-       <Field label="ATR do carregamento (kg/t) *"><input name="atr" required inputMode="decimal" maxLength={18} placeholder="Ex.: 121,500000" value={data.atr} onChange={e=>set('atr',e.target.value)}/><small>Informe o ATR medido neste carregamento.</small></Field>
+       <Field label="ATR do carregamento (kg/t)"><input name="atr" inputMode="decimal" maxLength={18} placeholder="Pendente · preencher quando disponível" value={data.atr} onChange={e=>set('atr',e.target.value)}/><small>Informe o ATR medido ou deixe pendente. O faturamento aguarda essa informação.</small></Field>
        <Field label="Documento (opcional)"><input name="document" maxLength={100} placeholder="Ticket, romaneio ou nota" value={data.document} onChange={e=>set('document',e.target.value)}/></Field>
       </div>
       <p className="field-help">Faturamento = quantidade (t) × ATR do carregamento (kg/t) × cotação (R$/kg). A cotação será {formatAtrCriterion(contract.atrPriceType,contract.atrPeriodType)}, do mesmo mês ou, enquanto ausente, do mês anterior.</p>

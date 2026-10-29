@@ -53,8 +53,9 @@ try {
  for(const table of ['billing_planning_periods','billing_planning_allocations','billing_planning_allocation_practices','billing_planning_history'])assert.ok(realtimeResources[table].includes('planning'));
  const shell=await readFile('shared/components/AppShell.tsx','utf8');
  const planning=await readFile('modules/planejamento/components/PlanejamentoPage.tsx','utf8');
- assert.doesNotMatch(shell,/AcompanhamentoPage|planejamentoSections/);
- assert.match(shell,/PlanejamentoPage/);
+ assert.doesNotMatch(shell,/AcompanhamentoPage|PlanejamentoPage|planejamentoSections/);
+ const legacyRoutes=await readFile('app/[modulo]/page.tsx','utf8');
+ assert.match(legacyRoutes,/if\(modulo==='planejamento'\)redirect\('\/'\)/);
  assert.match(planning,/PlanningDistribution/);
  assert.match(planning,/PlanningHistoryList/);
  assert.match(shell,/RelatoriosPage/);

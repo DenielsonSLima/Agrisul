@@ -3,7 +3,7 @@ export const derivedResources: Record<string, readonly string[]> = {
   signatures: ['service-requests'],
   'service-providers': ['service-requests', 'home', 'documentation'],
   'document-templates': ['service-requests'],
-  contracts: ['agenda', 'summary', 'reports', 'planning', 'home'],
+  contracts: ['agenda', 'summary', 'reports', 'planning', 'home', 'import-documents'],
   companies: ['agenda', 'summary', 'reports', 'service-requests', 'home', 'cane-weighings', 'documentation'],
   'report-headers': ['service-requests'],
   clients: ['agenda', 'summary', 'reports', 'home', 'cane-weighings', 'fleet', 'import-profiles', 'import-documents'],
@@ -22,6 +22,7 @@ export const derivedResources: Record<string, readonly string[]> = {
   'access-profiles': ['home'],
   users: ['home'],
   'import-profiles': ['import-documents'],
+  'import-documents': ['contracts', 'summary', 'planning', 'home', 'reports'],
   quotations: ['purchase-orders', 'documentation'],
   'purchase-orders': ['documentation'],
 };

@@ -86,6 +86,8 @@ export type ExecutivePlanningSummary = {
 };
 
 export type ExecutiveSummaryData = {
+ dimensions?:{partners:ExecutiveDimension[];contractTypes:ExecutiveDimension[]};
+ harvestMethods?:{code:'1'|'2'|'unknown';label:string;loadCount:number;loadedVolume:string}[];
  filters?:SummarySelection & {companyId:string;contractLabel:string};
  filterOptions?:SummaryFilterOptions;
  range:SummaryRange;totals:ExecutiveSummaryTotals;comparison:ExecutiveSummaryComparison;
@@ -101,3 +103,8 @@ export type ExecutiveSummaryData = {
 };
 
 export type ExecutiveSummarySnapshot = {data:ExecutiveSummaryData;companyId:string};
+
+export type ExecutiveDimension = {
+ id:string;name:string;contractCount:number;loadCount:number;loadedVolume:string;averageAtr:string;
+ netAmount:string;receivedAmount:string;pendingAmount:string;billingPending:boolean;sharePercent:string;
+};

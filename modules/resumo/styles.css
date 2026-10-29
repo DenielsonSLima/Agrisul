@@ -88,6 +88,7 @@
 .summary-table-action{display:inline-flex;align-items:center;gap:5px;background:transparent;border:0;padding:4px 0;color:#246140;text-align:left;font:inherit;text-decoration:underline;text-underline-offset:3px}
 .summary-table-action:hover{color:#153f27}
 .summary-donut{position:relative;height:245px;margin:16px 0}.summary-donut>div:last-child{position:absolute;inset:50% auto auto 50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;text-align:center;pointer-events:none;width:170px}
+.summary-donut>svg{display:block;width:100%;height:100%}
 .summary-donut>div:last-child span{font-size:11px;color:#5c7263}.summary-donut>div:last-child strong{font-size:19px;font-weight:700;letter-spacing:-.02em;margin:7px 0;color:#2b5139}.summary-donut>div:last-child small{font-size:10px;color:#5e7465}
 .summary-donut-legend{display:grid;gap:10px;margin-top:18px}.summary-donut-legend>div{display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid #e8eeea;padding-top:12px;font-size:12px}.summary-donut-legend dt{display:flex;align-items:center;gap:7px;color:#536c5b}.summary-donut-legend dd{color:#2d533a;font-weight:650}.summary-donut-legend i{height:9px;width:9px;border-radius:50%}.summary-donut-legend i.net{background:#2d8a63}.summary-donut-legend i.discount{background:#bd8f46}
 .summary-text-button{border:0;background:transparent;padding:8px 0;color:#2e6546;font-size:12px;text-decoration:underline;text-underline-offset:3px}

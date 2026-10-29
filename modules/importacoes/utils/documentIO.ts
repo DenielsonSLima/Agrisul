@@ -46,7 +46,9 @@ export async function sourceFileHash(file:File):Promise<string> {
 }
 
 async function newWorkbook() {
-  const excel = await import('exceljs');
+  // Client Component SSR also resolves this import; use the browser bundle
+  // explicitly so Node filesystem/stream dependencies never enter the UI.
+  const excel = await import('exceljs/dist/exceljs.min.js');
   return new excel.default.Workbook();
 }
 

@@ -3,6 +3,7 @@ export const ASSET_PRELOAD_RELOAD_COOLDOWN_MS = 30_000;
 
 export type AssetPreloadRecoveryRuntime = {
   onPreloadError(listener: (event: Event) => void): () => void;
+  onUnhandledRejection(listener: (event: PromiseRejectionEvent) => void): () => void;
   isOnline(): boolean;
   readStorage(key: string): string | null;
   writeStorage(key: string, value: string): void;
@@ -31,12 +32,19 @@ function rememberReload(runtime: AssetPreloadRecoveryRuntime, timestamp: number)
   }
 }
 
-/**
- * Recover once from a stale document requesting chunks from an older build.
- * Vite emits this event when a dynamic import or one of its CSS preloads fails.
- */
+export function isMissingNextStylesheet(reason: unknown): boolean {
+  let message: unknown;
+  try {
+    message = typeof reason === 'string' ? reason :
+      reason !== null && typeof reason === 'object' && 'message' in reason ? reason.message : null;
+  } catch { return false; }
+  return typeof message === 'string' &&
+    /^No link element found for chunk (?:https?:\/\/[^\s/]+)?\/_next\/static\/chunks\/[^\s]+\.css(?:[?#][^\s]*)?$/.test(message);
+}
+
+/** Recover from a stale asset once per cooldown, shared across both bundlers. */
 export function installAssetPreloadRecovery(runtime: AssetPreloadRecoveryRuntime): () => void {
-  return runtime.onPreloadError((event) => {
+  const recover = (event: Event) => {
     if (!runtime.isOnline()) return;
 
     const timestamp = runtime.now();
@@ -44,8 +52,14 @@ export function installAssetPreloadRecovery(runtime: AssetPreloadRecoveryRuntime
     if (lastReload !== null && timestamp - lastReload < ASSET_PRELOAD_RELOAD_COOLDOWN_MS) return;
     if (!rememberReload(runtime, timestamp)) return;
 
-    // Vite otherwise rethrows the preload error after dispatching the event.
+    // Preserve unrelated errors and avoid rethrowing an asset error while the
+    // fresh document is loading. Storage survives that reload to bound retries.
     event.preventDefault();
     runtime.reload();
+  };
+  const disposePreload = runtime.onPreloadError(recover);
+  const disposeRejection = runtime.onUnhandledRejection((event) => {
+    if (isMissingNextStylesheet(event.reason)) recover(event);
   });
+  return () => { disposePreload(); disposeRejection(); };
 }

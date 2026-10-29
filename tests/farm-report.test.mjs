@@ -19,5 +19,10 @@ try{
  assert.equal(new TextDecoder().decode(bytes.slice(0,4)),'%PDF');
  assert.equal(doc.getNumberOfPages(),2);
  assert.equal(fileName,'resumo-fazendas-2026-09-15.pdf');
+ const unknownFarm={...farms[0],areaHa:null,totalHa:null,preservedHa:null,usedPercent:0};
+ const unknownSummary={...summary,totalHa:null,preservedHa:null,usedPercent:0};
+ const unknownReport=await createFarmSummaryPdf([unknownFarm],unknownSummary,brand);
+ assert.equal(unknownReport.doc.getNumberOfPages(),1);
+ assert.ok(unknownReport.doc.output('arraybuffer').byteLength>0);
  console.log('Passed: downloadable farm PDF, portfolio totals and automatic pagination.');
 }finally{await rm(directory,{recursive:true,force:true});}

@@ -64,7 +64,8 @@ try{
   assert.equal(calls.at(-1).signal,controller.signal);
   assert.equal(farmList.farms[0].plotCount,2);
   assert.equal(farmList.summary.preservedHa,'4');
-  assert.deepEqual(await farms.persistFarm({name:'Teste',areaHa:'3,330001'},'id-edit'),{id:'farm-id'});
+  assert.deepEqual(await farms.persistFarm({name:'Teste',code:'005032',areaHa:'3,330001'},'id-edit'),{id:'farm-id'});
+  assert.equal(calls.at(-1).payload.code,'005032');
   const modules=[['contratos','typeApi','fetchTypes','persistType','types','type']];
   for(const [folder,file,list,save,plural,single] of modules){
     const api=await load(folder,file);

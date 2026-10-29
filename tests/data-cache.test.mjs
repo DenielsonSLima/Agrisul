@@ -51,6 +51,21 @@ try{
  }
  assert.equal(client.getQueryState(aContracts).isInvalidated,true);
 
+ // Finalizing a PDF must refresh open contract queues even if Realtime is
+ // disconnected. Removing its contract load returns the trip to that queue.
+ const aImports=key('owner-a','import-documents',{view:'pending-loads',contractId:'contract-one'});
+ const bImports=key('owner-b','import-documents',{view:'pending-loads',contractId:'contract-one'});
+ for(const resource of ['import-documents','contracts']){
+  for(const queryKey of [aImports,bImports,aContracts,bContracts])client.setQueryData(queryKey,{saved:true});
+  for(const affected of mutationResources(resource))await client.invalidateQueries({queryKey:billingKeys.resource('owner-a',affected),refetchType:'none'});
+  assert.equal(client.getQueryState(aImports).isInvalidated,true);
+  assert.equal(client.getQueryState(aContracts).isInvalidated,true);
+  assert.equal(client.getQueryState(bImports).isInvalidated,false);
+  assert.equal(client.getQueryState(bContracts).isInvalidated,false);
+ }
+ assert.ok(realtimeResources.billing_import_load_links.includes('summary'));
+ assert.ok(realtimeResources.billing_contract_loads.includes('import-documents'));
+
  // ATR quotations feed contract billing. The mutation fallback must update
  // contract projections without touching another signed-in account.
  for(const queryKey of [aContracts,bContracts])client.setQueryData(queryKey,{saved:true});

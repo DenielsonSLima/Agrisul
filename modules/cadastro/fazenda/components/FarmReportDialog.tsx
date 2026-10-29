@@ -7,7 +7,7 @@ import {ReportDocument} from '@/shared/reporting';
 import {activeReportHeader} from '@/modules/configuracoes/cabecalho-relatorios/types';
 import {useReportHeader} from '@/modules/configuracoes/cabecalho-relatorios/hooks/useReportHeader';
 import type {FarmPortfolioSummary,FarmSummary} from '../types';
-import {formatHectares} from '../utils/farmFormat';
+import {formatHectares,formatAreaHectares} from '../utils/farmFormat';
 import {downloadFarmSummaryPdf,printFarmSummaryPdf,type FarmReportBrand} from '../reporting/farmSummaryPdf';
 
 export function FarmReportDialog({open,onOpenChange,farms,summary}:{open:boolean;onOpenChange:(open:boolean)=>void;farms:FarmSummary[];summary:FarmPortfolioSummary}){
@@ -21,8 +21,8 @@ export function FarmReportDialog({open,onOpenChange,farms,summary}:{open:boolean
   {report.loading?<div className="report-loading" role="status"><Loader2 className="animate-spin"/>Carregando identidade do relatório…</div>:report.authRequired?<div className="company-empty"><FileText/><h3>Entre para gerar o relatório</h3><p>O PDF usa as configurações da sua conta.</p><Link className="btn company-primary" href="/login?returnTo=%2Fcadastro%3Fsecao%3Dfazenda" target="_top">Entrar</Link></div>:report.error?<div className="report-load-error" role="alert"><span>{report.error}</span><button className="btn" onClick={report.reload}><RefreshCw size={15}/>Tentar novamente</button></div>:<>
    <div className="farm-report-preview-stage"><ReportDocument orientation={brand.orientation} header={brand.header} company={brand.company} watermark={brand.watermark} issuer={brand.issuer} issuedAt={brand.issuedAt} title="Resumo geral de fazendas">
     <div className="farm-report-body">
-     <div className="farm-report-totals"><span><small>Fazendas</small><strong>{summary.farmCount}</strong></span><span><small>Talhões</small><strong>{summary.plotCount}</strong></span><span><small>Área total</small><strong>{formatHectares(summary.totalHa)} ha</strong></span><span><small>Área usada</small><strong>{formatHectares(summary.usedHa)} ha</strong></span><span className="preserved"><small>Preservada</small><strong>{formatHectares(summary.preservedHa)} ha</strong></span></div>
-     <table><thead><tr><th>Fazenda</th><th>Localização</th><th>Talhões</th><th>Total</th><th>Usada</th><th>Preservada</th></tr></thead><tbody>{farms.slice(0,brand.orientation==='portrait'?18:10).map(farm=><tr key={farm.id}><td>{farm.name}</td><td>{farm.city} / {farm.state}</td><td>{farm.plotCount}</td><td>{formatHectares(farm.totalHa)} ha</td><td>{formatHectares(farm.usedHa)} ha</td><td>{formatHectares(farm.preservedHa)} ha</td></tr>)}</tbody></table>
+     <div className="farm-report-totals"><span><small>Fazendas</small><strong>{summary.farmCount}</strong></span><span><small>Talhões</small><strong>{summary.plotCount}</strong></span><span><small>Área total</small><strong>{formatAreaHectares(summary.totalHa)}</strong></span><span><small>Área usada</small><strong>{formatHectares(summary.usedHa)} ha</strong></span><span className="preserved"><small>Preservada</small><strong>{formatAreaHectares(summary.preservedHa)}</strong></span></div>
+     <table><thead><tr><th>Fazenda</th><th>Localização</th><th>Talhões</th><th>Total</th><th>Usada</th><th>Preservada</th></tr></thead><tbody>{farms.slice(0,brand.orientation==='portrait'?18:10).map(farm=><tr key={farm.id}><td>{farm.name}</td><td>{farm.city} / {farm.state}</td><td>{farm.plotCount}</td><td>{formatAreaHectares(farm.totalHa)}</td><td>{formatHectares(farm.usedHa)} ha</td><td>{formatAreaHectares(farm.preservedHa)}</td></tr>)}</tbody></table>
      {farms.length>(brand.orientation==='portrait'?18:10)&&<p className="farm-report-more">O PDF completo incluirá todas as {farms.length} fazendas.</p>}
     </div>
    </ReportDocument></div>

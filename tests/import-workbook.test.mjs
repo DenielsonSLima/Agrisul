@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {pathToFileURL} from 'node:url';
 import ts from 'typescript';
-import ExcelJS from 'exceljs';
+import ExcelJS from 'exceljs/dist/exceljs.min.js';
 
 const require = createRequire(import.meta.url);
 function source(name) {
@@ -16,7 +16,7 @@ const defaultsUrl = dataUrl(source('defaults'));
 const parserUrl = dataUrl(source('taquariParser'));
 const pinheiroUrl = dataUrl(source('pinheiroParser'));
 const ioSource = source('documentIO').replaceAll("'./defaults'",JSON.stringify(defaultsUrl)).replaceAll("'./taquariParser'",JSON.stringify(parserUrl)).replaceAll("'./pinheiroParser'",JSON.stringify(pinheiroUrl))
-  .replace("import('exceljs')",`import(${JSON.stringify(pathToFileURL(require.resolve('exceljs')).href)})`);
+  .replace("import('exceljs/dist/exceljs.min.js')",`import(${JSON.stringify(pathToFileURL(require.resolve('exceljs/dist/exceljs.min.js')).href)})`);
 const {createImportWorkbook,inspectWorkbookTemplate} = await import(dataUrl(ioSource));
 
 test('exports native dates/numbers, preserves zeros and formula-looking text, clears old template records',async()=>{

@@ -24,6 +24,7 @@ const eslintConfig = defineConfig([
     "documentos/**",
     "out/**",
     "outputs/**",
+    "public/pdf.worker.min.mjs",
     "build/**",
     "supabase/.temp/**",
     "work/**",

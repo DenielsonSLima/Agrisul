@@ -1,0 +1,17 @@
+# Dashboard de acompanhamento
+
+O módulo visível é **Dashboard**, em `/dashboard`. Links antigos `/resumo` e `/acompanhamento` redirecionam para ele, preservando a consulta. O recurso RPC `summary/dashboard` continua compatível com o relatório e concentra os cálculos no Postgres.
+
+O Dashboard usa cinco páginas em abas: **Geral, Produção e ATR, Fornecedor, Contrato e Tipo**. Uma única página fica montada por vez, sem rolagem. Gráficos e listas usam paginação; em telas estreitas o seletor de conteúdo alterna as duas análises da aba. A faixa de mercado escura de 34 px permanece montada entre as trocas, com a engrenagem de configurações no canto direito. O restante da tela usa fundo claro e cards brancos, com cores pontuais.
+
+**Apresentar** alterna as abas em tela cheia. A engrenagem permite definir 1, 2, 5 ou 10 minutos para cada aba, ou aplicar o mesmo tempo às cinco. O padrão é de dois minutos por aba; as preferências são salvas no navegador e separadas por usuário. Alterar o tempo de outra aba mantém o temporizador atual. Pausa, avanço manual e encerramento estão disponíveis. Sair da tela cheia encerra a rotação. A sessão fica mantida somente enquanto o Dashboard registrado está conectado ao DOM, visível e em tela cheia; ao encerrar, volta o prazo comum de inatividade. Logout e revogação de acesso continuam válidos.
+
+TanStack Query recebe os eventos pelo Realtime central e reconsulta a RPC, além de atualizar a cada 60 segundos. Dados e cancelamento são isolados por conta, empresa e filtros. Erros de atualização mantêm a última consulta visível e indicam a falha. Produção e financeiro seguem empresa, datas, contrato e status; o planejamento da safra mantém seu escopo do grupo, indicado na tela.
+
+`harvestMethods` apresenta volume NUMERIC como texto e quantidade de carregamentos para manual (`1`), mecanizada (`2`) e não informado. O tipo é capturado da coluna K ao vincular conjuntos de PDFs finalizados; lançamentos históricos não são classificados por suposição. Veja também `modules/importacoes/README.md`.
+
+`dimensions.partners` agrupa os parceiros/usinas dos contratos (`billing_clients`) e `dimensions.contractTypes` agrupa os tipos cadastrados. Contagens, participação, ATR ponderado e financeiros são calculados no Postgres com os mesmos filtros; valores financeiros pendentes permanecem vazios, e créditos de um contrato não compensam dívidas de outro. As projeções reutilizam os financeiros já autorizados, sem calcular totais ou médias no navegador.
+
+A faixa de mercado usa `/api/dashboard-market`, autenticada. AwesomeAPI fornece câmbio intradiário, horário e variação quando disponível; Frankfurter serve como alternativa diária explicitamente identificada. Câmbio tem cache de um minuto e agro/cana têm cache separado de dez minutos. Agro usa Epagri/Cepa por praça e cana usa referência do Consecana-PR. Fontes, datas e horários estão no botão de informações e nos detalhes de cada ativo. Preferências do botão Adicionar são locais e separadas por usuário. Falhas preservam a última referência conhecida com aviso.
+
+Verificação: `npm run test:dashboard`, TypeScript e build. Com `BILLING_RUN_LIVE_TESTS=1`, `npm run test:dashboard:live` usa o CLI autenticado e um Chrome CDP em `127.0.0.1:9358` para verificar contas efêmeras, alteração por conexão independente, tela cheia real, inatividade, filtros, rotação, viewport móvel e vínculo do PDF pela interface. As identidades criadas são removidas ao terminar. Nunca use uma conta de produção como fixture.

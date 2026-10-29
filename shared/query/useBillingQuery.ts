@@ -4,7 +4,7 @@ import {useAuth} from '@/shared/supabase/AuthProvider';
 import {useWorkspaceCompany} from '@/shared/state/WorkspaceCompanyProvider';
 import {billingKeys} from './keys';
 
-export function useBillingQuery<T>(resource: string, params: Record<string, string>, fetcher: (companyId: string, signal: AbortSignal) => Promise<T>) {
+export function useBillingQuery<T>(resource: string, params: Record<string, string>, fetcher: (companyId: string, signal: AbortSignal) => Promise<T>, options: {refetchInterval?: number} = {}) {
   const {user, ready} = useAuth();
   const workspace = useWorkspaceCompany();
   const companyId = workspace.activeCompanyId;
@@ -12,6 +12,7 @@ export function useBillingQuery<T>(resource: string, params: Record<string, stri
     queryKey: [...billingKeys.resource(user?.id ?? '', resource), {...params, companyId}],
     queryFn: ({signal}) => fetcher(companyId, signal),
     enabled: ready && !!user && !!companyId,
+    refetchInterval: options.refetchInterval,
   });
   return {...query, companyId, company: workspace.activeCompany,
     loading: !ready || workspace.loading || (!!user && !!companyId && query.isPending),

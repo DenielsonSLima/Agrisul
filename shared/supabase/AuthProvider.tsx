@@ -10,7 +10,7 @@ import {canApplyAccessCheck,planAuthSessionTransition} from './authLifecycle';
 
 export type WorkspaceAccess='checking'|'ready'|'invite'|'password'|'disabled'|'removed'|'invalid'|'error';
 export type RefreshAccessOptions={silent?:boolean};
-type AuthState={user:User|null;session:Session|null;ready:boolean;error:string;access:WorkspaceAccess;signOut:()=>Promise<void>;refreshAccess:(options?:RefreshAccessOptions)=>Promise<WorkspaceAccess>};
+type AuthState={user:User|null;session:Session|null;ready:boolean;error:string;access:WorkspaceAccess;signOut:()=>Promise<void>;refreshAccess:(options?:RefreshAccessOptions)=>Promise<WorkspaceAccess>;registerLiveDisplay:(element:HTMLElement)=>()=>void};
 const AuthContext=createContext<AuthState|null>(null);
 const IDLE_MS=30*60*1000;
 const ACTIVITY_WRITE_MS=15000;
@@ -26,6 +26,18 @@ export function AuthProvider({children}:{children:ReactNode}){
  const identity=useRef<string|null>(null);
  const accessCheckRevision=useRef(0);
  const mounted=useRef(true);
+ const liveDisplay=useRef<{userId:string;element:HTMLElement}|null>(null);
+ const registerLiveDisplay=useCallback((element:HTMLElement)=>{
+  const userId=identity.current;
+  if(!userId)return()=>{};
+  const display={userId,element};liveDisplay.current=display;
+  return()=>{
+   if(liveDisplay.current!==display)return;
+   liveDisplay.current=null;
+   // Closing an attended display starts the ordinary inactivity period again.
+   if(identity.current===userId){try{localStorage.setItem(`billing:last-activity:${userId}`,String(Date.now()));}catch{}}
+  };
+ },[]);
 
  const refreshAccess=useCallback(async({silent=false}:RefreshAccessOptions={}):Promise<WorkspaceAccess>=>{
   const revision=++accessCheckRevision.current;
@@ -49,7 +61,7 @@ export function AuthProvider({children}:{children:ReactNode}){
    if(!active)return;
    const nextId=next?.user.id??null;
    const transition=planAuthSessionTransition(identity.current,nextId);
-   if(transition.clearQueryCache){accessCheckRevision.current++;void queryClient.cancelQueries();queryClient.clear();identity.current=nextId;}
+   if(transition.clearQueryCache){liveDisplay.current=null;accessCheckRevision.current++;void queryClient.cancelQueries();queryClient.clear();identity.current=nextId;}
    setSession(next);setReady(true);
    // Supabase emits SIGNED_IN again when a tab is refocused and may also emit
    // TOKEN_REFRESHED. The credentials must be updated, but those same-user
@@ -64,6 +76,7 @@ export function AuthProvider({children}:{children:ReactNode}){
 
  const signOut=useCallback(async()=>{
   const currentId=identity.current;
+  liveDisplay.current=null;
   accessCheckRevision.current++;
   const {error:signOutError}=await getSupabaseBrowserClient().auth.signOut({scope:'local'});
   await queryClient.cancelQueries();queryClient.clear();setSession(null);setAccess('ready');identity.current=null;
@@ -78,7 +91,11 @@ export function AuthProvider({children}:{children:ReactNode}){
   const write=(force=false)=>{const now=Date.now();if(!force&&now-lastWrite<ACTIVITY_WRITE_MS)return;lastWrite=now;try{localStorage.setItem(key,String(now));}catch{}};
   if(!read())write(true);
   const endIdleSession=()=>{if(ending)return;ending=true;try{sessionStorage.setItem('billing:session-notice','idle');}catch{}void signOut().catch(()=>{});};
-  const check=()=>{const last=read()||lastWrite;if(!ending&&Date.now()-last>=IDLE_MS){try{localStorage.setItem(logoutKey,JSON.stringify({userId,at:Date.now()}));}catch{}endIdleSession();}};
+  const check=()=>{
+   const display=liveDisplay.current;
+   if(display?.userId===userId&&display.element.isConnected&&document.fullscreenElement===display.element&&document.visibilityState==='visible')return;
+   const last=read()||lastWrite;if(!ending&&Date.now()-last>=IDLE_MS){try{localStorage.setItem(logoutKey,JSON.stringify({userId,at:Date.now()}));}catch{}endIdleSession();}
+  };
   const activity=()=>write();
   const visible=()=>{if(document.visibilityState==='visible'){check();if(!ending)write();}};
   const storage=(event:StorageEvent)=>{if(event.key!==logoutKey||!event.newValue)return;try{if((JSON.parse(event.newValue) as {userId?:string}).userId===userId)endIdleSession();}catch{}};
@@ -87,7 +104,7 @@ export function AuthProvider({children}:{children:ReactNode}){
   return()=>{window.clearInterval(timer);window.removeEventListener('pointerdown',activity);window.removeEventListener('pointermove',activity);window.removeEventListener('keydown',activity);window.removeEventListener('touchstart',activity);window.removeEventListener('focus',check);window.removeEventListener('storage',storage);document.removeEventListener('visibilitychange',visible);};
  },[session?.user.id,signOut]);
 
- return <AuthContext.Provider value={{session,user:session?.user??null,ready,error,access,signOut,refreshAccess}}>{children}</AuthContext.Provider>;
+ return <AuthContext.Provider value={{session,user:session?.user??null,ready,error,access,signOut,refreshAccess,registerLiveDisplay}}>{children}</AuthContext.Provider>;
 }
 
 function AccessBlocked({kind}:{kind:'disabled'|'removed'|'invalid'}){

@@ -7,6 +7,7 @@ import {defaultLoadFilters,type useContractLoads} from '../../hooks/useContractL
 import {useContractLoadsMutation} from '../../hooks/useContracts';
 import {formatAtr,formatContractLoadAmount,formatContractDate,formatContractMonth,formatContractVolume} from '../../utils/contractFormat';
 import {ContractLoadDialog} from './ContractLoadDialog';
+import {ImportedLoadsQueue} from './ImportedLoadsQueue';
 
 export function ContractLoadsTab({contract,filters,onFilters,query}:{contract:BillingContract;filters:ContractLoadFilters;onFilters:(filters:ContractLoadFilters)=>void;query:ReturnType<typeof useContractLoads>}){
  const [editor,setEditor]=useState<ContractLoad|'new'|null>(null);
@@ -23,6 +24,7 @@ export function ContractLoadsTab({contract,filters,onFilters,query}:{contract:Bi
  };
  return <div className="contract-detail-tab loads-workspace">
   <header className="loads-heading"><div><span className="loads-eyebrow"><Truck size={14}/>CONTROLE DE CARREGAMENTOS</span><h3>Da origem ao volume carregado</h3><p>Acompanhe as saídas e os valores de cada carregamento.</p></div><button className="btn company-primary" onClick={()=>openEditor('new')}><Plus size={17}/>Novo carregamento</button></header>
+  <ImportedLoadsQueue contract={contract}/>
   <section className="loads-filters" aria-label="Filtros dos carregamentos">
    <label className="loads-search"><span>Buscar carregamentos</span><div><Search size={17}/><input type="search" name="loadSearch" maxLength={200} placeholder="Fazenda, talhão, documento ou observação" value={filters.search} onChange={e=>set('search',e.target.value)}/></div></label>
    <label><span>Carregado de</span><input type="date" name="loadFrom" min="1900-01-01" max="9999-12-31" value={filters.from} onChange={e=>set('from',e.target.value)}/></label>

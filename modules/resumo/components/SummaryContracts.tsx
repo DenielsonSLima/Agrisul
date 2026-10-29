@@ -6,8 +6,8 @@ import {decimalLabel,moneyLabel} from '@/shared/utils/presentation';
 import type {ExecutiveSummaryData} from '../types';
 import {Progress} from './SummaryOperational';
 
-export function SummaryContracts({data,onSelectContract,onSelectStatus,disabled}:{data:ExecutiveSummaryData;onSelectContract:(id:string)=>void;onSelectStatus:(status:string)=>void;disabled:boolean}){
- const [page,setPage]=useState(0),pageSize=10,pages=Math.ceil(data.contracts.length/pageSize),currentPage=Math.min(page,Math.max(0,pages-1)),rows=data.contracts.slice(currentPage*pageSize,(currentPage+1)*pageSize);
+export function SummaryContracts({data,onSelectContract,onSelectStatus,disabled,presenting=false}:{data:ExecutiveSummaryData;onSelectContract:(id:string)=>void;onSelectStatus:(status:string)=>void;disabled:boolean;presenting?:boolean}){
+ const [page,setPage]=useState(0),pageSize=presenting?5:10,pages=Math.ceil(data.contracts.length/pageSize),currentPage=Math.min(page,Math.max(0,pages-1)),rows=data.contracts.slice(currentPage*pageSize,(currentPage+1)*pageSize);
  const performance=new Map(data.contractPerformance?.map(item=>[item.id,item]));
  return <section id="summary-contracts" className="summary-block">
   <header className="summary-block-heading"><div><span className="summary-kicker"><FileChartColumn size={15}/>CONTRATOS E RESULTADOS</span><h3>Explore a carteira</h3><p>Analise um contrato para atualizar os indicadores e gráficos de toda a empresa.</p></div><div className="summary-statuses" aria-label="Filtrar pelo status atual">{data.contractStatus.map(item=><button type="button" key={item.status} disabled={disabled} aria-pressed={data.filters?.status===item.status} onClick={()=>onSelectStatus(data.filters?.status===item.status?'':item.status)}>{item.status}<strong>{item.count}</strong></button>)}</div></header>

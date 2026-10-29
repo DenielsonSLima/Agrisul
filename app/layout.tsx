@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
+// Keep dashboard styles mounted while its modules change during navigation/HMR.
+import "@/modules/resumo/styles.css";
+import "@/modules/resumo/dashboard.css";
+import "@/modules/dashboard-market/market.css";
 import {DataProvider} from "@/shared/query/DataProvider";
 import { AppProvider } from "@/shared/state/AppProvider";
 import {WorkspaceCompanyProvider} from "@/shared/state/WorkspaceCompanyProvider";

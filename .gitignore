@@ -52,5 +52,7 @@ next-env.d.ts
 /.openai/
 # Planilhas e boletins operacionais usados apenas como referência local.
 /documentos/
+/pinheiro/
+/pinheiro 2/
 
 *.tsbuildinfo

@@ -55,7 +55,7 @@ export function InicioPage() {
                 {data.permissions.requests && <Shortcut href={servicesHref} icon={ClipboardList} title="Solicitações" detail="Serviços, orçamentos e aprovações"/>}
                 {data.permissions.registrations && <Shortcut href="/cadastro?secao=clientes" icon={Users} title="Cadastros" detail="Clientes, prestadores, fazendas e talhões"/>}
                 {data.permissions.registrations && <Shortcut href="/planejamento" icon={Sprout} title="Planejamento" detail="Metas, plantio, manejo e colheita"/>}
-                {data.permissions.summary && <Shortcut href="/resumo" icon={ChartNoAxesCombined} title="Resumo gerencial" detail="Evolução e resultados da operação"/>}
+                {data.permissions.summary && <Shortcut href="/dashboard" icon={ChartNoAxesCombined} title="Dashboard ao vivo" detail="Evolução e resultados da operação"/>}
                 {(data.permissions.contracts || data.permissions.registrations) && <Shortcut href={data.permissions.contracts ? '/relatorios' : '/relatorios?tipo=farms'} icon={FileChartColumn} title="Relatórios" detail="Consultar e exportar informações"/>}
                 <Shortcut href="/configuracoes?secao=perfil" icon={Settings} title="Meu perfil" detail="Conta e preferências"/>
               </nav>
@@ -71,7 +71,7 @@ export function InicioPage() {
 function FinancialOverview({data}: {data: HomeData}) {
   const finance = data.finance!;
   return <section className="inicio-finance" aria-label={`Indicadores de ${monthLabel(data.month)}`}>
-    <div className="inicio-finance-main"><span className="inicio-kicker">FATURAMENTO LÍQUIDO · {monthLabel(data.month)}</span><strong>{moneyLabel(finance.netAmount)}</strong><p>{finance.pendingLoadCount ? `${finance.pendingLoadCount} carga(s) aguardam ATR ou cotação.` : 'Valor dos carregamentos após os descontos.'}</p>{data.permissions.summary && <ModuleLink href="/resumo">Explorar resultados<ArrowUpRight size={15}/></ModuleLink>}</div>
+    <div className="inicio-finance-main"><span className="inicio-kicker">FATURAMENTO LÍQUIDO · {monthLabel(data.month)}</span><strong>{moneyLabel(finance.netAmount)}</strong><p>{finance.pendingLoadCount ? `${finance.pendingLoadCount} carga(s) aguardam ATR ou cotação.` : 'Valor dos carregamentos após os descontos.'}</p>{data.permissions.summary && <ModuleLink href="/dashboard">Explorar resultados<ArrowUpRight size={15}/></ModuleLink>}</div>
     <dl className="inicio-finance-metrics"><Metric icon={Banknote} label="Entradas líquidas em caixa" value={moneyLabel(finance.receivedAmount)} detail="Recebimentos + adiantamentos − estornos"/><Metric icon={Truck} label="Volume carregado" value={`${decimalLabel(finance.loadedVolume)} t`} detail={`${finance.loadCount} carregamento(s) no mês`}/><Metric icon={FileText} label="Contratos ativos" value={String(finance.activeContractCount)} detail={`${finance.contractCount} contrato(s) cadastrados na empresa`}/></dl>
   </section>;
 }

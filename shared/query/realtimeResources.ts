@@ -3,7 +3,7 @@ import {derivedResources} from './derivedResources.ts';
 const baseResources: Record<string, readonly string[]> = {
   billing_companies: ['companies', 'contracts', 'report-headers', 'service-requests', 'cane-weighings'],
   billing_contracts: ['contracts'],
-  billing_contract_loads: ['contracts', 'planning'],
+  billing_contract_loads: ['contracts', 'planning', 'import-documents'],
   billing_contract_payments: ['contracts'],
   billing_contract_discounts: ['contracts'],
   billing_cane_weighing_controls: ['cane-weighings'],
@@ -59,6 +59,7 @@ const baseResources: Record<string, readonly string[]> = {
   billing_import_documents: ['import-documents'],
   billing_import_entries: ['import-documents'],
   billing_import_entry_values: ['import-documents'],
+  billing_import_load_links: ['import-documents', 'contracts'],
   billing_document_links: ['documentation'],
   billing_document_files: ['documentation'],
   billing_document_events: ['documentation'],

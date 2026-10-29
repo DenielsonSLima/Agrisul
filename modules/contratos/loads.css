@@ -48,3 +48,4 @@
 .contract-detail-page .loads-empty h4{color:#17251d;font-size:17px;font-weight:720}
 .contract-detail-page .contract-load-modal .field>small{color:#4e5e54;font-size:11px}
 @media(max-width:650px){.contract-detail-page .loads-table td::before{color:#43534a;font-size:11px;font-weight:650}.contract-detail-page .loads-group summary small{font-size:11px}}
+.imported-loads-queue .loads-results-heading h3{display:flex;align-items:center;gap:8px}.imported-loads-state{display:flex;align-items:center;gap:8px;padding:18px;color:#587064;font-size:12px}.imported-loads-queue td:last-child{max-width:330px}.imported-loads-queue td:last-child .btn{margin-top:5px}

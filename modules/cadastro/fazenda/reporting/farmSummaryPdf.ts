@@ -1,7 +1,7 @@
 import type {jsPDF as JsPdf} from 'jspdf';
 import {drawReportPdfHeader,drawReportPdfWatermark,REPORT_MARGIN_MM,type ReportCompanyBrand,type ReportHeaderVariant,type ReportIssuer,type ReportOrientation,type ReportPdfImage,type ReportWatermarkBrand} from '@/shared/reporting';
 import type {FarmPortfolioSummary,FarmSummary} from '../types';
-import {formatHectares} from '../utils/farmFormat';
+import {formatHectares,formatAreaHectares} from '../utils/farmFormat';
 
 export type FarmReportBrand={
  orientation:ReportOrientation;
@@ -52,9 +52,9 @@ export async function createFarmSummaryPdf(farms:FarmSummary[],summary:FarmPortf
  };
  const drawSummary=(y:number)=>{
   const gap=3,boxWidth=(contentWidth-gap*4)/5;
-  const items=[['Fazendas',String(summary.farmCount)],['Talhões',String(summary.plotCount)],['Área total',formatHectares(summary.totalHa)+' ha'],['Área usada',formatHectares(summary.usedHa)+' ha'],['Preservada',formatHectares(summary.preservedHa)+' ha']];
+  const items=[['Fazendas',String(summary.farmCount)],['Talhões',String(summary.plotCount)],['Área total',formatAreaHectares(summary.totalHa)],['Área usada',formatHectares(summary.usedHa)+' ha'],['Preservada',formatAreaHectares(summary.preservedHa)]];
   items.forEach(([label,value],index)=>{const x=margin+index*(boxWidth+gap);doc.setFillColor(index===4?238:244,index===4?248:247,index===4?241:245);doc.roundedRect(x,y,boxWidth,15,1.5,1.5,'F');doc.setFont('helvetica','normal');doc.setFontSize(6.5);doc.setTextColor(126,145,132);doc.text(label,x+2,y+4);doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(index===4?42:67,index===4?121:91,index===4?78:75);doc.text(short(doc,value,boxWidth-4),x+2,y+10);});
-  doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(105,127,112);doc.text(`${pct(summary.usedPercent)} da área total está distribuída em talhões.`,margin,y+20);return y+24;
+  doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(105,127,112);doc.text(summary.totalHa===null?'Há fazendas com área total não informada.':`${pct(summary.usedPercent)} da área total está distribuída em talhões.`,margin,y+20);return y+24;
  };
  const drawTable=(y:number,pageFarms:FarmSummary[])=>{
   const rowHeight=10,headHeight=10;
@@ -62,7 +62,7 @@ export async function createFarmSummaryPdf(farms:FarmSummary[],summary:FarmPortf
   const labels=['Fazenda','Cidade / UF','Talhões','Área total','Área usada','Preservada'];
   doc.setFillColor(239,245,241);doc.rect(margin,y,contentWidth,headHeight,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.25);doc.setTextColor(78,103,86);
   let x=margin;labels.forEach((label,index)=>{doc.text(label,x+2,y+6.3);x+=widths[index]});
-  pageFarms.forEach((farm,index)=>{const rowY=y+headHeight+index*rowHeight;if(index%2) {doc.setFillColor(249,251,249);doc.rect(margin,rowY,contentWidth,rowHeight,'F');}doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(76,92,81);x=margin;const values=[farm.name,`${farm.city} / ${farm.state}`,String(farm.plotCount),formatHectares(farm.totalHa)+' ha',formatHectares(farm.usedHa)+' ha',formatHectares(farm.preservedHa)+' ha'];values.forEach((value,column)=>{doc.text(short(doc,value,widths[column]-4),x+2,rowY+6.3);x+=widths[column]});doc.setDrawColor(235,240,237);doc.line(margin,rowY+rowHeight,pageWidth-margin,rowY+rowHeight);});
+  pageFarms.forEach((farm,index)=>{const rowY=y+headHeight+index*rowHeight;if(index%2) {doc.setFillColor(249,251,249);doc.rect(margin,rowY,contentWidth,rowHeight,'F');}doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(76,92,81);x=margin;const values=[farm.name,`${farm.city} / ${farm.state}`,String(farm.plotCount),formatAreaHectares(farm.totalHa),formatHectares(farm.usedHa)+' ha',formatAreaHectares(farm.preservedHa)];values.forEach((value,column)=>{doc.text(short(doc,value,widths[column]-4),x+2,rowY+6.3);x+=widths[column]});doc.setDrawColor(235,240,237);doc.line(margin,rowY+rowHeight,pageWidth-margin,rowY+rowHeight);});
  };
 
  for(let page=1;page<=pages;page++){

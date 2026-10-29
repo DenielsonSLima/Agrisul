@@ -61,7 +61,7 @@ export function QuickOriginDialog({onClose,onCreated,returnFocus}:{onClose:()=>v
    <form className="quick-origin-form" onSubmit={event=>void save(event)}>
     <fieldset className="company-fieldset" disabled={saving||!!createdFarm}>
      <Field label="Nome da fazenda *"><input autoFocus required minLength={2} maxLength={150} value={farm.name} onChange={event=>changeFarm('name',event.target.value)} placeholder="Ex.: Fazenda Boa Vista"/></Field>
-     <Field label="Área da fazenda *"><div className="farm-area-input"><input required inputMode="decimal" maxLength={16} value={farm.areaHa} onChange={event=>changeFarm('areaHa',event.target.value)} placeholder="Ex.: 125,50"/><span aria-hidden="true">ha</span></div></Field>
+     <Field label="Área da fazenda (opcional)"><div className="farm-area-input"><input inputMode="decimal" maxLength={16} value={farm.areaHa} onChange={event=>changeFarm('areaHa',event.target.value)} placeholder="Ex.: 125,50"/><span aria-hidden="true">ha</span></div></Field>
      <div className="form-grid farm-location-grid"><Field label="Cidade *"><input required minLength={2} maxLength={100} value={farm.city} onChange={event=>changeFarm('city',event.target.value)} placeholder="Nome da cidade" autoComplete="address-level2"/></Field><Field label="UF *"><Choice label="UF da fazenda" value={farm.state} onChange={value=>changeFarm('state',value)} items={brazilStates.map(value=>({value,label:value}))}/></Field></div>
     </fieldset>
     {createdFarm&&<p className="quick-origin-persisted" role="status"><Tractor size={16}/><span><strong>{createdFarm.name}</strong> já foi cadastrada. Você pode tentar o talhão novamente ou continuar sem ele.</span></p>}

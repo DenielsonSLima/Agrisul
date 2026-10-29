@@ -9,6 +9,10 @@ export function AssetPreloadRecovery() {
       window.addEventListener("vite:preloadError", listener);
       return () => window.removeEventListener("vite:preloadError", listener);
     },
+    onUnhandledRejection(listener) {
+      window.addEventListener("unhandledrejection", listener, true);
+      return () => window.removeEventListener("unhandledrejection", listener, true);
+    },
     isOnline: () => window.navigator.onLine,
     readStorage: (key) => window.sessionStorage.getItem(key),
     writeStorage: (key, value) => window.sessionStorage.setItem(key, value),
