@@ -88,6 +88,7 @@ export type ExecutivePlanningSummary = {
 };
 
 export type ExecutiveSummaryData = {
+ dailyProductivity?:{productionDayCount:number;averageLoadedVolume:string;averageNetAmount:string;billingPending:boolean;pendingLoadCount:number};
  financialTimeline?:ExecutiveFinancialDay[];
  financialGroupings?:{week:ExecutiveFinancialPeriod[];fortnight:ExecutiveFinancialPeriod[]};
  dimensions?:{partners:ExecutiveDimension[];contractTypes:ExecutiveDimension[]};

@@ -80,11 +80,12 @@ function SummaryDashboard(){
 
 function DashboardMetrics({data,scene}:{data:ExecutiveSummaryData;scene:number}){
  const {money}=useDashboardValues();
- const t=data.totals,operation=data.operationalTotals,change=data.comparison.volumeChangePercent;
- return <dl className="executive-metrics">
+ const t=data.totals,operation=data.operationalTotals,change=data.comparison.volumeChangePercent,daily=data.dailyProductivity;
+ const productionDays=daily?daily.productionDayCount===0?'Nenhum dia com produção':`${daily.productionDayCount} ${daily.productionDayCount===1?'dia':'dias'} com produção`:'Aguardando atualização';
+ return <dl className="executive-metrics" data-metric-count={scene===1?4:5}>
   <Metric icon={Truck} name="Volume carregado" value={decimalLabel(t.loadedVolume)} unit="t" hint={`${t.loadCount} carregamentos no período`} featured marker="loaded-volume" change={change}/>
   <Metric icon={Gauge} name="ATR médio ponderado" value={decimalLabel(operation.averageAtr)} unit={operation.averageAtr?'kg/t':''} hint="Qualidade ponderada pelo volume" tone="gold"/>
-  {scene===1?<><Metric icon={FileText} name="Carregamentos" value={String(operation.loadCount)} hint={`${operation.farmCount} fazenda(s) de origem`} tone="blue"/><Metric icon={Truck} name="Carga média" value={decimalLabel(operation.averageLoadVolume)} unit="t" hint="Volume médio por carregamento" tone="violet"/></>:<><Metric icon={Wallet} name="Faturamento líquido" value={money(t.netAmount)} hint={t.billingPending?'Aguardando ATR ou cotação':'Entregas após os descontos'} tone="blue"/><Metric icon={FileText} name="Contratos na seleção" value={String(t.contractCount)} hint={`${t.activeContractCount} ativos na carteira`} tone="violet"/></>}
+  {scene===1?<><Metric icon={FileText} name="Carregamentos" value={String(operation.loadCount)} hint={`${operation.farmCount} fazenda(s) de origem`} tone="blue"/><Metric icon={Truck} name="Carga média" value={decimalLabel(operation.averageLoadVolume)} unit="t" hint="Volume médio por carregamento" tone="violet"/></>:<><Metric icon={Wallet} name="Faturamento líquido" value={money(t.netAmount)} hint={t.billingPending?'Aguardando ATR ou cotação':'Entregas após os descontos'} tone="blue"/><Metric icon={CalendarDays} name="Média carregada / dia" value={daily?decimalLabel(daily.averageLoadedVolume):'A apurar'} unit={daily?'t/dia':''} hint={productionDays} tone="violet" marker="average-daily-volume"/><Metric icon={Wallet} name="Faturamento médio / dia" value={money(daily?.averageNetAmount??'')} hint={daily?.billingPending?'Aguardando ATR ou cotação':`Líquido · ${productionDays}`} tone="gold" marker="average-daily-revenue"/></>}
  </dl>;
 }
 function Metric({icon:Icon,name,value,unit,hint,tone,featured=false,marker,change}:{icon:typeof Truck;name:string;value:string;unit?:string;hint:string;tone?:string;featured?:boolean;marker?:string;change?:string}){

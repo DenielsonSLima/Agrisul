@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createCaneWeighingDb} from '../supabase/tests/helpers/cane-weighing-db.mjs';
-test('daily financial timeline uses official load values and cash dates, filters tenants and preserves monthly output',async()=>{
+test('financial timeline and production-day averages use server valuations, scoped dates and authorized contracts',async()=>{
  const {db,ids,setActor}=await createCaneWeighingDb(),rpc=async(resource,action,payload)=>(await db.query('select public.billing_rpc($1,$2,$3::jsonb) result',[resource,action,JSON.stringify(payload)])).rows[0].result;
  try{
   await db.exec('RESET ROLE');
@@ -23,10 +23,18 @@ test('daily financial timeline uses official load values and cash dates, filters
   assert.equal(weekly.length,1);assert.equal(weekly[0].date,'2026-09-14');assert.equal(weekly[0].endDate,'2026-09-20');assert.equal(weekly[0].loadCount,4);assert.equal(weekly[0].grossAmount,'');assert.equal(weekly[0].receivedAmount,'145.57');
   assert.deepEqual(fortnightly.map(row=>[row.date,row.endDate]),[['2026-09-01','2026-09-15'],['2026-09-16','2026-09-30']]);assert.equal(fortnightly[0].grossAmount,daily[0].grossAmount);assert.equal(fortnightly[1].billingPending,true);assert.equal(fortnightly[1].receivedAmount,'145.57');
   assert.equal(selected.financialGroupings.week[0].grossAmount,selected.months[0].grossAmount);assert.equal(selected.financialGroupings.week[0].netAmount,selected.months[0].netAmount);assert.equal(selected.financialGroupings.week[0].billingPending,false);
+  assert.deepEqual(summary.dailyProductivity,{productionDayCount:3,averageLoadedVolume:'16.667',averageNetAmount:'',billingPending:true,pendingLoadCount:1});
+  assert.equal(selected.dailyProductivity.productionDayCount,2);assert.equal(selected.dailyProductivity.averageLoadedVolume,'20');assert.equal(selected.dailyProductivity.billingPending,false);
+  await db.exec('RESET ROLE');const expectedAverageNet=(await db.query('SELECT billing_private.decimal_text(round(sum(f.net_amount)/2,2)) average FROM public.billing_contracts c CROSS JOIN LATERAL billing_private.contract_load_financials(c) f WHERE c.id=$1',[a])).rows[0].average;await setActor();assert.equal(selected.dailyProductivity.averageNetAmount,expectedAverageNet);
+  const productiveDay=await rpc('summary','dashboard',{...scope,contractId:a,from:'2026-09-15',to:'2026-09-15'});assert.equal(productiveDay.dailyProductivity.productionDayCount,1);assert.equal(productiveDay.dailyProductivity.averageLoadedVolume,'30');assert.equal(Number(productiveDay.dailyProductivity.averageNetAmount),Number(Number(productiveDay.totals.netAmount).toFixed(2)));
   const singleDay=await rpc('summary','dashboard',{...scope,from:'2026-09-16',to:'2026-09-16'});assert.equal(singleDay.financialTimeline.length,1);assert.equal(singleDay.financialTimeline[0].receivedAmount,'123.45');assert.equal(singleDay.financialTimeline[0].grossAmount,'0');
   for(const rows of Object.values(singleDay.financialGroupings)){assert.equal(rows.length,1);assert.equal(rows[0].date,'2026-09-16');assert.equal(rows[0].endDate,'2026-09-16');assert.equal(rows[0].receivedAmount,'123.45');}
+  assert.deepEqual(singleDay.dailyProductivity,{productionDayCount:0,averageLoadedVolume:'0',averageNetAmount:'0',billingPending:false,pendingLoadCount:0},'Cash alone is not a production day');
   const empty=await rpc('summary','dashboard',{...scope,from:'2026-09-19',to:'2026-09-19'});assert.deepEqual(empty.financialTimeline,[]);
   assert.deepEqual(empty.financialGroupings,{week:[],fortnight:[]});
-  await assert.rejects(()=>rpc('summary','dashboard',{...scope,contractId:sibling}),error=>error.code==='42501');await setActor(ids.otherOwner);await assert.rejects(()=>rpc('summary','dashboard',scope));const other=await rpc('summary','dashboard',{...scope,companyId:ids.otherCompany});assert.deepEqual(other.financialTimeline,[]);await setActor(ids.reader);await assert.rejects(()=>rpc('summary','dashboard',scope),error=>error.code==='42501');await setActor(null);await assert.rejects(()=>rpc('summary','dashboard',scope),error=>error.code==='28000');
+  assert.deepEqual(empty.dailyProductivity,singleDay.dailyProductivity);
+  await db.exec('RESET ROLE');await load(b,'2026-09-15','125','30');await setActor();const sameDate=await rpc('summary','dashboard',scope);assert.equal(sameDate.dailyProductivity.productionDayCount,3,'A shared date across contracts is counted once');assert.equal(sameDate.dailyProductivity.averageLoadedVolume,'26.667');
+  await db.exec('RESET ROLE');await db.query("UPDATE public.billing_contracts SET status='Concluído' WHERE id=$1",[b]);await setActor();const active=await rpc('summary','dashboard',{...scope,status:'Ativo'});assert.deepEqual(active.dailyProductivity,selected.dailyProductivity,'Status excludes the other contract from both averages and production dates');
+  await assert.rejects(()=>rpc('summary','dashboard',{...scope,contractId:sibling}),error=>error.code==='42501');await setActor(ids.otherOwner);await assert.rejects(()=>rpc('summary','dashboard',scope));const other=await rpc('summary','dashboard',{...scope,companyId:ids.otherCompany});assert.deepEqual(other.financialTimeline,[]);assert.deepEqual(other.dailyProductivity,empty.dailyProductivity);await setActor(ids.reader);await assert.rejects(()=>rpc('summary','dashboard',scope),error=>error.code==='42501');await setActor(null);await assert.rejects(()=>rpc('summary','dashboard',scope),error=>error.code==='28000');
  }finally{await db.close();}
 });
