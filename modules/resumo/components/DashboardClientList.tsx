@@ -12,7 +12,7 @@ type Props={rows:ExecutiveDimension[];presenting?:boolean;slideDurationMs?:numbe
 
 export function DashboardClientList({rows,presenting=false,slideDurationMs=120000}:Props){
  const {money}=useDashboardValues(),id=useId(),{ref,size}=usePlotSize();
- const pageSize=size.height>=390?2:1,pages=Math.max(1,Math.ceil(rows.length/pageSize));
+ const pageSize=size.height>=300?2:1,pages=Math.max(1,Math.ceil(rows.length/pageSize));
  const signature=pageSize+':'+rows.map(row=>row.id).join('|');
  const [navigation,setNavigation]=useState({signature:'',page:0});
  const page=navigation.signature===signature?Math.min(navigation.page,pages-1):0;

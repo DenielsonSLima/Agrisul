@@ -127,7 +127,7 @@ test('per-client cards preserve cash-only clients and known cash or ATR when val
 });
 
 test('client-card pagination fits short and tall panels and exposes the remaining clients',()=>{
- const rows=[client,cashOnly,pendingClient],short=renderList({rows}),tall=renderList({rows,height:450});
+ const rows=[client,cashOnly,pendingClient],short=renderList({rows,height:299}),tall=renderList({rows,height:300});
  assert.match(short,/data-client-page-size="1"/);assert.equal([...short.matchAll(/data-dashboard-client-id=/g)].length,1);assert.match(short,/>1\/3</);assert.match(short,/aria-label="Próximos clientes"/);
  assert.match(tall,/data-client-page-size="2"/);assert.equal([...tall.matchAll(/data-dashboard-client-id=/g)].length,2);assert.match(tall,/data-dashboard-client-id="client-b"/);assert.match(tall,/>1\/2</);assert.match(tall,/aria-label="Próximos clientes"/);
 });
