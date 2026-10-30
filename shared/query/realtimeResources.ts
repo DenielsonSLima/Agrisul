@@ -2,6 +2,8 @@ import {derivedResources} from './derivedResources.ts';
 // Events invalidate authorized RPC projections; payloads never populate cache.
 const baseResources: Record<string, readonly string[]> = {
   billing_employees: ['employees'],
+  billing_overtime_reports: ['overtime'],
+  billing_overtime_rows: ['overtime'],
   billing_weather_settings: ['weather-preferences'],
   billing_weather_cities: ['weather-preferences'],
   billing_companies: ['companies', 'contracts', 'report-headers', 'service-requests', 'cane-weighings'],
@@ -29,9 +31,9 @@ const baseResources: Record<string, readonly string[]> = {
   billing_planning_field_logs: ['planning'],
   billing_watermarks: ['watermark', 'watermarks', 'report-headers'],
   billing_profiles: ['settings', 'profile', 'users', 'report-headers', 'signatures', 'service-requests'],
-  billing_memberships: ['companies','contracts','clients','atr','farms','plots','contract-types','cultures','cultural-practices','watermark','watermarks','settings','profile','users','access-profiles','permissions','employees','fleet','cane-weighings','report-headers','signatures','service-requests','document-templates','service-providers','purchase-requests','import-profiles','import-documents'],
+  billing_memberships: ['companies','contracts','clients','atr','farms','plots','contract-types','cultures','cultural-practices','watermark','watermarks','settings','profile','users','access-profiles','permissions','employees','overtime','fleet','cane-weighings','report-headers','signatures','service-requests','document-templates','service-providers','purchase-requests','import-profiles','import-documents'],
   billing_invitations: ['users'],
-  billing_access_profiles: ['companies','contracts','clients','atr','farms','plots','contract-types','cultures','cultural-practices','watermark','watermarks','settings','profile','users','access-profiles','permissions','employees','fleet','cane-weighings','report-headers','signatures','service-requests','document-templates','service-providers','purchase-requests','import-profiles','import-documents'],
+  billing_access_profiles: ['companies','contracts','clients','atr','farms','plots','contract-types','cultures','cultural-practices','watermark','watermarks','settings','profile','users','access-profiles','permissions','employees','overtime','fleet','cane-weighings','report-headers','signatures','service-requests','document-templates','service-providers','purchase-requests','import-profiles','import-documents'],
   billing_user_settings: ['settings', 'profile', 'users', 'report-headers', 'signatures', 'service-requests', 'planning'],
   billing_report_headers: ['report-headers', 'service-requests'],
   billing_signatures: ['signatures', 'service-requests'],

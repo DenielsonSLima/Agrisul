@@ -7,18 +7,19 @@ import {Field} from '@/shared/components/Common';
 import {notifications} from '@/shared/feedback';
 import type {Employee,EmployeeInput} from '../types';
 
-export function EmployeeForm({employee,onClose,onSave}:{employee?:Employee;onClose:()=>void;onSave:(input:EmployeeInput)=>Promise<Employee>}){
+export function EmployeeForm({employee,onClose,onSave,requireJobTitle=false}:{employee?:Employee;onClose:()=>void;onSave:(input:EmployeeInput)=>Promise<Employee>;requireJobTitle?:boolean}){
   const mounted=useRef(false);
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   const [fullName,setFullName]=useState(employee?.fullName??'');
   const [registrationNumber,setRegistrationNumber]=useState(employee?.registrationNumber??'');
+  const [jobTitle,setJobTitle]=useState(employee?.jobTitle??'');
   const [saving,setSaving]=useState(false);
   const [error,setError]=useState('');
 
   const submit=async(event:FormEvent)=>{
     event.preventDefault();
     setSaving(true);setError('');
-    try{await onSave({id:employee?.id,fullName,registrationNumber});}
+    try{await onSave({id:employee?.id,fullName,registrationNumber,jobTitle});}
     catch(reason){
       if(!mounted.current)return;
       const message=reason instanceof Error?reason.message:'Não foi possível salvar o funcionário.';
@@ -32,16 +33,17 @@ export function EmployeeForm({employee,onClose,onSave}:{employee?:Employee;onClo
       onPointerDownOutside={event=>{if(saving)event.preventDefault();}}>
       <DialogHeader>
         <DialogTitle>{employee?'Editar funcionário':'Cadastrar funcionário'}</DialogTitle>
-        <DialogDescription>Informe o nome completo e a matrícula do funcionário.</DialogDescription>
+        <DialogDescription>Informe o nome completo, a matrícula e o cargo do funcionário.</DialogDescription>
       </DialogHeader>
       <form onSubmit={event=>void submit(event)}>
         <fieldset disabled={saving} className="employee-form">
           <Field label="Nome completo *"><input autoFocus required minLength={2} maxLength={160} autoComplete="name"
             value={fullName} onChange={event=>{setFullName(event.target.value);setError('');}}
             placeholder="Ex.: Maria Aparecida Santos"/></Field>
-          <Field label="Matrícula *"><input required maxLength={60} type="text" autoComplete="off"
+          <Field label="Matrícula (quando disponível)"><input maxLength={60} type="text" autoComplete="off"
             value={registrationNumber} onChange={event=>{setRegistrationNumber(event.target.value);setError('');}}
-            placeholder="Ex.: 00123"/></Field>
+            placeholder="Ex.: 00123 — deixe em branco se ainda não possui"/></Field>
+          <Field label={requireJobTitle?'Cargo *':'Cargo'}><input required={requireJobTitle} maxLength={100} value={jobTitle} onChange={event=>{setJobTitle(event.target.value);setError('');}} placeholder="Ex.: Motorista, Operador ou Fiscal"/></Field>
         </fieldset>
         {error&&<p className="form-error" role="alert">{error}</p>}
         <div className="form-actions">
