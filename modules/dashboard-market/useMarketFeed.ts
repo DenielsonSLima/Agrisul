@@ -1,6 +1,6 @@
 'use client';
 import {useQueries,useQueryClient} from '@tanstack/react-query';
-import {authenticatedFetch} from '@/shared/supabase/rpc';
+import {rpcRequest} from '@/shared/supabase/rpc';
 import {billingKeys} from '@/shared/query/keys';
 import type {MarketFeed,MarketId} from './catalog';
 import {marketFeedGroups,mergeMarketFeed,parseMarketFeed,readMarketSnapshot,saveMarketSnapshot,staleMarketFeed} from './marketSnapshot.mjs';
@@ -17,9 +17,7 @@ export function useMarketFeed(userId:string){
       initialData:()=>readMarketSnapshot(snapshotStorage(),userId,group) as MarketFeed|undefined,
       initialDataUpdatedAt:0,
       queryFn:async({signal}:{signal:AbortSignal}):Promise<MarketFeed>=>{
-        const response=await authenticatedFetch(`/api/dashboard-market?group=${group}`,{signal});
-        if(!response.ok)throw new Error('Não foi possível consultar as referências de mercado.');
-        const current=parseMarketFeed(await response.json(),group);
+        const current=parseMarketFeed(await rpcRequest<MarketFeed>('dashboard-market','get',{group},signal),group);
         if(!current)throw new Error('A fonte retornou referências de mercado inválidas.');
         if(signal.aborted)throw new DOMException('Consulta cancelada','AbortError');
         const previous=client.getQueryData<MarketFeed>(queryKey)??readMarketSnapshot(snapshotStorage(),userId,group);

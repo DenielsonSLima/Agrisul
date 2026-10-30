@@ -10,3 +10,7 @@ enabled = false
 [auth]
 site_url = "https://agrisul.vercel.app"
 additional_redirect_urls = ["https://agrisul.vercel.app/auth/confirm", "http://localhost:5173/auth/confirm", "http://127.0.0.1:5173/auth/confirm"]
+
+[functions.dashboard-market-refresh]
+# Server-only job: the handler validates its scoped secret from Vault.
+verify_jwt = false

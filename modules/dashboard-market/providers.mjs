@@ -1,11 +1,12 @@
 // Public reference data only. Never replace an unavailable quote with a made-up
 // price, or label daily/monthly publications as a real-time exchange feed.
+import {Buffer} from 'node:buffer';
 export const EPAGRI_URL='https://docweb.epagri.sc.gov.br/website_cepa/precos/Historico_precos_diario.xlsx';
 export const EPAGRI_SOURCE='https://cepa.epagri.sc.gov.br/index.php/mercado-agricola/';
 export const CANE_URL='https://www.sistemafaep.org.br/consecana/';
 export const AWESOME_URL='https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL';
 const months=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
-const products=[
+export const agriculturalProducts=[
   ['soy','Soja industrial - sc 60 kg','Oeste'],
   ['corn','Milho-amarelo - sc 60 kg','Oeste'],
   ['cattle','Boi gordo - arroba','Oeste'],
@@ -15,6 +16,7 @@ const products=[
   ['pork','Suíno vivo - produtores independentes - kg','Oeste'],
   ['chicken','Frango de corte - vivo - kg','Oeste'],
 ];
+const products=agriculturalProducts;
 const clean=text=>String(text).replace(/<[^>]*>/g,' ').replace(/&nbsp;|&#160;/g,' ').replace(/\s+/g,' ').trim();
 const decimal=value=>{const number=Number(value);return Number.isFinite(number)&&number>0?String(number):null;};
 export function unavailable(id,source,sourceUrl,note='Fonte temporariamente indisponível'){

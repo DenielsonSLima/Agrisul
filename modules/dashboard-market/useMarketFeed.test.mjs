@@ -9,7 +9,7 @@ const fixtures=dataUrl(`export const state={results:null,options:[],cache:new Ma
  export function useQueryClient(){return {getQueryData:key=>state.cache.get(JSON.stringify(key))};}
  export function useQueries({queries}){state.options=queries;return state.results??queries.map(()=>({data:undefined,isPending:true,isFetching:true,isError:false,refetch:async()=>{}}));}
  export const billingKeys={resource:(userId,resource)=>['billing',userId,resource]};
- export function authenticatedFetch(url,options){return state.fetch(url,options);}`);
+ export async function rpcRequest(resource,action,payload,signal){if(resource!=='dashboard-market'||action!=='get')throw Error('Unexpected RPC');return (await state.fetch(payload.group,{signal})).json();}`);
 const {state}=await import(fixtures);
 const source=ts.transpileModule(await readFile(new URL('./useMarketFeed.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText
  .replace(/from ['"](@tanstack\/react-query|@\/shared\/supabase\/rpc|@\/shared\/query\/keys)['"]/g,`from ${JSON.stringify(fixtures)}`)

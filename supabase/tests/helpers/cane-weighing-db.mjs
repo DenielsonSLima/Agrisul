@@ -1,5 +1,6 @@
 import {readdir,readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
+import {installSchedulingFixture,withoutSchedulingExtensions} from './scheduling-fixture.mjs';
 
 export const caneFixtureIds={
  owner:'10000000-0000-4000-8000-000000000001',
@@ -13,7 +14,7 @@ export const caneFixtureIds={
  readerProfile:'10000000-0000-4000-8000-000000000031',
 };
 
-// Executes the actual complete migration chain. Auth and Storage infrastructure
+// Executes the actual complete migration chain. Auth, Storage and scheduling infrastructure
 // are the only fixtures; application authorization and calculations are real SQL.
 export async function createCaneWeighingDb(){
  const db=new PGlite();
@@ -32,9 +33,10 @@ export async function createCaneWeighingDb(){
   GRANT USAGE ON SCHEMA storage TO authenticated;
   GRANT SELECT,INSERT,UPDATE,DELETE ON storage.objects TO authenticated;
  `);
+ await installSchedulingFixture(db);
  const directory=new URL('../../migrations/',import.meta.url);
  for(const name of (await readdir(directory)).filter(name=>name.endsWith('.sql')).sort()){
-  try{await db.exec(await readFile(new URL(name,directory),'utf8'));}
+  try{await db.exec(withoutSchedulingExtensions(await readFile(new URL(name,directory),'utf8')));}
   catch(error){await db.close();throw new Error(`Migration ${name}: ${error.message}`,{cause:error});}
  }
  const ids=caneFixtureIds;

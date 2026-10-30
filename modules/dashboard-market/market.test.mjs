@@ -189,7 +189,7 @@ test('HTTP route authenticates before group validation and forwards only whiteli
   const {readFile}=await import('node:fs/promises');
   const {transpileModule,ModuleKind,ScriptTarget}=await import('typescript');
   const uri=code=>`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
-  const dependencies=uri(`export async function getRequestUser(request){return request.headers.has('x-test-auth')?{id:'test'}:null;} export async function getMarketFeed(group){return {group:group??'all',quotes:[],checkedAt:'2026-10-29T12:00:00.000Z',refreshSeconds:group==='currency'?60:600};}`);
+  const dependencies=uri(`export async function getRequestUser(request){return request.headers.has('x-test-auth')?{id:'test'}:null;} export function getRequestSupabase(){return {rpc:(_name,args)=>({abortSignal:async()=>({data:{group:args.p_payload.group??'all',quotes:[],checkedAt:'2026-10-29T12:00:00.000Z',refreshSeconds:args.p_payload.group==='currency'?60:600}})})};}`);
   const route=(await readFile(new URL('../../app/api/dashboard-market/route.ts',import.meta.url),'utf8')).replace('@/shared/supabase/server',dependencies).replace('@/modules/dashboard-market/providers.mjs',dependencies);
   const {outputText}=transpileModule(route,{compilerOptions:{module:ModuleKind.ESNext,target:ScriptTarget.ES2022}});
   const {GET}=await import(uri(outputText));
