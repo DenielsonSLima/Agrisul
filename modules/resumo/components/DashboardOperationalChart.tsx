@@ -8,6 +8,7 @@ import {usePlotSize} from '../hooks/usePlotSize';
 import {financialChartPage} from '../utils/financialChart';
 import {operationalChartRows,type OperationalChartRow} from '../utils/operationalChart';
 import {chartPeriodLabel,fullChartPeriod} from '../utils/chartPeriod';
+import {DashboardDataDialog} from './DashboardDataDialog';
 
 type Props={data:ExecutiveSummaryData['monthlyOperations'];dailyData?:ExecutiveOperationalPeriod[];periodData?:ExecutiveOperationalPeriod[];grouping?:FinancialGrouping;onSelectMonth?:(month:string)=>void;disabled?:boolean;presenting?:boolean;slideDurationMs?:number};
 const compact=(value:number)=>new Intl.NumberFormat('pt-BR',{notation:'compact',maximumFractionDigits:1}).format(value);
@@ -20,7 +21,7 @@ function axis(values:number[],top:number,height:number){
 }
 
 export function OperationalEvolution({data,dailyData,periodData,grouping='month',onSelectMonth,disabled,presenting=false,slideDurationMs=120000}:Props){
- const id=useId(),{ref,size}=usePlotSize(),[navigation,setNavigation]=useState({signature:'',page:0}),[detailsOpen,setDetailsOpen]=useState(false);
+ const id=useId(),{ref,size}=usePlotSize(),[navigation,setNavigation]=useState({signature:'',page:0});
  const rows=useMemo(()=>operationalChartRows(data,dailyData,grouping,periodData),[data,dailyData,grouping,periodData]),longest=Math.max(8,...rows.map(row=>volumeText(row).length));
  const capacity=Math.max(1,Math.min(18,Math.floor(Math.max(0,size.width-112)/Math.max(140,Math.min(280,longest*7+24))))),pages=Math.max(1,Math.ceil(rows.length/capacity));
  const signature=grouping+':'+rows.map(row=>row.key).join('|'),page=navigation.signature===signature?Math.min(navigation.page,pages-1):0,shown=financialChartPage(rows,capacity,page);
@@ -32,7 +33,7 @@ export function OperationalEvolution({data,dailyData,periodData,grouping='month'
   <div className="summary-chart-legend"><span><i className="net"/>Volume (t)</span><span><i className="atr"/>ATR (kg/t)</span></div>
   <div ref={ref} className="summary-chart dashboard-operational-plot">{rows.length?size.width>0&&size.height>0&&<OperationPlot rows={shown} width={size.width} height={size.height} onSelect={select}/>:<div className="summary-chart-empty"><span><BarChart3 size={25}/></span><strong>{available?'Nenhuma movimentação nesta seleção':'Atualizando agrupamento operacional'}</strong><p>{available?'Ajuste os filtros para explorar outro recorte.':'Aguarde a atualização dos dados.'}</p></div>}</div>
   {shown.length>0&&<footer className="dashboard-financial-pagination"><span>{fullChartPeriod(shown[0])}{shown.length>1?' — '+fullChartPeriod(shown.at(-1)!):''}</span>{pages>1&&<nav aria-label="Períodos do gráfico operacional"><button type="button" aria-label="Períodos anteriores" disabled={page>=pages-1} onClick={()=>setNavigation({signature,page:page+1})}><ChevronLeft size={13}/></button><span>{pages-page} / {pages}</span><button type="button" aria-label="Próximos períodos" disabled={page===0} onClick={()=>setNavigation({signature,page:page-1})}><ChevronRight size={13}/></button></nav>}</footer>}
-  <details className="summary-data-details" onToggle={event=>setDetailsOpen(event.currentTarget.open)}><summary>Ver dados operacionais</summary>{detailsOpen&&<div className="summary-table-wrap" tabIndex={0} role="region" aria-label="Dados operacionais por período"><table className="summary-table"><thead><tr><th scope="col">Período</th><th scope="col">Volume (t)</th><th scope="col">Cargas</th><th scope="col">ATR (kg/t)</th></tr></thead><tbody>{rows.map(row=><tr key={row.key}><th scope="row">{fullChartPeriod(row)}</th><td>{decimalLabel(row.loadedVolume)}</td><td>{row.loadCount}</td><td>{decimalLabel(row.averageAtr)}</td></tr>)}</tbody></table></div>}</details>
+  <DashboardDataDialog title="Dados operacionais por período" description="Todos os períodos com movimento da seleção aplicada. Volume em toneladas e ATR ponderado pelas toneladas carregadas."><table><caption className="sr-only">Dados operacionais por período</caption><thead><tr><th scope="col">Período</th><th scope="col">Volume (t)</th><th scope="col">Cargas</th><th scope="col">ATR (kg/t)</th></tr></thead><tbody>{rows.map(row=><tr key={row.key}><th scope="row">{fullChartPeriod(row)}</th><td>{decimalLabel(row.loadedVolume)}</td><td>{row.loadCount}</td><td>{decimalLabel(row.averageAtr)}</td></tr>)}</tbody></table></DashboardDataDialog>
  </section>;
 }
 

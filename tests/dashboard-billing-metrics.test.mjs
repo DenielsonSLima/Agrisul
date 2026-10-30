@@ -28,13 +28,13 @@ const {DashboardMetrics}=await import(metricsUrl);
 const fixture={
  totals:{grossAmount:'519190.29',netAmount:'270683.04',discountAmount:'248507.25',loadedVolume:'1234.567',loadCount:19,billingPending:false,pendingLoadCount:0},
  operationalTotals:{averageAtr:'131.23',farmCount:3,loadCount:19},
- comparison:{volumeChangePercent:'77.77',netChangePercent:'88.88'},
+ comparison:{from:'2025-10-01',to:'2025-10-31',loadedVolume:'694.46',netAmount:'143311.23',receivedAmount:'3000',volumeChangePercent:'77.77',netChangePercent:'88.88',receivedChangePercent:'-12.34'},
  dailyProductivity:{productionDayCount:7,averageLoadedVolume:'176.367',averageNetAmount:'38669.01',billingPending:false},
  averageGrossPricePerTon:'420.55',
 };
-const render=({scene=2,visible=true,totals={}}={})=>{
+const render=({scene=2,visible=true,totals={},comparison={}}={})=>{
  display.visible=visible;
- return renderToStaticMarkup(createElement(DashboardMetrics,{scene,data:{...fixture,totals:{...fixture.totals,...totals}}}));
+ return renderToStaticMarkup(createElement(DashboardMetrics,{scene,data:{...fixture,totals:{...fixture.totals,...totals},comparison:{...fixture.comparison,...comparison}}}));
 };
 const card=(html,marker)=>{
  const match=html.match(new RegExp(`data-dashboard-metric="${marker}"[^>]*>([\\s\\S]*?)<\\/dd>`));
@@ -52,7 +52,8 @@ test('billing renders four dedicated RPC metrics with exact labels and no operat
  }
  assert.match(card(html,'loaded-volume'),/<small>t<\/small>/);
  assert.doesNotMatch(html,/ATR médio ponderado|Média carregada \/ dia|Faturamento médio \/ dia|Venda média bruta \/ t/);
- assert.doesNotMatch(html,/executive-metric-change|77,77%|88,88%/);
+ assert.doesNotMatch(html,/77,77%/);
+ assert.match(html,/\+88,88%/);assert.match(html,/vs\. período anterior/);assert.match(html,/01\/10\/2025 a 31\/10\/2025/);assert.match(html,/Anterior: R\$ 143\.311,23/);
  assert.deepEqual(fixture,before,'Presentation must not mutate or recalculate the RPC snapshot');
 });
 
@@ -61,7 +62,7 @@ test('financial visibility masks metric text and titles while tonnes remain visi
  for(const marker of ['gross-amount','net-amount','discount-amount']){
   const output=card(html,marker);assert.match(output,/title="••••••"/);assert.match(output,/<span>••••••<\/span>/);
  }
- for(const amount of ['519.190,29','270.683,04','248.507,25'])assert.equal(html.includes(amount),false,'Hidden money must be absent from all rendered text and accessibility attributes');
+ for(const amount of ['519.190,29','270.683,04','248.507,25','143.311,23','88,88%'])assert.equal(html.includes(amount),false,'Hidden money and financial comparisons must be absent from all rendered text and accessibility attributes');
  assert.match(card(html,'loaded-volume'),/title="1\.234,57"/);assert.match(card(html,'loaded-volume'),/<small>t<\/small>/);
  assert.doesNotMatch(html,/R\$/);
 });
@@ -73,8 +74,17 @@ test('pending billing preserves known discounts and tonnes without inventing zer
  }
  assert.match(card(html,'discount-amount'),/title="R\$ 12,34"/);
  assert.match(card(html,'loaded-volume'),/1\.234,57/);
+ assert.doesNotMatch(html,/88,88%/,'Pending current billing must not display a stale financial percentage');
  const hidden=render({visible:false,totals:{grossAmount:'',netAmount:'',discountAmount:'12.34',billingPending:true}});
  assert.doesNotMatch(hidden,/12,34|A apurar/);assert.match(card(hidden,'loaded-volume'),/1\.234,57/);
+});
+
+test('financial comparisons preserve unavailable and zero RPC percentages without recomputing them',()=>{
+ const unavailable=render({comparison:{netChangePercent:'',netAmount:'0'}});
+ assert.match(unavailable,/Sem comparação/);assert.match(unavailable,/Anterior: R\$ 0,00/);assert.doesNotMatch(unavailable,/88,88%/);
+ const zero=render({comparison:{netChangePercent:'0'}});assert.match(zero,/0,00%/);assert.doesNotMatch(zero,/Sem comparação/);
+ const clients=render({scene:3});assert.match(clients,/-12,34%/);assert.match(clients,/Anterior: R\$ 3\.000,00/);
+ const hiddenClients=render({scene:3,visible:false});assert.doesNotMatch(hiddenClients,/-12,34%|3\.000,00|R\$/);
 });
 
 test('zero, negative and long RPC amounts are displayed directly without client-side financial reconciliation',()=>{

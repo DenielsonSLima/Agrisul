@@ -124,3 +124,44 @@
 .executive-tabs{flex-wrap:wrap;row-gap:3px}
 @media(max-width:1200px) and (min-width:761px){.executive-tabs{gap:3px 10px}.executive-tabs>button{font-size:11px;gap:5px}.executive-page-controls>span{margin-right:4px}}
 @media(max-width:760px){.executive-navigation{min-height:56px}.executive-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0 4px;width:100%}.executive-tabs>button{justify-content:center;min-height:26px;white-space:normal}.executive-tabs>button>span{white-space:normal;line-height:1.2}}
+
+/* Informational text keeps readable contrast on the light dashboard surfaces. */
+.executive-dashboard{--dashboard-muted:#52665a;--dashboard-warning:#86591f}
+.executive-dashboard .executive-eyebrow,.executive-dashboard .executive-company,
+.executive-dashboard .executive-tabs>button,.executive-dashboard .executive-page-controls i,
+.executive-dashboard .executive-context,.executive-dashboard .executive-sync,.executive-dashboard .executive-sync small,
+.executive-dashboard .summary-kicker,.executive-dashboard .executive-panel-eyebrow,
+.executive-dashboard .summary-panel-heading p,.executive-dashboard .executive-panel-header p,
+.executive-dashboard .summary-chart-legend,.executive-dashboard .executive-card-caption,
+.executive-dashboard .executive-footer,.executive-dashboard .executive-mobile-views button,
+.executive-dashboard .executive-rank,.executive-dashboard .executive-dimension-title>b small,
+.executive-dashboard .executive-dimension-list dt,.executive-dashboard .executive-dimension-list dd small,
+.executive-dashboard .executive-dimension-list footer,.executive-dashboard .executive-contract-list p,
+.executive-dashboard .executive-contract-progress,.executive-dashboard .executive-contract-list footer,
+.executive-dashboard .executive-harvest-columns dd>small,.executive-dashboard .executive-harvest-columns dd>span,
+.executive-dashboard .executive-harvest-total,.executive-dashboard .executive-metric:not(.is-featured) dd small,
+.executive-dashboard .executive-metric:not(.is-featured)>div{color:var(--dashboard-muted)}
+.executive-dashboard .executive-sync.is-warning,.executive-dashboard .executive-footer:has(.executive-footer-warning)>span:first-child{color:var(--dashboard-warning)}
+.executive-dashboard .executive-pending-tag{color:var(--dashboard-warning)!important}
+.executive-dashboard .executive-metric.is-featured dt,.executive-dashboard .executive-metric.is-featured dd small,.executive-dashboard .executive-metric.is-featured>div{color:#e1f0e7}
+.executive-dashboard .executive-metric-comparison{align-items:flex-start;gap:8px;margin-top:7px;padding-top:6px;border-top:1px solid #dfe7e1;font-size:10px;line-height:1.35}
+.executive-metric-comparison>span{min-width:0;overflow-wrap:anywhere}
+.executive-metric-comparison>span:last-child{text-align:right}
+.executive-metric-comparison small{display:block;font-size:9px;line-height:1.4}
+.executive-metric-comparison strong{display:flex;align-items:center;justify-content:flex-end;gap:2px;color:inherit;font-size:11px;font-weight:650;white-space:nowrap}
+.executive-metric-comparison svg{flex:none}
+.executive-metric.is-featured .executive-metric-comparison{border-color:#ffffff40}
+.dashboard-data-trigger{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;flex:none;margin-top:6px;padding:5px 8px;border:1px solid #cad7ce;border-radius:5px;background:#fff;color:#365b44;font-size:11px;line-height:1.4;cursor:pointer}
+.dashboard-data-trigger:focus-visible,.dashboard-data-dialog :focus-visible{outline:2px solid #176447;outline-offset:3px}
+.dashboard-data-dialog{box-sizing:border-box;position:fixed;inset:0;margin:auto;width:min(1000px,calc(100vw - 32px));max-width:none;max-height:calc(100dvh - 32px);padding:20px;border:1px solid #cddbd2;border-radius:12px;background:#fff;color:#253e2e;box-shadow:0 20px 70px #092c2840;font-size:13px;overflow:auto}
+.dashboard-data-dialog::backdrop{background:#10291f80}
+.dashboard-data-dialog>header{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.dashboard-data-dialog h3{margin:0;font-size:18px;font-weight:650;color:#253e2e}
+.dashboard-data-dialog>header>button{display:grid;place-items:center;flex:none;width:32px;height:32px;border:1px solid #cddbd2;border-radius:6px;background:#fff;color:#365b44;cursor:pointer}
+.dashboard-data-dialog>p{margin:10px 0 16px;color:#52665a;line-height:1.5}
+.dashboard-data-scroll{max-height:60dvh;overflow:auto;overscroll-behavior:contain}
+.dashboard-data-dialog table{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+.dashboard-data-dialog th,.dashboard-data-dialog td{padding:10px 12px;text-align:right;border-bottom:1px solid #dfe7e1;white-space:nowrap}
+.dashboard-data-dialog thead th{position:sticky;top:0;background:#edf4ef;color:#365b44;font-weight:650}
+.dashboard-data-dialog th:first-child{text-align:left}
+.dashboard-data-dialog tbody th{font-weight:500}

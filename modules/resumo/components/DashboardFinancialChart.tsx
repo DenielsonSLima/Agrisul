@@ -7,10 +7,12 @@ import {FINANCIAL_GROUPINGS,type FinancialGrouping} from '../financialGrouping';
 import {DASHBOARD_MONEY_MASK,useDashboardValues} from '../dashboardValues';
 import {financialChartCapacity,financialChartPage,financialChartRows,grossChangeLabel,type FinancialChartRow} from '../utils/financialChart';
 import {chartPeriodLabel as periodLabel,fullChartPeriod as fullPeriod} from '../utils/chartPeriod';
+import {DashboardDataDialog} from './DashboardDataDialog';
 
 type Props={data:ExecutiveSummaryData['months'];dailyData?:ExecutiveFinancialDay[];periodData?:ExecutiveFinancialPeriod[];grouping?:FinancialGrouping;compareVolume?:boolean;title?:string;onSelectMonth?:(month:string)=>void;disabled?:boolean;presenting?:boolean;slideDurationMs?:number};
 const compact=(value:number)=>new Intl.NumberFormat('pt-BR',{notation:'compact',maximumFractionDigits:1}).format(value);
 type BarKey='grossAmount'|'netAmount'|'loadedVolume';
+const comparisonBase=(row:FinancialChartRow,periods:ReadonlyMap<string,FinancialChartRow>)=>row.grossChangeFrom?fullPeriod(periods.get(row.grossChangeFrom)??{...row,key:row.grossChangeFrom,endDate:undefined}):'Sem período anterior com movimento';
 const rawQuote=(row:FinancialChartRow,key:BarKey)=>key==='loadedVolume'?row.loadedVolume===undefined?'A apurar':`${decimalLabel(row.loadedVolume)} t`:row.billingPending?'A apurar':moneyLabel(row[key]);
 const coordinate=(value:string)=>Number.isFinite(Number(value))?Number(value):0;
 type PlotBox={left:number;right:number;top:number;bottom:number};
@@ -25,8 +27,9 @@ function placeChangeBadge(x:number,lineY:number,width:number,height:number,frame
 export function FinancialEvolution({data,dailyData,periodData,grouping='month',compareVolume=false,title,onSelectMonth,disabled,presenting=false,slideDurationMs=120000}:Props){
  const {visible,money}=useDashboardValues(),quote=(row:FinancialChartRow,key:BarKey)=>key==='loadedVolume'||visible?rawQuote(row,key):DASHBOARD_MONEY_MASK;
  const secondary:BarKey=compareVolume?'loadedVolume':'netAmount';
- const id=useId(),plot=useRef<HTMLDivElement>(null),[size,setSize]=useState({width:0,height:0}),[navigation,setNavigation]=useState({signature:'',page:0}),[detailsOpen,setDetailsOpen]=useState(false);
+ const id=useId(),plot=useRef<HTMLDivElement>(null),[size,setSize]=useState({width:0,height:0}),[navigation,setNavigation]=useState({signature:'',page:0});
  const rows=useMemo(()=>financialChartRows(data,dailyData,grouping,periodData),[data,dailyData,grouping,periodData]);
+ const periods=useMemo(()=>new Map(rows.map(row=>[row.key,row])),[rows]);
  const longest=Math.max(8,...rows.flatMap(row=>[rawQuote(row,'grossAmount').length,rawQuote(row,secondary).length]));
  const capacity=financialChartCapacity(size.width-(compareVolume&&size.height>=150?49:0),longest),pages=Math.max(1,Math.ceil(rows.length/capacity));
  const signature=grouping+':'+rows.map(row=>row.key).join('|'),page=navigation.signature===signature?Math.min(navigation.page,pages-1):0;
@@ -36,17 +39,17 @@ export function FinancialEvolution({data,dailyData,periodData,grouping='month',c
  const select=(row:FinancialChartRow)=>{if(!disabled)onSelectMonth?.(row.key.slice(0,7));};
  return <section className="summary-panel summary-evolution dashboard-financial" aria-labelledby={id} data-chart-mode={compareVolume?'gross-volume':'financial'} data-chart-grouping={grouping} data-financial-grouping={grouping} data-visible-periods={shown.length} data-total-periods={rows.length}>
   <header className="summary-panel-heading"><div><span className="summary-kicker"><BarChart3 size={15}/>{compareVolume?'CARREGAMENTOS NO PERÍODO':'RESULTADOS FINANCEIROS'}</span><h3 id={id}>{title??(compareVolume?'Bruto e volume carregado':'Entregas que viram receita')}</h3><p>{FINANCIAL_GROUPINGS.find(item=>item.id===grouping)?.label} · {compareVolume?'bruto (R$) e volume (t)':'bruto e líquido'} pela data do carregamento.</p></div></header>
-  <div className="summary-chart-legend dashboard-financial-legend" aria-label="Legenda"><span><i className="gross"/>{compareVolume?'Bruto (R$)':'Bruto'}</span><span><i className="net"/>{compareVolume?'Volume (t)':'Líquido'}</span><span><i className="trend"/>Evolução do bruto · %{compareVolume?'':' entre períodos'}</span></div>
+  <div className="summary-chart-legend dashboard-financial-legend" aria-label="Legenda"><span><i className="gross"/>{compareVolume?'Bruto (R$)':'Bruto'}</span><span><i className="net"/>{compareVolume?'Volume (t)':'Líquido'}</span><span><i className="trend"/>Variação do bruto · % vs. período anterior com movimento</span></div>
   <div ref={plot} className="summary-chart dashboard-financial-plot">
-   {rows.length?size.width>0&&size.height>0&&<FinancialPlot compareVolume={compareVolume} rows={shown} width={size.width} height={size.height} onSelect={onSelectMonth&&!disabled?select:undefined}/>:<div className="summary-chart-empty"><span><BarChart3 size={25}/></span><strong>Nenhuma movimentação nesta seleção</strong><p>Ajuste os filtros para explorar outro recorte.</p></div>}
+   {rows.length?size.width>0&&size.height>0&&<FinancialPlot compareVolume={compareVolume} rows={shown} periods={periods} width={size.width} height={size.height} onSelect={onSelectMonth&&!disabled?select:undefined}/>:<div className="summary-chart-empty"><span><BarChart3 size={25}/></span><strong>Nenhuma movimentação nesta seleção</strong><p>Ajuste os filtros para explorar outro recorte.</p></div>}
   </div>
   {shown.length>0&&<footer className="dashboard-financial-pagination"><span>{fullPeriod(shown[0])}{shown.length>1?' — '+fullPeriod(shown[shown.length-1]):''}</span>{pages>1&&<nav aria-label="Períodos do gráfico financeiro"><button type="button" aria-label="Períodos anteriores" disabled={page>=pages-1} onClick={()=>navigate(page+1)}><ChevronLeft size={13}/></button><span>{pages-page} / {pages}</span><button type="button" aria-label="Próximos períodos" disabled={page===0} onClick={()=>navigate(page-1)}><ChevronRight size={13}/></button></nav>}</footer>}
   {rows.some(row=>row.billingPending)&&<p className="summary-chart-note">ATR ou cotação incompletos: o valor financeiro do período fica A apurar.</p>}
-  <details className="summary-data-details" onToggle={event=>setDetailsOpen(event.currentTarget.open)}><summary>Ver dados financeiros</summary>{detailsOpen&&<div className="summary-table-wrap" tabIndex={0} role="region" aria-label="Dados financeiros da seleção"><table className="summary-table"><thead><tr><th scope="col">Período</th><th scope="col">Bruto</th><th scope="col">{compareVolume?'Volume (t)':'Líquido'}</th><th scope="col">Variação do bruto</th><th scope="col">Entradas em caixa</th></tr></thead><tbody>{rows.map(row=><tr key={row.key}><th scope="row">{fullPeriod(row)}</th><td>{quote(row,'grossAmount')}</td><td>{quote(row,secondary)}</td><td>{visible?grossChangeLabel(row):DASHBOARD_MONEY_MASK}</td><td>{money(row.receivedAmount)}</td></tr>)}</tbody></table></div>}</details>
+  <DashboardDataDialog title="Dados financeiros por período" description="Todos os períodos com movimento da seleção aplicada. Faturamento pela data do carregamento; entradas em caixa pela data do recebimento. A variação do bruto compara o período anterior com movimento, indicado na tabela; valores com ATR ou cotação pendentes ficam a apurar."><table><caption className="sr-only">Dados financeiros da seleção</caption><thead><tr><th scope="col">Período</th><th scope="col">Bruto</th><th scope="col">{compareVolume?'Volume (t)':'Líquido'}</th><th scope="col">Variação do bruto</th><th scope="col">Base da variação</th><th scope="col">Entradas em caixa</th></tr></thead><tbody>{rows.map(row=><tr key={row.key}><th scope="row">{fullPeriod(row)}</th><td>{quote(row,'grossAmount')}</td><td>{quote(row,secondary)}</td><td>{visible?grossChangeLabel(row):DASHBOARD_MONEY_MASK}</td><td>{comparisonBase(row,periods)}</td><td>{money(row.receivedAmount)}</td></tr>)}</tbody></table></DashboardDataDialog>
  </section>;
 }
 
-function FinancialPlot({rows,width,height,compareVolume,onSelect}:{rows:FinancialChartRow[];width:number;height:number;compareVolume:boolean;onSelect?: (row:FinancialChartRow)=>void}){
+function FinancialPlot({rows,periods,width,height,compareVolume,onSelect}:{rows:FinancialChartRow[];periods:ReadonlyMap<string,FinancialChartRow>;width:number;height:number;compareVolume:boolean;onSelect?: (row:FinancialChartRow)=>void}){
  const {visible}=useDashboardValues(),quote=(row:FinancialChartRow,key:BarKey)=>key==='loadedVolume'||visible?rawQuote(row,key):DASHBOARD_MONEY_MASK;
  const secondary:BarKey=compareVolume?'loadedVolume':'netAmount',keys:BarKey[]=['grossAmount',secondary],secondaryLabel=compareVolume?'volume':'líquido';
  const known=(row:FinancialChartRow,key:BarKey)=>key==='loadedVolume'?row.loadedVolume!==undefined&&row.loadedVolume!=='':!row.billingPending&&row[key]!=='';
@@ -64,14 +67,14 @@ function FinancialPlot({rows,width,height,compareVolume,onSelect}:{rows:Financia
  const changeQuote=(row:FinancialChartRow)=>visible?grossChangeLabel(row):DASHBOARD_MONEY_MASK;
  const amountLabels=rows.flatMap((row,index)=>{const center=centers[index],pairTop=Math.min(zero,...keys.map(key=>barScale(key)(known(row,key)?coordinate(row[key]!):0))),spacing=compactHeight?14:18,firstLabel=Math.max(font+2,pairTop-spacing-9);return keys.map((key,series)=>({id:row.key+key,series,x:stacked?center:center+(series?1:-1)*slot*.24,y:stacked?firstLabel+series*spacing:Math.min(barScale(key)(known(row,key)?coordinate(row[key]!):0),zero)-9,text:(stacked?(series?compareVolume?'Volume ':'Líquido ':'Bruto '):'')+quote(row,key)}));});
  const labelBoxes:PlotBox[]=amountLabels.map(label=>({left:label.x-label.text.length*font*.66/2-3,right:label.x+label.text.length*font*.66/2+3,top:label.y-font-3,bottom:label.y+5}));
- return <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${compareVolume?'Faturamento bruto em reais e volume em toneladas, em escalas independentes':'Bruto e líquido'} por período em barras. Linha pontilhada do faturamento bruto, com variação percentual entre períodos. Valores visíveis acima das barras.`}>
+ return <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${compareVolume?'Faturamento bruto em reais e volume em toneladas, em escalas independentes':'Bruto e líquido'} por período em barras. Linha pontilhada do faturamento bruto, com variação percentual em relação ao período anterior com movimento. Valores visíveis acima das barras.`}>
   {!compactHeight&&<text x={left-9} y={12} textAnchor="end" className="dashboard-financial-axis">R$</text>}
   {(compactHeight?[0]:ticks).map(value=><g key={value}><line x1={left} x2={width-right} y1={scale(value)} y2={scale(value)} stroke="#e2ebe5" strokeDasharray="3 5"/>{!compactHeight&&<text x={left-9} y={scale(value)+4} textAnchor="end" className="dashboard-financial-axis">{visible?compact(value):'•••'}</text>}</g>)}
   {compareVolume&&!compactHeight&&<g className="dashboard-volume-axis"><text x={width-right+9} y={12} textAnchor="start" className="dashboard-financial-axis">t</text>{Array.from({length:Math.round(volumeMax/volumeStep)+1},(_,i)=>i*volumeStep).map(value=><text key={value} x={width-right+9} y={volumeScale(value)+4} textAnchor="start" className="dashboard-financial-axis">{compact(value)}</text>)}</g>}
   {rows.map((row,index)=>{
    const center=centers[index],start=center-slot*.24,end=center+slot*.24;
-   return <g key={row.key} className="dashboard-financial-period" role={onSelect?'button':undefined} tabIndex={onSelect?0:undefined} onClick={()=>onSelect?.(row)} onKeyDown={event=>{if(onSelect&&(event.key==='Enter'||event.key===' ')){event.preventDefault();onSelect(row);}}} aria-label={`${fullPeriod(row)}: bruto ${quote(row,'grossAmount')}; ${secondaryLabel} ${quote(row,secondary)}; variação do bruto ${changeQuote(row)}.`}>
-    <title>{fullPeriod(row)}: bruto {quote(row,'grossAmount')}; {secondaryLabel} {quote(row,secondary)}; variação do bruto {changeQuote(row)}.</title>
+   return <g key={row.key} className="dashboard-financial-period" role={onSelect?'button':undefined} tabIndex={onSelect?0:undefined} onClick={()=>onSelect?.(row)} onKeyDown={event=>{if(onSelect&&(event.key==='Enter'||event.key===' ')){event.preventDefault();onSelect(row);}}} aria-label={`${fullPeriod(row)}: bruto ${quote(row,'grossAmount')}; ${secondaryLabel} ${quote(row,secondary)}; variação do bruto ${changeQuote(row)}; base: ${comparisonBase(row,periods)}.`}>
+    <title>{fullPeriod(row)}: bruto {quote(row,'grossAmount')}; {secondaryLabel} {quote(row,secondary)}; variação do bruto {changeQuote(row)}; base: {comparisonBase(row,periods)}.</title>
     {keys.map((key,series)=>{const value=known(row,key)?coordinate(row[key]!):0,tip=barScale(key)(value),baseline=barScale(key)(0),x=series?end:start;return known(row,key)&&<rect key={key} x={x-barWidth/2} y={Math.min(tip,baseline)} width={barWidth} height={Math.max(0,Math.abs(tip-baseline))} rx={4} fill={series?'#2d8a63':'#bbd3c4'} className={`dashboard-financial-bar is-${series?compareVolume?'volume':'net':'gross'}`}/>;})}
     <text x={center} y={height-7} textAnchor="middle" className="dashboard-financial-date">{periodLabel(row)}</text>
    </g>;
@@ -81,14 +84,14 @@ function FinancialPlot({rows,width,height,compareVolume,onSelect}:{rows:Financia
   {rows.map((row,index)=>{
    const single=rows.length===1&&!!row.grossChangeFrom;
    if(!knownGross(row)||index===0&&!single||index>0&&!knownGross(rows[index-1]))return null;
-   const previous=single?periodLabel({...row,key:row.grossChangeFrom!,endDate:undefined}):fullPeriod(rows[index-1]);
-   const text=changeQuote(row)+(single?` vs ${previous}`:''),labelFont=compactHeight?9:preferredFont,labelWidth=Math.max(66,Math.min(slot*.8,text.length*labelFont*.62+20)),labelHeight=compactHeight?20:28;
+   const previous=comparisonBase(row,periods);
+   const text=changeQuote(row)+(single?` vs ${periodLabel({...row,key:row.grossChangeFrom!,endDate:undefined})}`:''),labelFont=compactHeight?9:preferredFont,labelWidth=Math.max(66,Math.min(slot*.8,text.length*labelFont*.62+20)),labelHeight=compactHeight?20:28;
    const lineX=single?centers[index]:(centers[index-1]+centers[index])/2,lineY=single?scale(coordinate(row.grossAmount)):(scale(coordinate(rows[index-1].grossAmount))+scale(coordinate(row.grossAmount)))/2;
    const {x,y}=placeChangeBadge(lineX,lineY,labelWidth,labelHeight,{left,right:width-right,top,bottom:height-bottom-3},labelBoxes);
    labelBoxes.push({left:x-labelWidth/2,right:x+labelWidth/2,top:y-labelHeight/2,bottom:y+labelHeight/2});
    const direction=!visible||!row.grossChangePercent||/^0(?:\.0*)?$/.test(row.grossChangePercent)?'neutral':row.grossChangePercent.startsWith('-')?'down':'up';
    return <g key={row.key} className={`dashboard-financial-change is-${direction}`} aria-label={`Variação do bruto de ${previous} para ${fullPeriod(row)}: ${changeQuote(row)}`}>
-    <title>Variação do faturamento bruto: {text}</title><line x1={lineX} y1={lineY} x2={x} y2={y} stroke="#c18a39" strokeWidth={1}/><rect x={x-labelWidth/2} y={y-labelHeight/2} width={labelWidth} height={labelHeight} rx={6}/><text x={x} y={y+labelFont*.34} textAnchor="middle" fontSize={Math.min(labelFont,(labelWidth-12)/Math.max(1,text.length*.62))}>{text}</text>
+    <title>Variação do faturamento bruto de {previous} para {fullPeriod(row)}: {changeQuote(row)}</title><line x1={lineX} y1={lineY} x2={x} y2={y} stroke="#c18a39" strokeWidth={1}/><rect x={x-labelWidth/2} y={y-labelHeight/2} width={labelWidth} height={labelHeight} rx={6}/><text x={x} y={y+labelFont*.34} textAnchor="middle" fontSize={Math.min(labelFont,(labelWidth-12)/Math.max(1,text.length*.62))}>{text}</text>
    </g>;
   })}
   <g aria-hidden="true" pointerEvents="none">{amountLabels.map(label=><text key={label.id} x={label.x} y={label.y} textAnchor="middle" fontSize={font} className={`dashboard-financial-value-label is-${label.series?compareVolume?'volume':'net':'gross'}`}>{label.text}</text>)}</g>
