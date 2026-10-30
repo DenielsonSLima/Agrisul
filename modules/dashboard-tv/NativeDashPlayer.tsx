@@ -94,7 +94,7 @@ export function NativeDashPlayer({videoId,title,autoplay,paused,onActiveChange,o
      return request;
     }
    });
-   engine.on(dash.MediaPlayer.events.ERROR,()=>mediaError());
+   engine.on(dash.MediaPlayer.events.ERROR,event=>{const detail=event.error,code=detail&&typeof detail==='object'&&'code' in detail?detail.code:undefined;console.error('dashboard-tv playback error',JSON.stringify({code,time:video.currentTime,mediaError:video.error?.code}));mediaError();});
    engine.on(dash.MediaPlayer.events.PLAYBACK_NOT_ALLOWED,()=>{if(!disposed&&!failed){clearTimeout(startupTimer);engine.updateSettings({streaming:{scheduling:{scheduleWhilePaused:false}}});setStatus('blocked');callbacks.current.onActiveChange?.(false);}});
    manifestUrl=URL.createObjectURL(new Blob([manifest],{type:'application/dash+xml'}));
    resume.current=shouldLoad&&pausedRef.current;

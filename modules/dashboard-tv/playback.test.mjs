@@ -1,9 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createPlaybackResolver} from './playback.ts';
-import {MAX_TV_RANGE_BYTES,playbackVideoId,playbackItag,playbackRange,preflightMediaIndex,trustedMediaUrl,assertTvUploader,validateMediaResponse,verifyTvVideo} from './playbackSafety.ts';
+import {MAX_TV_RANGE_BYTES,playbackVideoId,playbackItag,playbackRange,preflightMediaIndex,preflightMediaRepresentation,trustedMediaUrl,assertTvUploader,validateMediaResponse,verifyTvVideo} from './playbackSafety.ts';
 import {TV_CHANNELS} from './catalog.ts';
-
 test('media endpoints accept only video IDs, numeric formats and the five actual uploader IDs',()=>{
  assert.equal(playbackVideoId('wkNChZCvJKY'),'wkNChZCvJKY');assert.equal(playbackItag('140'),140);
  assertTvUploader(TV_CHANNELS[0].channelId);
@@ -17,7 +16,7 @@ test('deciphered destinations are exclusively HTTPS Google video playback, never
  for(const url of ['http://rr1.googlevideo.com/videoplayback','https://evil.com/videoplayback','https://googlevideo.com.evil.com/videoplayback','https://googlevideo.com/videoplayback','https://127.0.0.1/videoplayback','https://rr1.googlevideo.com:444/videoplayback','https://user:pass@rr1.googlevideo.com/videoplayback','https://rr1.googlevideo.com/other'])assert.throws(()=>trustedMediaUrl(url));
 });
 
-test('blocked upstream responses allow another client without mistaking missing publisher data for foreign access',()=>{
+test('blocked upstream responses remain distinct from confirmed foreign publisher access',()=>{
  const id='wkNChZCvJKY',channelId=TV_CHANNELS[0].channelId;
  assert.throws(()=>verifyTvVideo(id,{status:'LOGIN_REQUIRED'}),{status:503});
  assert.throws(()=>verifyTvVideo(id,{status:'OK',id}),{status:503});
@@ -70,4 +69,18 @@ test('stalled extraction times out, rejects excess concurrent work, and releases
  const get=createPlaybackResolver({timeoutMs:15,maxPending:1,resolve:async()=>stalled?new Promise(()=>{}):{manifest:'<MPD/>',formats:new Map(),expiresAt:Date.now()+300000}});
  const blocked=get('wkNChZCvJKY');await assert.rejects(get('b7VD7J75j_M'),{status:429});await assert.rejects(blocked,{status:503});
  stalled=false;assert.equal((await get('wkNChZCvJKY')).manifest,'<MPD/>');
+});
+
+test('preflight verifies SIDX and distant/final audio bytes instead of accepting the first playable megabyte',async()=>{
+ const total=8*1024*1024,url='https://rr1.googlevideo.com/videoplayback?itag=140',ranges=[];
+ const fetchImpl=async(_input,{headers})=>{
+  const match=/^bytes=(\d+)-(\d+)$/.exec(headers.Range),start=Number(match[1]),end=Number(match[2]);ranges.push(headers.Range);
+  const bytes=new Uint8Array(end-start+1);if(start===100)bytes.set([0,0,0,12,115,105,100,120]);
+  return new Response(bytes,{status:206,headers:{'Content-Range':`bytes ${start}-${end}/${total}`,'Content-Length':String(bytes.length),'Content-Type':'audio/mp4'}});
+ };
+ assert.equal(await preflightMediaRepresentation(url,'bytes=100-111',total,fetchImpl),true);
+ assert.deepEqual(new Set(ranges),new Set(['bytes=100-111','bytes=1500000-1501023',`bytes=${total-1024}-${total-1}`]));
+ const restricted=async(input,init)=>Number(init.headers.Range.match(/\d+/)[0])>=1048576?new Response('limited',{status:403}):fetchImpl(input,init);
+ assert.equal(await preflightMediaRepresentation(url,'bytes=100-111',total,restricted),false,'The previous false startup followed by a 12-second stop is rejected');
+ assert.equal(await preflightMediaRepresentation(url,'bytes=100-111',undefined,fetchImpl),false);
 });

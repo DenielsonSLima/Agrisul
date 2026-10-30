@@ -65,3 +65,30 @@ export async function preflightMediaIndex(url:string,header:string,total:number|
  }catch{return false;}
  finally{clearTimeout(timer);controller.abort();await response?.body?.cancel().catch(()=>{});}
 }
+
+async function preflightMediaChunk(url:string,range:ReturnType<typeof playbackRange>,fetchImpl:typeof fetch){
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);
+ let response:Response|undefined;
+ try{
+  response=await fetchImpl(trustedMediaUrl(url),{headers:{Range:range.header},redirect:'error',signal:controller.signal});
+  const media=validateMediaResponse(response,range),reader=response.body!.getReader();let received=0;
+  try{for(;;){const chunk=await reader.read();if(chunk.done)break;received+=chunk.value.byteLength;if(received>media.length)return false;}}
+  finally{await reader.cancel().catch(()=>{});}
+  return received===media.length;
+ }catch{return false;}
+ finally{clearTimeout(timer);controller.abort();await response?.body?.cancel().catch(()=>{});}
+}
+
+/** A valid SIDX alone does not prove that later audio/video chunks are available. */
+export async function preflightMediaRepresentation(url:string,indexHeader:string,total:number|undefined,fetchImpl:typeof fetch=fetch){
+ if(!Number.isSafeInteger(total)||!total||total<8)return false;
+ const length=total as number,index=playbackRange(indexHeader,length);
+ if(index.length>256*1024)return false;
+ const lastStart=Math.max(0,length-1024),farStart=Math.min(1500000,lastStart);
+ const sampleHeaders=new Set([`bytes=${farStart}-${Math.min(length-1,farStart+1023)}`,`bytes=${lastStart}-${length-1}`]);
+ const checks=await Promise.all([
+  preflightMediaIndex(url,indexHeader,length,fetchImpl),
+  ...[...sampleHeaders].map(header=>preflightMediaChunk(url,playbackRange(header,length),fetchImpl)),
+ ]);
+ return checks.every(Boolean);
+}

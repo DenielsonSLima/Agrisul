@@ -1,16 +1,14 @@
-import {verifyTvVideo,playbackItag,playbackVideoId,preflightMediaIndex,trustedMediaUrl,TvPlaybackError} from './playbackSafety.ts';
+import {verifyTvVideo,playbackItag,playbackVideoId,preflightMediaRepresentation,trustedMediaUrl,TvPlaybackError} from './playbackSafety.ts';
 import {isHorizontalVideo} from './videoFormat.ts';
 
 type ResolvedFormat={url:string;mimeType:string;contentLength:number|undefined};
 export type TvPlayback={manifest:string;formats:Map<number,ResolvedFormat>;expiresAt:number};
 type Youtube=Awaited<ReturnType<typeof import('youtubei.js')['Innertube']['create']>>;
-let client:Promise<Youtube>|null=null,clientCreated=0;
 const SESSION_MS=60*60*1000;
+let client:Promise<Youtube>|null=null,clientCreated=0;
 
-async function getYoutube(){
- if(client&&Date.now()-clientCreated<SESSION_MS)return client;
- clientCreated=Date.now();
- client=(async()=>{
+async function createYoutube():Promise<Youtube>{
+ try{
   const [{Innertube,Log,Platform},{getQuickJS,shouldInterruptAfterDeadline}]=await Promise.all([import('youtubei.js'),import('quickjs-emscripten')]);
   Log.setLevel(Log.Level.NONE);
   const quickjs=await getQuickJS();
@@ -18,22 +16,27 @@ async function getYoutube(){
   Platform.shim.eval=async data=>quickjs.evalCode(`(function(){${data.output}\n})()`,{shouldInterrupt:shouldInterruptAfterDeadline(Date.now()+3000),memoryLimitBytes:32*1024*1024,maxStackSizeBytes:1024*1024});
   const fetchImpl:typeof fetch=async(input,init={})=>{
    const target=new URL(typeof input==='string'?input:input instanceof URL?input.toString():input.url);
-   if(target.protocol!=='https:'||!['www.youtube.com','youtube.com','youtubei.googleapis.com','www.google.com','jnn-pa.googleapis.com'].includes(target.hostname)||target.username||target.password||target.port)throw new TvPlaybackError('Serviço de vídeo indisponível.');
+   if(target.protocol!=='https:'||!['www.youtube.com','youtube.com','youtubei.googleapis.com','www.google.com'].includes(target.hostname)||target.username||target.password||target.port)throw new TvPlaybackError('Serviço de vídeo indisponível.');
    const sourceSignal=init.signal??(input instanceof Request?input.signal:undefined);
    return fetch(input,{...init,redirect:'error',signal:sourceSignal?AbortSignal.any([sourceSignal,AbortSignal.timeout(18000)]):AbortSignal.timeout(18000)});
   };
-  return Innertube.create({fetch:fetchImpl,retrieve_player:true,generate_session_locally:true,enable_session_cache:false,lang:'pt',location:'BR'});
- })().catch(()=>{client=null;throw new TvPlaybackError('Não foi possível iniciar o serviço de vídeo.');});
- return client;
+  const youtube=await Innertube.create({fetch:fetchImpl,retrieve_player:true,generate_session_locally:false,fail_fast:true,enable_session_cache:false,lang:'pt',location:'BR'});
+  if(!youtube.session.context.client.visitorData)throw new TvPlaybackError('Não foi possível iniciar a sessão de vídeo.');
+  return youtube;
+ }catch{throw new TvPlaybackError('Não foi possível iniciar o serviço de vídeo.');}
+}
+
+export async function getYoutube(){
+ if(client&&Date.now()-clientCreated<SESSION_MS)return client;
+ clientCreated=Date.now();
+ const pending=createYoutube();client=pending;
+ return pending.catch(error=>{if(client===pending)client=null;throw error;});
 }
 
 async function resolveVideo(videoId:string):Promise<TvPlayback>{
- const youtube=await getYoutube();
- const clients=['WEB','MWEB','IOS','ANDROID_VR'] as const;
- for(const clientName of clients){
-  try{
-   const info=await youtube.getBasicInfo(videoId,{client:clientName});
-   console.info('dashboard-tv player response',{client:clientName,status:info.playability_status?.status??'unknown',hasPublisher:!!info.basic_info.channel_id});
+ try{
+   const youtube=await getYoutube();
+   const info=await youtube.getBasicInfo(videoId,{client:'VISIONOS'});
    verifyTvVideo(videoId,{id:info.basic_info.id,channelId:info.basic_info.channel_id,status:info.playability_status?.status,private:info.basic_info.is_private,live:info.basic_info.is_live,upcoming:info.basic_info.is_upcoming,postLive:info.basic_info.is_post_live_dvr});
    const available=info.streaming_data?.adaptive_formats??[];
    const compatible=available.filter(format=>!format.drm_families?.length&&!format.is_type_otf&&!!format.init_range&&!!format.index_range&&(
@@ -49,7 +52,7 @@ async function resolveVideo(videoId:string):Promise<TvPlayback>{
     try{
      const url=trustedMediaUrl(await format.decipher(youtube.session.player));
      const range=format.index_range!;
-     return await preflightMediaIndex(url.toString(),`bytes=${range.start}-${range.end}`,format.content_length)?format:null;
+     return await preflightMediaRepresentation(url.toString(),`bytes=${range.start}-${range.end}`,format.content_length)?format:null;
     }catch{return null;}
    }));
    const supported=playable.filter((format):format is NonNullable<typeof format>=>!!format);
@@ -68,29 +71,24 @@ async function resolveVideo(videoId:string):Promise<TvPlayback>{
    if(!urls.length||urls.some(url=>!url.startsWith(`/api/dashboard-tv/stream?videoId=${videoId}&amp;itag=`)))throw new TvPlaybackError('Não foi possível preparar o vídeo.');
    const expires=Math.min(...[...formats.values()].map(format=>Number(new URL(format.url).searchParams.get('expire'))*1000).filter(expiry=>Number.isFinite(expiry)&&expiry>Date.now()));
    return {manifest:safeManifest,formats,expiresAt:Math.min(Date.now()+300000,expires-60000)};
-  }catch(error){
-   if(error instanceof TvPlaybackError&&error.status===403)throw error;
-   if(clientName===clients.at(-1))throw error instanceof TvPlaybackError?error:new TvPlaybackError('Não foi possível preparar este vídeo. Tente outro vídeo ou abra o canal.');
-  }
- }
- throw new TvPlaybackError('Vídeo temporariamente indisponível.');
+ }catch(error){throw error instanceof TvPlaybackError?error:new TvPlaybackError('Não foi possível preparar este vídeo. Tente novamente.');}
 }
 
-export function createPlaybackResolver({resolve=resolveVideo,now=Date.now,maxEntries=64,maxPending=8,timeoutMs=40000}:{resolve?:(id:string)=>Promise<TvPlayback>;now?:()=>number;maxEntries?:number;maxPending?:number;timeoutMs?:number}={}){
+export function createPlaybackResolver({resolve=resolveVideo,now=Date.now,maxEntries=64,maxPending=8,timeoutMs=45000}:{resolve?:(id:string)=>Promise<TvPlayback>;now?:()=>number;maxEntries?:number;maxPending?:number;timeoutMs?:number}={}){
  const cache=new Map<string,TvPlayback>(),pending=new Map<string,Promise<TvPlayback>>();
  return async function getPlayback(raw:string,{refresh=false}:{refresh?:boolean}={}){
-  const videoId=playbackVideoId(raw);
+  const videoId=playbackVideoId(raw),cacheKey=videoId;
   for(const [key,value]of cache)if(value.expiresAt<=now())cache.delete(key);
-  const current=cache.get(videoId);if(current&&!refresh)return current;
-  if(pending.has(videoId))return pending.get(videoId)!;
+  const current=cache.get(cacheKey);if(current&&!refresh)return current;
+  if(pending.has(cacheKey))return pending.get(cacheKey)!;
   if(pending.size>=maxPending)throw new TvPlaybackError('Há muitos vídeos sendo preparados. Aguarde e tente novamente.',429);
   let timer:ReturnType<typeof setTimeout>|undefined;
   const timeout=new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(new TvPlaybackError('O vídeo demorou para ficar disponível. Tente novamente.')),timeoutMs);});
   const task=Promise.race([resolve(videoId),timeout]).then(value=>{
    while(cache.size>=maxEntries){const oldest=cache.keys().next().value;if(oldest===undefined)break;cache.delete(oldest);}
-   cache.set(videoId,value);return value;
-  }).finally(()=>{clearTimeout(timer);pending.delete(videoId);});
-  pending.set(videoId,task);return task;
+   cache.set(cacheKey,value);return value;
+  }).finally(()=>{clearTimeout(timer);pending.delete(cacheKey);});
+  pending.set(cacheKey,task);return task;
  };
 }
 export const getTvPlayback=createPlaybackResolver();
