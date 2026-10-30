@@ -73,6 +73,10 @@ const visualUrl=dataUrl(`import {createElement} from ${JSON.stringify(reactUrl)}
 const {observed}=await import(visualUrl);
 const linkUrl=dataUrl(`import {createElement} from ${JSON.stringify(reactUrl)};export const ModuleLink=({children,...props})=>createElement('a',props,children);`);
 const iconsUrl=dataUrl('export const ArrowUpRight=()=>null,ChevronLeft=()=>null,ChevronRight=()=>null;');
+const clientChartsUrl=dataUrl(transpile(readFileSync(new URL('../modules/resumo/components/DashboardContractClientCharts.tsx',import.meta.url),'utf8'))
+ .replace(/from ['"]react['"]/g,`from ${JSON.stringify(reactUrl)}`)
+ .replace(/from ['"]react\/jsx-runtime['"]/g,`from ${JSON.stringify(jsxUrl)}`)
+ .replace(/from ['"]@\/shared\/utils\/presentation['"]/g,`from ${JSON.stringify(sharedUrl)}`));
 const analysisSource=transpile(readFileSync(new URL('../modules/resumo/components/DashboardContractAnalysis.tsx',import.meta.url),'utf8')+'\nexport {GeneralComparison,ClientComparison,ContractCards};')
  .replace(/from ['"]react['"]/g,`from ${JSON.stringify(reactUrl)}`)
  .replace(/from ['"]react\/jsx-runtime['"]/g,`from ${JSON.stringify(jsxUrl)}`)
@@ -80,7 +84,8 @@ const analysisSource=transpile(readFileSync(new URL('../modules/resumo/component
  .replace(/from ['"]@\/shared\/navigation\/ModuleNavigation['"]/g,`from ${JSON.stringify(linkUrl)}`)
  .replace(/from ['"]@\/shared\/utils\/presentation['"]/g,`from ${JSON.stringify(sharedUrl)}`)
  .replace(/from ['"]\.\.\/hooks\/usePlotSize['"]/g,`from ${JSON.stringify(plotUrl)}`)
- .replace(/from ['"]\.\/DashboardVisuals['"]/g,`from ${JSON.stringify(visualUrl)}`);
+ .replace(/from ['"]\.\/DashboardVisuals['"]/g,`from ${JSON.stringify(visualUrl)}`)
+ .replace(/from ['"]\.\/DashboardContractClientCharts['"]/g,`from ${JSON.stringify(clientChartsUrl)}`);
 const {GeneralComparison,ClientComparison,ContractCards}=await import(dataUrl(analysisSource));
 const client={id:'client-a',name:'CLIENTE COM NOME COMPLETO MUITO LONGO PARA COMPARAÇÃO DOS CONTRATOS MANUAIS E MECANIZADOS',overall:comparison.overall,types:comparison.types};
 const otherClient={...client,id:'client-b',name:'Outro cliente com contratos'};
@@ -89,19 +94,19 @@ const otherContract={...contract,id:'contract-b',contractNumber:'CTR-002',client
 const performance={id:contract.id,periodLoadedVolume:'60.006',averageAtr:'140.603216',periodLoadCount:3,totalLoadedVolume:'777.123',contractedVolume:'1000',deliveryPercent:'77.7123'};
 const detailData={contracts:[contract,otherContract],contractPerformance:[performance]};
 const metadata={...comparison,contracts:[{id:contract.id,clientId:client.id,typeCode:'1',typeName:'MANUAL'},{id:otherContract.id,clientId:otherClient.id,typeCode:'unknown',typeName:'Manual e Mecanizado'}]};
-const renderClients=(rows=[client],height=0)=>{dimensions.height=height;return renderToStaticMarkup(createElement(ClientComparison,{rows,presenting:false,slideDurationMs:120000}));};
-const renderContracts=(height=0)=>{dimensions.height=height;return renderToStaticMarkup(createElement(ContractCards,{data:detailData,comparison:metadata,presenting:false,slideDurationMs:120000}));};
-const matrixRow=(html,code)=>{const match=html.match(new RegExp(`data-comparison-type="${code}"[^>]*>([\\s\\S]*?)<\\/tr>`));assert.ok(match,`Expected comparison row ${code}`);return match[1];};
+const renderClients=(rows=[client],height=0,width=600)=>{dimensions.height=height;dimensions.width=width;return renderToStaticMarkup(createElement(ClientComparison,{rows,presenting:false,slideDurationMs:120000}));};
+const renderContracts=(height=0,width=600,data=detailData)=>{dimensions.height=height;dimensions.width=width;return renderToStaticMarkup(createElement(ContractCards,{data,comparison:metadata,presenting:false,slideDurationMs:120000}));};
+const matrixRow=(html,code)=>{const marker=`data-comparison-type="${code}"`,start=html.indexOf(marker);assert.ok(start>=0,`Expected comparison row ${code}`);const end=html.indexOf('data-comparison-type=',start+marker.length);return html.slice(start,end<0?undefined:end);};
 const matrixCell=(row,marker)=>{
- const match=row.match(new RegExp(`<td\\b[^>]*data-comparison-value="${marker}"[^>]*>([\\s\\S]*?)<\\/td>`));
- assert.ok(match,`Expected comparison cell ${marker}`);return match[1].replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim();
+ const match=row.match(new RegExp(`data-comparison-value="${marker}"[^>]*title="([^"]+)"`));
+ assert.ok(match,`Expected comparison value ${marker}`);return match[1];
 };
 
 test('general and per-client comparisons keep unclassified contracts explicit and preserve every official volume and ATR',()=>{
  const general=renderToStaticMarkup(createElement(GeneralComparison,{comparison}));
  assert.match(general,/Não classificado: 12,01 t · 2 contrato\(s\)/);
  assert.deepEqual(observed.bars.rows.map(row=>row.id),['1','2','unknown']);assert.equal(observed.bars.showAtr,true);assert.equal(observed.bars.showValues,true);
- const html=renderClients();assert.ok(html.includes(`<h4>${client.name}</h4>`));assert.match(html,/data-comparison-client-id="client-a"/);
+ const html=renderClients();assert.ok(html.includes(`<h4>${client.name}</h4>`));assert.match(html,/data-comparison-client-id="client-a"/);assert.doesNotMatch(html,/<table/);
  for(const [code,label,volume,atr] of [['overall','Geral','122,03','135,28'],['1','Manual','60,01','140,60'],['2','Mecanizada','50,01','150,88'],['unknown','Não classificado','12,01','116,38']]){
   const row=matrixRow(html,code);assert.ok(row.includes(label));assert.equal(matrixCell(row,'volume'),volume);assert.equal(matrixCell(row,'atr'),atr);
  }
@@ -117,7 +122,9 @@ test('contract cards separate current period figures from lifetime progress and 
  assert.match(short,/data-contract-period="volume"[\s\S]*?title="60,01"/);assert.match(short,/data-contract-period="atr"[\s\S]*?title="140,60"/);
  assert.match(short,/Acumulado \/ contratado/);assert.match(short,/777,12 \/ 1\.000,00 t/);assert.match(short,/77,71%/);assert.match(short,/Página seguinte|Próxima página · Contratos/);
  assert.match(short,/MANUAL/);assert.doesNotMatch(short,/99\.999,99|R\$/);
- const tall=renderContracts(600);assert.match(tall,/data-contract-page-size="2"/);assert.equal([...tall.matchAll(/data-comparison-contract-id=/g)].length,2);assert.match(tall,/Não classificado/);assert.match(tall,/Meta a apurar/);
+ const tall=renderContracts(600,900);assert.match(tall,/data-contract-page-size="2"/);assert.equal([...tall.matchAll(/data-comparison-contract-id=/g)].length,2);assert.match(tall,/Não classificado/);assert.match(tall,/Meta a apurar/);
+ const thirdContract={...contract,id:'contract-c'},desktop=renderContracts(340,1800,{...detailData,contracts:[contract,otherContract,thirdContract]});assert.match(desktop,/data-contract-page-size="3"/);assert.equal([...desktop.matchAll(/data-comparison-contract-id=/g)].length,3);
+ const mobile=renderContracts(600,360);assert.match(mobile,/data-contract-page-size="1"/);assert.equal([...mobile.matchAll(/data-comparison-contract-id=/g)].length,1);
  const shortClients=renderClients([client,otherClient]);assert.match(shortClients,/data-comparison-page-size="1"/);assert.equal([...shortClients.matchAll(/data-comparison-client-id=/g)].length,1);
  const tallClients=renderClients([client,otherClient],600);assert.match(tallClients,/data-comparison-page-size="2"/);assert.equal([...tallClients.matchAll(/data-comparison-client-id=/g)].length,2);
 });

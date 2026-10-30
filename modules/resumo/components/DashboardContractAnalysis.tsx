@@ -7,6 +7,7 @@ import {decimalLabel} from '@/shared/utils/presentation';
 import type {ExecutiveSummaryData} from '../types';
 import {usePlotSize} from '../hooks/usePlotSize';
 import {DashboardBars,DashboardEmpty,DashboardPanel} from './DashboardVisuals';
+import {DashboardContractClientCharts} from './DashboardContractClientCharts';
 
 type Props={data:ExecutiveSummaryData;presenting?:boolean;slideDurationMs?:number};
 type Comparison=NonNullable<ExecutiveSummaryData['contractComparison']>;
@@ -44,9 +45,9 @@ function GeneralComparison({comparison,presenting=false,slideDurationMs=120000}:
  </div>;
 }
 
-function usePages<T extends{id:string}>(rows:readonly T[],threshold:number,presenting:boolean,slideDurationMs:number,allowColumns=false){
- const {ref,size}=usePlotSize(),columns=allowColumns&&size.width>=1000&&size.height>=260?2:1;
- const pageSize=columns===2||size.height>=threshold?2:1,pages=Math.max(1,Math.ceil(rows.length/pageSize));
+function usePages<T extends{id:string}>(rows:readonly T[],threshold:number,presenting:boolean,slideDurationMs:number,maxColumns:2|3=2){
+ const {ref,size}=usePlotSize(),columns=maxColumns===3?(size.width>=1100?3:size.width>=700?2:1):(size.width>=1000&&size.height>=260?2:1);
+ const pageSize=maxColumns===3?columns:columns===2||size.height>=threshold?2:1,pages=Math.max(1,Math.ceil(rows.length/pageSize));
  const signature=pageSize+':'+rows.map(row=>row.id).join('|'),[navigation,setNavigation]=useState({signature:'',page:0});
  const page=navigation.signature===signature?Math.min(navigation.page,pages-1):0;
  useEffect(()=>{
@@ -62,36 +63,18 @@ function Pager({page,pages,navigate,label}:{page:number;pages:number;navigate:(p
 }
 
 function ClientComparison({rows,presenting,slideDurationMs}:{rows:Client[];presenting:boolean;slideDurationMs:number}){
- const {ref:listRef,page,pageSize,pages,columns,shown,navigate}=usePages(rows,460,presenting,slideDurationMs,true);
+ const {ref:listRef,page,pageSize,pages,columns,shown,navigate}=usePages(rows,460,presenting,slideDurationMs);
  return <DashboardPanel className="dashboard-contract-client-panel" title="Modalidades por cliente" eyebrow="COMPARATIVO DOS CLIENTES" subtitle="Toneladas e ATR de todos os contratos do cliente no período." actions={<Pager page={page} pages={pages} navigate={navigate} label="Modalidades por cliente"/>}>
   <div ref={listRef} className="dashboard-contract-card-list" data-comparison-page-size={pageSize} data-comparison-layout={columns===2?'columns':'rows'} style={{gridTemplateColumns:`repeat(${columns},minmax(0,1fr))`,gridTemplateRows:`repeat(${columns===2?1:Math.max(1,shown.length)},minmax(0,1fr))`}}>
-   {shown.length?shown.map(client=>{
-    const methodRows=client.types.filter(row=>row.code!=='unknown'||row.contractCount>0||row.loadCount>0);
-    return <article className="dashboard-contract-client-card" key={client.id} data-comparison-client-id={client.id}>
-     <h4>{client.name}</h4>
-     <table className="dashboard-contract-matrix"><caption className="sr-only">Toneladas e ATR de {client.name}</caption><thead><tr><th scope="col">Modalidade</th><th scope="col">Toneladas</th><th scope="col">ATR (kg/t)</th></tr></thead><tbody>
-      <ComparisonRow label="Geral" code="overall" volume={client.overall.loadedVolume} atr={client.overall.averageAtr}/>
-      {methodRows.map(row=><ComparisonRow key={row.code} label={row.label} code={row.code} volume={row.loadedVolume} atr={row.averageAtr}/>)}
-     </tbody></table>
-     <footer>{client.overall.contractCount} contrato(s) · {client.overall.loadCount} carregamento(s)</footer>
-    </article>;
-   }):<DashboardEmpty text="Nenhum cliente nesta seleção" detail="Ajuste os filtros para comparar as modalidades dos contratos."/>}
+   {shown.length?shown.map(client=><DashboardContractClientCharts key={client.id} client={client}/>):<DashboardEmpty text="Nenhum cliente nesta seleção" detail="Ajuste os filtros para comparar as modalidades dos contratos."/>}
   </div>
  </DashboardPanel>;
 }
 
-function ComparisonRow({label,code,volume,atr}:{label:string;code:string;volume:string;atr:string}){
- return <tr data-comparison-type={code}><th scope="row">{label}</th><ComparisonCell value={decimalLabel(volume)} marker="volume"/><ComparisonCell value={decimalLabel(atr)} marker="atr"/></tr>;
-}
-
-function ComparisonCell({value,marker}:{value:string;marker:string}){
- return <td data-comparison-value={marker} title={value}><span className="dashboard-contract-cell-value" style={{'--contract-cell-length':Math.max(1,value.length)} as CSSProperties}>{value}</span></td>;
-}
-
 function ContractCards({data,comparison,presenting,slideDurationMs}:{data:ExecutiveSummaryData;comparison:Comparison;presenting:boolean;slideDurationMs:number}){
- const {ref:listRef,page,pageSize,pages,shown,navigate}=usePages(data.contracts,540,presenting,slideDurationMs),performance=new Map(data.contractPerformance.map(row=>[row.id,row])),metadata=new Map(comparison.contracts.map(row=>[row.id,row]));
+ const {ref:listRef,page,pageSize,pages,columns,shown,navigate}=usePages(data.contracts,540,presenting,slideDurationMs,3),performance=new Map(data.contractPerformance.map(row=>[row.id,row])),metadata=new Map(comparison.contracts.map(row=>[row.id,row]));
  return <DashboardPanel className="dashboard-contract-detail-panel" eyebrow="ANDAMENTO DOS CONTRATOS" title="Entregas e metas" subtitle="Entregas e ATR no período; andamento acumulado em todas as datas." actions={<Pager page={page} pages={pages} navigate={navigate} label="Contratos"/>}>
-  <div ref={listRef} className="dashboard-contract-card-list" data-contract-page-size={pageSize} style={{gridTemplateRows:`repeat(${Math.max(1,shown.length)},minmax(0,1fr))`}}>
+  <div ref={listRef} className="dashboard-contract-card-list" data-contract-page-size={pageSize} data-contract-columns={columns} data-contract-layout="columns" style={{gridTemplateColumns:`repeat(${columns},minmax(0,1fr))`,gridTemplateRows:'minmax(0,1fr)'}}>
    {shown.length?shown.map(contract=>{
     const detail=performance.get(contract.id),meta=metadata.get(contract.id),type=comparison.types.find(row=>row.code===meta?.typeCode),progress=detail?.deliveryPercent??'';
     return <article className="dashboard-contract-detail-card" key={contract.id} data-comparison-contract-id={contract.id}>

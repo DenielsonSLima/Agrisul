@@ -19,7 +19,7 @@
 .dashboard-contract-client-panel .executive-panel-eyebrow,.dashboard-contract-client-panel>.executive-panel-header p{color:#4b5563}
 .dashboard-contract-card-list{display:grid;flex:1;min-width:0;min-height:0;gap:12px;margin-top:12px;container:dashboardContractCards/size}
 .dashboard-contract-card-list[data-comparison-layout=columns]{column-gap:16px}
-.dashboard-contract-client-card,.dashboard-contract-detail-card{display:flex;flex-direction:column;justify-content:center;gap:10px;min-width:0;min-height:0;padding:12px 15px;box-sizing:border-box;border:1px solid #dfe9e2;border-radius:8px;background:#f9fbfa;color:#34513f}
+.dashboard-contract-client-card,.dashboard-contract-detail-card{display:flex;flex-direction:column;justify-content:flex-start;gap:14px;min-width:0;min-height:0;padding:20px;box-sizing:border-box;border:1px solid #dfe9e2;border-radius:10px;background:#f9fbfa;color:#34513f;overflow-y:auto;scrollbar-width:thin}
 .dashboard-contract-client-card h4,.dashboard-contract-detail-card h4{margin:0;color:#2f503b;font-size:14px;font-weight:600;line-height:1.3;overflow-wrap:anywhere;white-space:normal}
 .dashboard-contract-matrix{width:100%;min-width:0;border-collapse:collapse;table-layout:fixed;font-variant-numeric:tabular-nums}
 .dashboard-contract-matrix th,.dashboard-contract-matrix td{padding:3px 5px;border-bottom:1px solid #e3ece6;line-height:1.2;overflow-wrap:anywhere;text-align:right}
@@ -49,7 +49,44 @@
 .dashboard-contract-accumulated{display:flex;align-items:baseline;flex-wrap:wrap;gap:5px 10px;font-size:10px;line-height:1.35;color:#6b8373}
 .dashboard-contract-accumulated strong{font-size:14px;line-height:1.3;font-weight:600;color:#3e634b;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .dashboard-contract-accumulated>span:last-child{margin-left:auto;font-weight:600;color:#4b7858}
-.dashboard-contract-detail-card>.executive-track{flex:none;height:4px}
+.dashboard-contract-detail-card>.executive-track{flex:none;height:7px;border-radius:999px;overflow:hidden;background:#e7eee9}
+.dashboard-contract-detail-card{border-top:3px solid #6aa383;background:linear-gradient(160deg,#fff,#f5f9f6)}
+.dashboard-contract-detail-card h4{font-size:16px;line-height:1.4}
+.dashboard-contract-detail-card .dashboard-contract-period{padding:16px 0;border-top:1px solid #e3ece6;border-bottom:1px solid #e3ece6}
+.dashboard-contract-detail-card .dashboard-contract-period dt{font-size:11px}
+.dashboard-contract-detail-card .dashboard-contract-period dd{font-size:28px}
+.dashboard-contract-detail-card .dashboard-contract-accumulated{margin-top:auto;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;font-size:11px}
+.dashboard-contract-detail-card .dashboard-contract-accumulated>span:first-child{grid-column:1/-1}
+.dashboard-contract-detail-card .dashboard-contract-accumulated strong{font-size:15px}
+.dashboard-contract-detail-card footer{font-size:11px}
+.dashboard-contract-type.code-2{background:#edf3fb;border-color:#d9e5f4;color:#537dad}
+.dashboard-contract-client-chart{background:#fff}
+.dashboard-contract-client-chart h4{font-size:16px;line-height:1.4}
+.dashboard-contract-client-overall{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:4px 18px;padding:15px 18px;border:1px solid #dbe9df;border-radius:8px;background:#eff6f1}
+.dashboard-contract-client-overall>span{grid-column:1/-1;color:#5c7465;font-size:11px}
+.dashboard-contract-client-total{display:flex;align-items:baseline;gap:5px;min-width:0;color:#23583c;font-variant-numeric:tabular-nums}
+.dashboard-contract-client-total strong{font-size:30px;font-weight:600;line-height:1.2;overflow-wrap:anywhere}
+.dashboard-contract-client-total small{font-size:11px}
+.dashboard-contract-client-total-atr{display:flex;align-items:baseline;justify-content:flex-end;flex-wrap:wrap;gap:4px;color:#315941;font-variant-numeric:tabular-nums}
+.dashboard-contract-client-total-atr>span{flex-basis:100%;font-size:10px;text-align:right;color:#5c7465}
+.dashboard-contract-client-total-atr strong{font-size:19px;font-weight:600;line-height:1.2}
+.dashboard-contract-client-total-atr small{font-size:10px}
+.dashboard-contract-client-bars{display:flex;flex:1;flex-direction:column;justify-content:space-evenly;gap:18px;min-height:0;padding:8px 0}
+.dashboard-contract-client-bar{--client-bar-color:#658c76;display:grid;grid-template-columns:minmax(0,1fr) auto;align-content:start;gap:7px 16px}
+.dashboard-contract-client-bar[data-client-chart-tone=manual]{--client-bar-color:#bc913e}
+.dashboard-contract-client-bar[data-client-chart-tone=mechanized]{--client-bar-color:#668db8}
+.dashboard-contract-client-bar[data-client-chart-tone=unknown]{--client-bar-color:#8d9690}
+.dashboard-contract-client-bar-heading{grid-column:1/-1;display:flex;align-items:baseline;justify-content:space-between;gap:8px;color:#31473a;font-size:12px}
+.dashboard-contract-client-bar-heading>div{display:flex;align-items:baseline;justify-content:flex-end;gap:4px;white-space:nowrap}
+.dashboard-contract-client-bar-heading strong{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.dashboard-contract-client-bar-heading small{font-size:10px;font-weight:400}
+.dashboard-contract-client-bar-track{grid-column:1/-1;height:13px;overflow:hidden;border-radius:4px;background:#eef2ef}
+.dashboard-contract-client-bar-track>i{display:block;height:100%;background:var(--client-bar-color);border-radius:4px}
+.dashboard-contract-client-bar-atr{grid-column:1/-1;display:flex;justify-content:flex-end;align-items:baseline;gap:4px;color:#687a6e;font-size:10px;font-variant-numeric:tabular-nums}
+.dashboard-contract-client-bar-atr strong{color:#354c3e;font-size:12px;font-weight:600}
+.dashboard-contract-client-bar-atr small{font-size:10px}
+.dashboard-contract-client-zero{margin:0;color:#687a6e;font-size:11px}
+.dashboard-contract-client-chart footer{flex:none;padding-top:10px;border-top:1px solid #e5ece7;font-size:11px;color:#5d7365}
 @media(max-width:760px){
  .executive-metrics[data-metric-count="3"]{grid-template-columns:repeat(2,minmax(0,1fr))}
  .executive-metrics[data-metric-count="3"]>.executive-metric:first-child{grid-column:1/-1}
@@ -69,6 +106,21 @@
  .dashboard-contract-period{gap:7px 12px}.dashboard-contract-period dt{font-size:8px;margin-bottom:2px}.dashboard-contract-period dd{font-size:17px}
  .dashboard-contract-accumulated{gap:3px 6px;font-size:8px}.dashboard-contract-accumulated strong{font-size:12px}
  .dashboard-contract-detail-heading{font-size:8px;gap:6px}.dashboard-contract-type{padding:2px 5px}
+ .dashboard-contract-client-overall{padding:10px 12px;gap:4px 10px}
+ .dashboard-contract-client-total strong{font-size:25px}.dashboard-contract-client-total-atr strong{font-size:16px}
+ .dashboard-contract-client-bars{gap:14px}.dashboard-contract-client-bar-heading strong{font-size:16px}
+ .dashboard-contract-detail-card .dashboard-contract-period{padding:12px 0}
+ .dashboard-contract-detail-card .dashboard-contract-period dd{font-size:24px}
+ .dashboard-contract-detail-card .dashboard-contract-period dt,.dashboard-contract-detail-card .dashboard-contract-accumulated,.dashboard-contract-detail-card footer{font-size:10px}
+}
+@container dashboardContractCards (max-height:380px){
+ .dashboard-contract-detail-card{padding:12px 14px;gap:8px}
+ .dashboard-contract-detail-card h4{font-size:14px;line-height:1.3}
+ .dashboard-contract-detail-card .dashboard-contract-period{padding:10px 0}
+ .dashboard-contract-detail-card .dashboard-contract-period dd{font-size:24px}
+ .dashboard-contract-detail-card .dashboard-contract-accumulated{font-size:10px;gap:5px}
+ .dashboard-contract-detail-card .dashboard-contract-accumulated strong{font-size:13px}
+ .dashboard-contract-detail-card footer{font-size:10px}
 }
 @container dashboardContractCards (max-height:260px){
  .dashboard-contract-client-card,.dashboard-contract-detail-card{padding:8px 10px;gap:6px}
@@ -80,6 +132,18 @@
  .dashboard-contract-detail-heading{font-size:8px}.dashboard-contract-type{padding:2px 5px}
  .dashboard-contract-period{padding-top:0}.dashboard-contract-period dt{font-size:8px;margin-bottom:2px}.dashboard-contract-period dd{font-size:16px}
  .dashboard-contract-accumulated{font-size:8px;gap:3px 6px}.dashboard-contract-accumulated strong{font-size:12px}
+ .dashboard-contract-detail-card .dashboard-contract-period{padding:8px 0}
+ .dashboard-contract-detail-card .dashboard-contract-period dt{font-size:9px}
+ .dashboard-contract-detail-card .dashboard-contract-period dd{font-size:21px}
+ .dashboard-contract-detail-card .dashboard-contract-accumulated{gap:3px;font-size:9px}
+ .dashboard-contract-detail-card .dashboard-contract-accumulated strong{font-size:12px}
+ .dashboard-contract-detail-card footer{font-size:9px}
+ .dashboard-contract-client-overall{padding:8px 10px;gap:3px 10px}
+ .dashboard-contract-client-total strong{font-size:22px}.dashboard-contract-client-total-atr strong{font-size:16px}
+ .dashboard-contract-client-bars{gap:8px;padding:3px 0;flex:none}
+ .dashboard-contract-client-bar{gap:3px 10px}.dashboard-contract-client-bar-heading{font-size:10px}.dashboard-contract-client-bar-heading strong{font-size:14px}
+ .dashboard-contract-client-bar-track{height:8px}.dashboard-contract-client-bar-atr,.dashboard-contract-client-bar-atr small{font-size:9px}.dashboard-contract-client-bar-atr strong{font-size:10px}
+ .dashboard-contract-client-chart footer{padding-top:5px;font-size:9px}
 }
 @container dashboardContractCards (max-height:180px){
  .dashboard-contract-client-card,.dashboard-contract-detail-card{padding:6px 8px;gap:4px}

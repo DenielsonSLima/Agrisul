@@ -16,11 +16,11 @@ const fixtures=dataUrl(`
  export const ArrowUpRight=()=>null,ChevronLeft=()=>null,ChevronRight=()=>null,ModuleLink=()=>null;
  export const decimalLabel=value=>String(value??'A apurar');
  export const usePlotSize=()=>({ref:()=>{},size:{width:0,height:0}});
- export const DashboardBars=()=>null,DashboardEmpty=()=>null,DashboardPanel=()=>null;
+ export const DashboardBars=()=>null,DashboardEmpty=()=>null,DashboardPanel=()=>null,DashboardContractClientCharts=()=>null;
 `);
 const {state,DashboardBars}=await import(fixtures);
 const source=ts.transpileModule(readFileSync(new URL('../modules/resumo/components/DashboardContractAnalysis.tsx',import.meta.url),'utf8')+'\nexport {GeneralComparison};',{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText
- .replace(/from ['"](?:react|react\/jsx-runtime|lucide-react|@\/shared\/navigation\/ModuleNavigation|@\/shared\/utils\/presentation|\.\.\/hooks\/usePlotSize|\.\/DashboardVisuals)['"]/g,`from ${JSON.stringify(fixtures)}`);
+ .replace(/from ['"](?:react|react\/jsx-runtime|lucide-react|@\/shared\/navigation\/ModuleNavigation|@\/shared\/utils\/presentation|\.\.\/hooks\/usePlotSize|\.\/DashboardVisuals|\.\/DashboardContractClientCharts)['"]/g,`from ${JSON.stringify(fixtures)}`);
 const {DashboardContractAnalysis,GeneralComparison}=await import(dataUrl(source));
 const data={contractComparison:{overall:{loadedVolume:'0',averageAtr:'',loadCount:0,contractCount:0},types:[],clients:[],contracts:[]},contracts:[],contractPerformance:[]};
 function findNode(node,predicate){
