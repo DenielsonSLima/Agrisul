@@ -23,8 +23,8 @@ test('contract comparison uses contract snapshots, exact weighted ATR and every 
   const unclassified=await contract(ids.partner,'Cana'),ambiguous=await contract(partner,'Manual e Mecanizado'),empty=await contract(ids.partner,'MANUAL'),sibling=await contract(siblingPartner,'MANUAL','Ativo',ids.siblingCompany);
   await db.query("UPDATE public.billing_contracts SET title='MANUAL no título não define modalidade' WHERE id=$1",[unclassified]);
   const load=async(contractId,farmId,plotId,date,volume,atr,method)=>insert('INSERT INTO public.billing_contract_loads(owner_id,contract_id,farm_id,plot_id,loaded_at,volume,atr,harvest_method) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',[ids.owner,contractId,farmId,plotId,date,volume,atr,method]);
-  // These deliberately disagree with the contract snapshot. The comparison is
-  // about contract types, while harvestMethods continues to classify each load.
+  // Missing or conflicting import codes must not override the linked contract
+  // snapshot in any Dashboard modality projection.
   await load(manualA,farmA,pa1,'2026-10-01','10.001','100.123456','2');
   await load(manualA,farmA,pa2,'2026-10-02','30.002','140.654321',null);
   await load(manualB,farmB,pb1,'2026-10-03','20.003','160.765432','1');
@@ -44,7 +44,11 @@ test('contract comparison uses contract snapshots, exact weighted ATR and every 
   assert.equal(mechanized.loadedVolume,'50.009');assert.equal(mechanized.averageAtr,'');assert.equal(mechanized.loadCount,2);assert.equal(mechanized.contractCount,2);assert.equal(mechanized.sharePercent,'40.98');
   assert.equal(unknown.loadedVolume,'12.013');assert.equal(unknown.averageAtr,'116.381238');assert.equal(unknown.loadCount,2);assert.equal(unknown.contractCount,2);assert.equal(unknown.sharePercent,'9.84');
   assert.equal(summary.operationalTotals.loadedVolume,all.overall.loadedVolume);assert.equal(summary.operationalTotals.averageAtr,all.overall.averageAtr);
-  assert.notEqual(summary.harvestMethods.find(row=>row.code==='1').loadedVolume,manual.loadedVolume,'Load modality and contract classification remain distinct');
+  for(const method of summary.harvestMethods){
+   const expected=byCode(all,method.code);
+   assert.equal(Number(method.loadedVolume),Number(expected.loadedVolume),'Harvest totals follow the linked contract, including historical loads');
+   assert.equal(method.loadCount,expected.loadCount);
+  }
   const a=byClient(all,ids.partner),b=byClient(all,partner);
   assert.deepEqual(a.overall,{loadedVolume:'65.013',averageAtr:'135.280393',loadCount:4,contractCount:4});
   assert.equal(byCode(a,'1').loadedVolume,'40.003');assert.equal(byCode(a,'1').averageAtr,'130.521351');assert.equal(byCode(a,'1').contractCount,2);assert.equal(byCode(a,'1').sharePercent,'61.53');

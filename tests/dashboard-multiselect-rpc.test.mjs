@@ -56,7 +56,7 @@ test('dashboard multi-selection intersects clients and contracts and unions comp
   assert.equal(combined.totals.loadedVolume,'70');assert.equal(combined.totals.loadCount,3);assert.equal(combined.totals.contractCount,2);
   assert.equal(combined.operationalTotals.loadedVolume,'70');assert.equal(combined.monthlyOperations[0].loadedVolume,'70');assert.equal(combined.months[0].loadedVolume,'70');
   assert.equal(combined.dimensions.partners.length,1);assert.equal(combined.dimensions.partners[0].loadedVolume,'70');assert.equal(combined.dimensions.contractTypes[0].loadedVolume,'70');
-  assert.equal(combined.harvestMethods.find(row=>row.code==='1').loadedVolume,'10.000');assert.equal(combined.harvestMethods.find(row=>row.code==='2').loadedVolume,'60.000');
+  assert.equal(combined.harvestMethods.find(row=>row.code==='1').loadCount,0);assert.equal(combined.harvestMethods.find(row=>row.code==='2').loadCount,0);assert.equal(combined.harvestMethods.find(row=>row.code==='unknown').loadedVolume,'70.000');
   assert.equal(combined.comparison.loadedVolume,'7');assert.equal(combined.dailyProductivity.productionDayCount,3);
   assert.equal(combined.financialGroupings.week[0].loadedVolume,'30');assert.equal(combined.financialGroupings.week[1].loadedVolume,'40');
   assert.equal(combined.financialGroupings.fortnight[0].loadedVolume,'70');assert.equal(combined.filters.cashScope,'contract');assert.equal(combined.totals.receivedAmount,'3.33');

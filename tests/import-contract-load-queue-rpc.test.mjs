@@ -40,11 +40,11 @@ test('finished PDF groups link once to the matching contract with exact tonne vo
   const historical=await rpc('contracts','save-load',{...scope,loadedAt:'2026-10-21',farmId:farm,plotId:'',volume:'3.125',atr:'',document:'Histórico',notes:''});
   const dashboardScope={companyId:ids.company,from:'2026-10-01',to:'2026-10-31'};
   const dashboard=await rpc('summary','dashboard',dashboardScope);const methods=Object.fromEntries(dashboard.harvestMethods.map(method=>[method.code,method]));
-  assert.equal(methods['1'].loadCount,1);assert.equal(Number(methods['1'].loadedVolume),28.5);assert.equal(methods['2'].loadCount,1);assert.equal(Number(methods['2'].loadedVolume),24);assert.equal(methods.unknown.loadCount,1);assert.equal(Number(methods.unknown.loadedVolume),3.125);
-  assert.equal((await rpc('summary','dashboard',{...dashboardScope,from:'2026-10-22',to:'2026-10-22'})).harvestMethods.find(method=>method.code==='unknown').loadCount,0);
+  assert.equal(methods['1'].loadCount,0);assert.equal(methods['2'].loadCount,0);assert.equal(methods.unknown.loadCount,3);assert.equal(Number(methods.unknown.loadedVolume),55.625,'The generic contract type stays unclassified even when imported loads have a harvest code');
+  assert.equal((await rpc('summary','dashboard',{...dashboardScope,from:'2026-10-22',to:'2026-10-22'})).harvestMethods.find(method=>method.code==='unknown').loadCount,2);
   assert.equal((await rpc('summary','dashboard',{...dashboardScope,status:'Concluído'})).harvestMethods.every(method=>method.loadCount===0),true);
   assert.equal((await rpc('summary','dashboard',{...dashboardScope,companyId:ids.siblingCompany})).harvestMethods.every(method=>method.loadCount===0),true);
-  assert.equal((await rpc('summary','dashboard',{...dashboardScope,contractId:contract})).harvestMethods.find(method=>method.code==='2').loadCount,1);
+  assert.equal((await rpc('summary','dashboard',{...dashboardScope,contractId:contract})).harvestMethods.find(method=>method.code==='unknown').loadCount,3);
   await deny(()=>db.query('DELETE FROM public.billing_import_load_links WHERE document_id=$1',[document.id]),'42501');
   await setActor(ids.reader);assert.equal((await docs('pending-loads',scope)).loads.length,2);await deny(()=>docs('link-load',{...payload,tripKey:machine.tripKey}),'42501');
   await setActor(ids.otherOwner);await deny(()=>docs('pending-loads',scope),'P0002');await deny(()=>docs('link-load',payload),'P0002');
@@ -82,6 +82,6 @@ test('mixed-origin trips split into exact idempotent plot loads without changing
   for(const part of parts){const payload={...scope,id:document.id,expectedUpdatedAt:document.updatedAt,tripKey:part.tripKey,farmId:farm,plotId:part.plotCode==='54'?a:b};const saved=await docs('link-load',payload);assert.equal(saved.created,true);assert.equal(saved.load.atr,'');assert.equal(saved.load.plotId,payload.plotId);assert.equal((await docs('link-load',payload)).created,false);}
   const remaining=(await docs('pending-loads',scope)).loads;assert.equal(remaining.length,1);assert.equal(remaining[0].entryNumber,'3404');
   const saved=await rpc('contracts','get',{companyId:ids.company,id:contract});assert.match(saved.contract.loadedVolume,/^35\.50*$/);
-  const summary=await rpc('summary','dashboard',{companyId:ids.company,from:'2026-10-27',to:'2026-10-27'});assert.match(summary.harvestMethods[0].loadedVolume,/^35\.50*$/);
+  const summary=await rpc('summary','dashboard',{companyId:ids.company,from:'2026-10-27',to:'2026-10-27'});assert.match(summary.harvestMethods.find(method=>method.code==='unknown').loadedVolume,/^35\.50*$/);
  }finally{await db.close();}
 });

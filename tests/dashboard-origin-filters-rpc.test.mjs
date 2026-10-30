@@ -63,7 +63,7 @@ test('dashboard origin, client and contract filters combine on the server withou
   assert.deepEqual(origin.plotPerformance.map(row=>row.id).sort(),[a1,a2].sort());
   assert.equal(origin.dimensions.partners[0].loadedVolume,'7.777');assert.equal(origin.dimensions.contractTypes[0].loadedVolume,'7.777');
   assert.equal(byId(origin.contracts,a).loadedVolume,'7.777');assert.equal(byId(origin.contractPerformance,a).periodLoadedVolume,'7.777');
-  assert.equal(origin.harvestMethods.find(row=>row.code==='1').loadedVolume,'5.555');assert.equal(origin.harvestMethods.find(row=>row.code==='2').loadedVolume,'2.222');
+  assert.equal(origin.harvestMethods.find(row=>row.code==='1').loadCount,0);assert.equal(origin.harvestMethods.find(row=>row.code==='2').loadCount,0);assert.equal(origin.harvestMethods.find(row=>row.code==='unknown').loadedVolume,'7.777');
   assert.equal(origin.comparison.loadedVolume,'4.444','The comparison period receives the same origin selection');
   assert.equal(origin.dailyProductivity.productionDayCount,3);assert.equal(origin.dailyProductivity.averageLoadedVolume,'2.592');
   assert.equal(origin.financialGroupings.week[0].loadedVolume,'3.333');
@@ -76,7 +76,7 @@ test('dashboard origin, client and contract filters combine on the server withou
   assert.equal(selected.monthlyOperations[0].loadedVolume,'2.222');assert.equal(selected.farms[0].loadedVolume,'2.222');
   assert.equal(selected.plotPerformance.length,1);assert.equal(selected.plotPerformance[0].id,a2);
   assert.equal(selected.dimensions.partners[0].loadedVolume,'2.222');assert.equal(selected.harvestMethods.find(row=>row.code==='1').loadCount,0);
-  assert.equal(selected.harvestMethods.find(row=>row.code==='2').loadedVolume,'2.222');
+  assert.equal(selected.harvestMethods.find(row=>row.code==='unknown').loadedVolume,'2.222');
   assert.equal(selected.comparison.loadedVolume,'0');assert.equal(selected.dailyProductivity.averageLoadedVolume,'2.222');
   assert.equal(selected.financialTimeline.find(row=>row.date==='2026-10-02').grossAmount,original.gross);
   assert.equal(selected.financialGroupings.week[0].loadedVolume,'2.222');assert.equal(selected.financialGroupings.fortnight[0].loadedVolume,'2.222');

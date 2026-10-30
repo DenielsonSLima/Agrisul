@@ -83,9 +83,9 @@ export function DashboardDimensionList({rows,title}:{rows:ExecutiveDimension[];t
 
 export function DashboardHarvest({data}:{data:ExecutiveSummaryData}){
  const methods=data.harvestMethods??[];
- const columns=[{code:'1',label:'Manual'},{code:'2',label:'Mecanizada'},{code:'unknown',label:'Não informado'}];
- return <DashboardPanel eyebrow="MODALIDADE DA COLHEITA" title="Manual e mecanizada" subtitle="Classificação registrada nos carregamentos.">
-  <dl className="executive-harvest-columns">{columns.map((column,index)=>{
+ const columns=[{code:'1',label:'Manual'},{code:'2',label:'Mecanizada'},{code:'unknown',label:'Não classificado'}].filter(column=>column.code!=='unknown'||methods.some(method=>method.code==='unknown'&&method.loadCount>0));
+ return <DashboardPanel eyebrow="MODALIDADE DA COLHEITA" title="Manual e mecanizada" subtitle="Classificação pelo tipo dos contratos vinculados.">
+  <dl className="executive-harvest-columns" style={{'--harvest-columns':columns.length} as CSSProperties}>{columns.map((column,index)=>{
    const row=methods.find(method=>method.code===column.code),volume=row?decimalLabel(row.loadedVolume):'—';
    return <div key={column.code} style={{'--harvest-color':palette[index],'--harvest-value-width':Math.max(1,volume.length*.62)} as CSSProperties}><dt><i/>{column.label}</dt><dd><strong>{volume}</strong><small>toneladas</small><span>{row?`${row.loadCount} carga(s)`:'Sem classificação disponível'}</span></dd></div>;
   })}</dl>
