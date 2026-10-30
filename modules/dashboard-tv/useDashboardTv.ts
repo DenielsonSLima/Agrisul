@@ -7,7 +7,7 @@ import {isTvFeed} from './catalog';
 
 export function useDashboardTv(){
  const {user,ready}=useAuth();
- return useQuery({queryKey:[...billingKeys.resource(user?.id??'','dashboard-tv'),{version:2}],enabled:ready&&!!user,
+ return useQuery({queryKey:[...billingKeys.resource(user?.id??'','dashboard-tv'),{version:3}],enabled:ready&&!!user,
   queryFn:async({signal})=>{
    const response=await authenticatedFetch('/api/dashboard-tv',{signal:AbortSignal.any([signal,AbortSignal.timeout(45000)])});
    if(!response.ok)throw Error('Não foi possível atualizar os vídeos.');

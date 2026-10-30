@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {TV_CHANNELS,isTvFeed} from './catalog.ts';
-import {parseTvRss,createTvFeed,parseChannelSearchVideos,searchPublicationDate} from './providers.ts';
+import {parseTvRss,createTvFeed as createFeed,parseChannelSearchVideos,searchPublicationDate} from './providers.ts';
+const createTvFeed=options=>createFeed({formatFilter:async videos=>videos,...options});
 
 const at=Date.parse('2026-10-30T13:00:00Z');
 function fixture(channel,index=0){return `<feed><yt:channelId>${channel.channelId}</yt:channelId><entry><yt:videoId>video${String(index).padStart(6,'0')}</yt:videoId><yt:channelId>${channel.channelId}</yt:channelId><title><![CDATA[Cana &amp; etanol ${index}]]></title><published>${new Date(at-index*1000).toISOString()}</published></entry></feed>`;}

@@ -4,6 +4,8 @@ A aba reúne Canal Rural, Notícias Agrícolas, TV Senado, AgroMais e Canal do B
 
 A curadoria busca 50% cana-de-açúcar, 20% soja/milho e 30% outros temas agro, com seleção global por canal. As proporções dependem do conteúdo publicado. Vagas não são preenchidas com assuntos gerais ou vídeos antigos. Busca complementar tem orçamento total de 30 segundos, até três consultas por canal e três canais concorrentes. Datas relativas ambíguas são rejeitadas; até quatro candidatos de cana recebem consulta opcional da data exata. Cache de contingência também respeita as 36 horas.
 
+Shorts são excluídos antes da seleção: uma consulta HEAD limitada ao endpoint público `/shorts/:id` distingue Shorts de vídeos regulares, sem seguir redirecionamentos externos. Resultados inconclusivos não entram na lista. A etapa usa oito consultas concorrentes, até 80 candidatos, cache limitado e orçamento de oito segundos. Na reprodução, as dimensões reais do formato também precisam ser horizontais (`width > height`); verticais, quadrados e dimensões desconhecidas não são anunciados no manifesto.
+
 As configurações do Dashboard permitem selecionar canais e escolher:
 
 - Reprodução automática: inicia o vídeo, respeitando a permissão de áudio do navegador. Ao terminar, a apresentação segue para a próxima aba; com apenas TV ativa, segue para o próximo vídeo. Publicações indisponíveis são puladas, até cinco tentativas.

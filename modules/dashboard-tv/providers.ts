@@ -1,5 +1,6 @@
 import {TV_CHANNELS,type TvChannel,type TvFeed,type TvSource,type TvVideo} from './catalog.ts';
 import {classifyTvVideo,curateTvVideos} from './curation.ts';
+import {createHorizontalVideoFilter} from './videoFormat.ts';
 
 const REFRESH_MS=300_000,STALE_MS=24*60*60*1000,MAX_BYTES=500_000,MAX_VIDEO_AGE=36*60*60*1000;
 const field=(xml:string,name:string)=>new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`,'i').exec(xml)?.[1]??'';
@@ -112,7 +113,7 @@ async function readFeed(response:Response,maxBytes=MAX_BYTES){
  return chunks.map(chunk=>decoder.decode(chunk,{stream:true})).join('')+decoder.decode();
 }
 
-export function createTvFeed({fetchImpl=fetch,now=Date.now,timeoutMs=6500,searchImpl,searchBudgetMs=30000}:{fetchImpl?:typeof fetch;now?:()=>number;timeoutMs?:number;searchImpl?:SupplementSearch;searchBudgetMs?:number}={}){
+export function createTvFeed({fetchImpl=fetch,now=Date.now,timeoutMs=6500,searchImpl,searchBudgetMs=30000,formatFilter=createHorizontalVideoFilter()}:{fetchImpl?:typeof fetch;now?:()=>number;timeoutMs?:number;searchImpl?:SupplementSearch;searchBudgetMs?:number;formatFilter?:(videos:TvVideo[])=>Promise<TvVideo[]>}={}){
  const cache=new Map<string,{videos:TvVideo[];updatedAt:number}>();
  let complete:TvFeed|null=null,checked=0,pending:Promise<TvFeed>|null=null;
  async function load():Promise<TvFeed>{
@@ -151,7 +152,11 @@ export function createTvFeed({fetchImpl=fetch,now=Date.now,timeoutMs=6500,search
     finally{controller.signal.removeEventListener('abort',onAbort);}
    });
   }finally{clearTimeout(timer);controller.abort();}
-  const videos=curateTvVideos(results.flatMap(result=>result.videos).filter(video=>{const date=Date.parse(video.publishedAt);return date<=at&&at-date<=MAX_VIDEO_AGE;}),TV_CHANNELS.map(channel=>channel.id));
+  const candidates=results.flatMap(result=>result.videos).filter(video=>{const date=Date.parse(video.publishedAt);return date<=at&&at-date<=MAX_VIDEO_AGE;}),channelIds=TV_CHANNELS.map(channel=>channel.id);
+  const preferred=curateTvVideos(candidates,channelIds),preferredIds=new Set(preferred.map(video=>video.id));
+  const horizontal=await formatFilter([...preferred,...candidates.filter(video=>!preferredIds.has(video.id))]);
+  const current=now();
+  const videos=curateTvVideos(horizontal.filter(video=>{const date=Date.parse(video.publishedAt);return date<=current&&current-date<=MAX_VIDEO_AGE;}),channelIds);
   checked=at;complete={videos,sources:results.map(result=>result.source),checkedAt:new Date(at).toISOString(),refreshSeconds:300};return complete;
  }
  return function getFeed(){

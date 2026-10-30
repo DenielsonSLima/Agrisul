@@ -1,4 +1,5 @@
 import {verifyTvVideo,playbackItag,playbackVideoId,preflightMediaIndex,trustedMediaUrl,TvPlaybackError} from './playbackSafety.ts';
+import {isHorizontalVideo} from './videoFormat.ts';
 
 type ResolvedFormat={url:string;mimeType:string;contentLength:number|undefined};
 export type TvPlayback={manifest:string;formats:Map<number,ResolvedFormat>;expiresAt:number};
@@ -36,7 +37,7 @@ async function resolveVideo(videoId:string):Promise<TvPlayback>{
    verifyTvVideo(videoId,{id:info.basic_info.id,channelId:info.basic_info.channel_id,status:info.playability_status?.status,private:info.basic_info.is_private,live:info.basic_info.is_live,upcoming:info.basic_info.is_upcoming,postLive:info.basic_info.is_post_live_dvr});
    const available=info.streaming_data?.adaptive_formats??[];
    const compatible=available.filter(format=>!format.drm_families?.length&&!format.is_type_otf&&!!format.init_range&&!!format.index_range&&(
-    format.has_video&&!format.has_audio&&format.mime_type.startsWith('video/mp4')&&format.mime_type.includes('avc1')&&(format.height??9999)<=720
+    format.has_video&&!format.has_audio&&isHorizontalVideo(format.width,format.height)&&format.mime_type.startsWith('video/mp4')&&format.mime_type.includes('avc1')&&(format.height??9999)<=720
     ||format.has_audio&&!format.has_video&&format.mime_type.startsWith('audio/mp4')&&format.mime_type.includes('mp4a')&&!format.is_drc&&!format.is_secondary&&(!format.audio_track||format.audio_track.audio_is_default)
    ));
    // Two video qualities and one default audio track keep startup bounded and avoid fetching unused variants.

@@ -30,7 +30,7 @@ const validFeed=()=>({checkedAt:'2026-10-30T13:00:00Z',refreshSeconds:300,source
 test('TV query isolates accounts, waits for session readiness and refreshes on reconnect',()=>{
  state.user={id:'tv-owner'};state.ready=true;
  const query=useDashboardTv();
- assert.deepEqual(query.queryKey,['billing','tv-owner','dashboard-tv',{version:2}]);assert.equal(query.enabled,true);
+ assert.deepEqual(query.queryKey,['billing','tv-owner','dashboard-tv',{version:3}]);assert.equal(query.enabled,true);
  assert.equal(query.staleTime,300000);assert.equal(query.refetchInterval,300000);assert.equal(query.refetchOnReconnect,true);assert.equal(query.retry,1);
  state.ready=false;assert.equal(useDashboardTv().enabled,false);
  state.ready=true;state.user={id:'other-owner'};assert.equal(useDashboardTv().queryKey[1],'other-owner');
