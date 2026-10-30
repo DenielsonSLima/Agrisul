@@ -10,7 +10,7 @@ const catalog=url(await compile('modules/dashboard-news/catalog.ts'));
 const hookSource=(await compile('modules/dashboard-news/useAgroNews.ts')).replace(/from ['"](?:@tanstack\/react-query|@\/shared\/supabase\/AuthProvider|@\/shared\/supabase\/rpc|@\/shared\/query\/keys)['"]/g,`from ${JSON.stringify(fixtures)}`).replace(/from ['"]\.\/catalog['"]/g,`from ${JSON.stringify(catalog)}`);
 const {useAgroNews}=await import(url(hookSource));
 test('news query is account scoped, cancels fetches, refreshes automatically and validates the response',async()=>{
- state.user={id:'news-owner'};const options=useAgroNews();assert.deepEqual(options.queryKey,['billing','news-owner','dashboard-news',{version:3}]);assert.equal(options.enabled,true);assert.equal(options.refetchInterval,300000);
+ state.user={id:'news-owner'};const options=useAgroNews();assert.deepEqual(options.queryKey,['billing','news-owner','dashboard-news',{version:4}]);assert.equal(options.enabled,true);assert.equal(options.refetchInterval,300000);
  state.body={articles:[],sources:[],checkedAt:'2026-10-29T12:00:00Z',refreshSeconds:300};state.status=200;const controller=new AbortController();await options.queryFn({signal:controller.signal});assert.equal(state.calls.at(-1).options.signal.aborted,false);assert.equal(options.retry,1);
  state.body={articles:[],sources:[],refreshSeconds:300};await assert.rejects(()=>options.queryFn({signal:controller.signal}),/inválidas/);state.status=503;await assert.rejects(()=>options.queryFn({signal:controller.signal}),/atualizar/);
  state.user={id:'other-owner'};assert.equal(useAgroNews().queryKey[1],'other-owner');state.user=null;assert.equal(useAgroNews().enabled,false);

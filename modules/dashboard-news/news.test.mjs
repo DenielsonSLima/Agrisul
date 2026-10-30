@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {NEWS_SOURCES,createNewsFeed,parseNewsRss,safeNewsUrl,classifyNewsTopic,curateNews} from './providers.mjs';
+import {NEWS_SOURCES,createNewsFeed,parseNewsRss,safeNewsUrl,classifyNewsTopic,curateNews,parseNewsPageImage} from './providers.mjs';
 import {newsForScope,newsTopicLabel} from './presentation.ts';
 const at=Date.parse('2026-10-29T15:00:00Z'),source=NEWS_SOURCES[0];
-function rss(provider,index=0,extra=''){
+function rss(provider,index=0,extra='<enclosure url="https://cdn.example.com/article.jpg" type="image/jpeg"/>'){
  return `<rss><channel><item><title><![CDATA[Cana &amp; etanol ${index}]]></title><link>https://${provider.domain}/noticia-${index}?utm_source=rss</link><pubDate>${new Date(at-index*60000).toUTCString()}</pubDate><description><![CDATA[<p>Resumo da notícia do setor sucroenergético para conferência.</p><p>O post apareceu primeiro no jornal.</p>]]></description>${extra}</item></channel></rss>`;
 }
 test('RSS extracts plain headlines, attribution, exact publication dates and optional publisher images',()=>{
@@ -102,4 +102,87 @@ test('shortages redistribute only real unique recent articles and never change t
  const selected=curateNews([...input,duplicate,old,input[1]],30,at);
  assert.equal(selected.length,20);assert.equal(new Set(selected.map(row=>row.url)).size,20);assert.equal(selected.some(row=>row.topic==='cane'),false);
  assert.deepEqual(curateNews([],30,at),[]);
+});
+
+const htmlResponse=html=>new Response(html,{headers:{'Content-Type':'text/html; charset=utf-8'}});
+test('article image metadata accepts attribute order, escaped and relative URLs and Twitter fallback',()=>{
+ const page='https://www.noticiasagricolas.com.br/noticias/cana.html';
+ assert.equal(parseNewsPageImage('<meta content="/images/cana.jpg?a=1&amp;b=2" property="og:image">',page),'https://www.noticiasagricolas.com.br/images/cana.jpg?a=1&b=2');
+ assert.equal(parseNewsPageImage("<meta name='twitter:image' content='https://cdn.example.com/cana.jpg'>",page),'https://cdn.example.com/cana.jpg');
+ for(const bad of ['javascript:alert(1)','https://127.0.0.1/foto.jpg','https://www.youtube.com/embed/video','https://cdn.example.com/logo.jpg']){
+  assert.equal(parseNewsPageImage(`<meta property="og:image" content="${bad}">`,page),null);
+ }
+ assert.equal(parseNewsPageImage('<meta property="og:image" content="https://cdn.example.com/logo.jpg"><meta name="twitter:image" content="https://cdn.example.com/article.jpg">',page),'https://cdn.example.com/article.jpg');
+ assert.equal(parseNewsPageImage('<html>No article photo</html>',page),null);
+});
+
+test('missing RSS images are enriched once across concurrent feeds and cached beyond RSS refresh without changing source articles',async()=>{
+ let now=at,imageCalls=0,feedCalls=0;
+ const feed=createNewsFeed({now:()=>now,fetchImpl:async(url,options)=>{
+  const provider=NEWS_SOURCES.find(source=>source.url===url);
+  if(provider){feedCalls++;return new Response(rss(provider,0,provider.id===source.id?'':undefined));}
+  imageCalls++;assert.equal(options.redirect,'manual');assert.equal(options.headers['User-Agent'],'AgrisulDashboard/1.0 RSS reader');
+  return htmlResponse('<meta property="og:image" content="https://cdn.example.com/from-page.jpg">');
+ }});
+ const [first,second]=await Promise.all([feed(),feed()]);assert.deepEqual(first,second);assert.equal(imageCalls,1);
+ const article=first.articles.find(article=>article.sourceId===source.id);assert.equal(article.imageUrl,'https://cdn.example.com/from-page.jpg');
+ assert.equal(article.title,'Cana & etanol 0');assert.equal(article.topic,'cane');assert.equal(article.publishedAt,new Date(at).toISOString());
+ await feed();assert.equal(imageCalls,1);assert.equal(feedCalls,NEWS_SOURCES.length);
+ now+=301000;await feed();assert.equal(imageCalls,1);assert.equal(feedCalls,NEWS_SOURCES.length*2);
+ now+=24*3600000;await feed();assert.equal(imageCalls,2);
+});
+
+test('absent metadata is cached briefly and failures never remove a valid RSS article',async()=>{
+ let now=at,imageCalls=0;
+ const feed=createNewsFeed({now:()=>now,fetchImpl:async url=>{
+  const provider=NEWS_SOURCES.find(source=>source.url===url);
+  if(provider)return new Response(rss(provider,0,provider.id===source.id?'':undefined));
+  imageCalls++;return htmlResponse('<html>No photo</html>');
+ }});
+ const first=await feed();assert.ok(first.articles.some(article=>article.sourceId===source.id&&article.imageUrl===null));
+ await feed();assert.equal(imageCalls,1);now+=301000;await feed();assert.equal(imageCalls,2);
+});
+
+test('article lookups follow only publisher redirects, reject oversized pages and retain headlines',async()=>{
+ for(const kind of ['external','local','oversized','blocked','redirect']){
+  const pageCalls=[];
+  const feed=createNewsFeed({now:()=>at,fetchImpl:async url=>{
+   const provider=NEWS_SOURCES.find(source=>source.url===url);
+   if(provider)return new Response(rss(provider,0,provider.id===source.id?'':undefined));
+   pageCalls.push(url);
+   if(kind==='blocked')return new Response('Denied',{status:403});
+   if(kind==='oversized')return htmlResponse('x'.repeat(300_001));
+   if(pageCalls.length===1)return new Response(null,{status:302,headers:{Location:kind==='external'?'https://foreign.example/news':kind==='local'?'https://127.0.0.1/news':'/canonical'}});
+   return htmlResponse('<meta property="og:image" content="https://cdn.example.com/redirect.jpg">');
+  }});
+  const result=await feed(),article=result.articles.find(article=>article.sourceId===source.id);
+  assert.equal(article.imageUrl,kind==='redirect'?'https://cdn.example.com/redirect.jpg':null);
+  assert.equal(pageCalls.length,kind==='redirect'?2:1);assert.equal(result.sources[0].status,'current');
+ }
+});
+
+test('photo lookup concurrency and total deadline are bounded even when a publisher ignores abort, then recover',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});let stalled=true,active=0,peak=0;
+ const signals=[];
+ const feed=createNewsFeed({now:()=>at,fetchImpl:async(url,options)=>{
+  const provider=NEWS_SOURCES.find(source=>source.url===url);
+  if(provider){
+   if(provider.id!==source.id)return new Response('offline',{status:503});
+   return new Response('<rss><channel>'+Array.from({length:30},(_,index)=>rss(provider,index,'').match(/<item>[\s\S]*<\/item>/)[0]).join('')+'</channel></rss>');
+  }
+  if(stalled){
+   signals.push(options.signal);active++;peak=Math.max(peak,active);
+   options.signal.addEventListener('abort',()=>active--,{once:true});
+   return new Promise(()=>{});
+  }
+  return htmlResponse('<meta property="og:image" content="https://cdn.example.com/recovered.jpg">');
+ }});
+ try{
+  const request=feed();await new Promise(setImmediate);assert.equal(peak,6);
+  t.mock.timers.tick(1500);await new Promise(setImmediate);
+  t.mock.timers.tick(2500);const result=await request;
+  assert.equal(result.articles.length,30);assert.equal(result.sources[0].status,'current');assert.equal(peak,6);assert.equal(active,0);
+  assert.ok(signals.every(signal=>signal.aborted));
+  stalled=false;const recovered=await feed();assert.equal(recovered.articles.every(article=>article.imageUrl==='https://cdn.example.com/recovered.jpg'),true);
+ }finally{t.mock.timers.reset();}
 });

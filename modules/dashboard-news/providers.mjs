@@ -20,6 +20,23 @@ const field=(xml,name)=>new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name
 const attribute=(tag,name)=>new RegExp(`\\b${name}\\s*=\\s*["']([^"']*)["']`,'i').exec(tag)?.[1]??'';
 const normalized=value=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 
+export function parseNewsPageImage(html,pageUrl){
+ const candidates=new Map();
+ for(const match of html.matchAll(/<meta\b[^>]*>/gi)){
+  const key=decode(attribute(match[0],'property')||attribute(match[0],'name')).toLowerCase();
+  if(!candidates.has(key))candidates.set(key,attribute(match[0],'content'));
+ }
+ for(const key of ['og:image:secure_url','og:image','og:image:url','twitter:image','twitter:image:src']){
+  try{
+   const value=candidates.get(key);if(!value)continue;
+   const url=safeNewsUrl(new URL(decode(value),pageUrl).toString());
+   if(url&&!/(?:^|\.)(?:youtube\.com|youtu\.be|vimeo\.com|dailymotion\.com)$/.test(new URL(url).hostname)
+    &&!/(?:logo|favicon|avatar|tracking|spacer)/i.test(new URL(url).pathname))return url;
+  }catch{/* Ignore malformed publisher metadata and try the next image field. */}
+ }
+ return null;
+}
+
 // The publisher is attribution, never evidence of an article's subject.
 export function classifyNewsTopic(title,categories=[],description=''){
  const cane=/\b(?:cana|acucar|acucareir\w*|sucro\w*|consecana|canav\w*|mastercana)\b/;
@@ -96,11 +113,11 @@ export function parseNewsRss(xml,source,now=Date.now()){
  }
  return articles;
 }
-async function limitedText(response){
- if(Number(response.headers.get('content-length'))>MAX_BYTES)throw Error('Feed muito grande.');
+async function limitedText(response,maxBytes=MAX_BYTES){
+ if(Number(response.headers.get('content-length'))>maxBytes)throw Error('Resposta muito grande.');
  if(!response.body)return '';
  const reader=response.body.getReader(),chunks=[];let length=0;
- try{for(;;){const {done,value}=await reader.read();if(done)break;length+=value.length;if(length>MAX_BYTES)throw Error('Feed muito grande.');chunks.push(value);}}
+ try{for(;;){const {done,value}=await reader.read();if(done)break;length+=value.length;if(length>maxBytes)throw Error('Resposta muito grande.');chunks.push(value);}}
  catch(error){await reader.cancel().catch(()=>{});throw error;}
  const bytes=new Uint8Array(length);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
  return new TextDecoder().decode(bytes);
@@ -108,6 +125,66 @@ async function limitedText(response){
 
 export function createNewsFeed({fetchImpl=(...args)=>globalThis.fetch(...args),now=Date.now}={}){
  const cache=new Map(),pending=new Map();
+ const imageCache=new Map(),pendingImages=new Map();
+ function pageImage(article,signal){
+  const source=NEWS_SOURCES.find(source=>source.id===article.sourceId);
+  if(!source||!safeNewsUrl(article.url,source.domain))return Promise.resolve(null);
+  const saved=imageCache.get(article.url);
+  if(saved&&now()<saved.expires)return Promise.resolve(saved.imageUrl);
+  if(pendingImages.has(article.url))return pendingImages.get(article.url);
+  const task=Promise.resolve().then(async()=>{
+   const controller=new AbortController();let timer,onAbort;
+   try{
+    const deadline=new Promise((_,reject)=>{
+     const abort=reason=>{controller.abort(reason);reject(reason);};
+     onAbort=()=>abort(signal.reason);signal.addEventListener('abort',onAbort,{once:true});
+     if(signal.aborted)onAbort();
+     timer=setTimeout(()=>abort(Error('Tempo de consulta da imagem esgotado.')),1500);
+    });
+    return await Promise.race([deadline,(async()=>{
+     let url=article.url;
+     for(let redirects=0;redirects<=2;redirects++){
+      controller.signal.throwIfAborted();
+      const response=await fetchImpl(url,{cache:'no-store',redirect:'manual',headers:{Accept:'text/html, application/xhtml+xml','User-Agent':'AgrisulDashboard/1.0 RSS reader'},signal:controller.signal});
+      controller.signal.throwIfAborted();
+      if([301,302,303,307,308].includes(response.status)){
+       void response.body?.cancel().catch(()=>{});
+       const location=response.headers.get('location');
+       if(!location)return null;
+       const next=safeNewsUrl(new URL(location,url).toString(),source.domain);
+       if(!next)return null;url=next;continue;
+      }
+      if(!response.ok||response.url&&!safeNewsUrl(response.url,source.domain))return null;
+      const type=response.headers.get('content-type')??'';
+      if(!/^(?:text\/html|application\/xhtml\+xml)\b/i.test(type))return null;
+      const imageUrl=parseNewsPageImage(await limitedText(response,300_000),url);
+      controller.signal.throwIfAborted();
+      // Positive results last a day; absent metadata is retried in five minutes.
+      imageCache.delete(article.url);imageCache.set(article.url,{imageUrl,expires:now()+(imageUrl?MAX_CACHE_AGE:NEWS_REFRESH_SECONDS*1000)});
+      if(imageCache.size>512)imageCache.delete(imageCache.keys().next().value);
+      return imageUrl;
+     }
+     return null;
+    })()]);
+   }catch{return null;}
+   finally{clearTimeout(timer);if(onAbort)signal.removeEventListener('abort',onAbort);pendingImages.delete(article.url);}
+  });
+  pendingImages.set(article.url,task);return task;
+ }
+ async function withImages(articles){
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(Error('Tempo de imagens esgotado.')),4000);
+  const result=[...articles];let cursor=0;
+  try{
+   await Promise.all(Array.from({length:Math.min(6,articles.length)},async()=>{
+    while(cursor<articles.length&&!controller.signal.aborted){
+     const index=cursor++,article=articles[index];if(article.imageUrl)continue;
+     const imageUrl=await pageImage(article,controller.signal);
+     if(imageUrl)result[index]={...article,imageUrl};
+    }
+   }));
+   return result;
+  }finally{clearTimeout(timer);}
+ }
  function sourceFeed(source){
   const saved=cache.get(source.id);
   const result=(articles,status,at)=>({articles,source:{id:source.id,name:source.name,url:source.url,status,updatedAt:at===null?null:new Date(at).toISOString()}});
@@ -136,7 +213,7 @@ export function createNewsFeed({fetchImpl=(...args)=>globalThis.fetch(...args),n
  }
  return async()=>{
   const responses=await Promise.all(NEWS_SOURCES.map(sourceFeed));
-  const chosen=curateNews(responses.flatMap(response=>response.articles),30,now());
+  const chosen=await withImages(curateNews(responses.flatMap(response=>response.articles),30,now()));
   return {articles:chosen,sources:responses.map(response=>response.source),checkedAt:new Date(now()).toISOString(),refreshSeconds:NEWS_REFRESH_SECONDS};
  };
 }
