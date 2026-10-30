@@ -27,7 +27,7 @@ const comparison={
  ],clients:[],contracts:[],
 };
 const fixture={totals:{loadedVolume:'1234.567',grossAmount:'',netAmount:'',billingPending:true},operationalTotals:{averageAtr:'999'},comparison:{volumeChangePercent:'88.88'},contractComparison:comparison};
-const render=({visible=true,projection=comparison,scene=4}={})=>{display.visible=visible;return renderToStaticMarkup(createElement(DashboardMetrics,{scene,data:{...fixture,contractComparison:projection}}));};
+const render=({visible=true,projection=comparison,scene='dashboard-contracts'}={})=>{display.visible=visible;return renderToStaticMarkup(createElement(DashboardMetrics,{scene,data:{...fixture,contractComparison:projection}}));};
 const card=(html,marker)=>{const chunk=html.split(`data-dashboard-metric="${marker}"`)[1];assert.ok(chunk,`Expected ${marker} metric`);return chunk.split('data-dashboard-metric=')[0];};
 const metricMarkers=html=>[...html.matchAll(/data-dashboard-metric="([^"]+)"/g)].map(match=>match[1]);
 

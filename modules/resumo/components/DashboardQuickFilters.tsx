@@ -21,7 +21,7 @@ function FilterCheckbox({checked,partial=false,onChange,children,label}:{checked
  </label>;
 }
 
-export function DashboardQuickFilters({filters,options,onChange,onOpen,open,onMenuChange}:{filters:SummaryFilters;options?:SummaryFilterOptions;onChange:(filters:SummaryFilters)=>void;onOpen:()=>void;open:QuickFilterMenu;onMenuChange:(value:QuickFilterMenu)=>void}){
+export function DashboardQuickFilters({filters,options,onChange,onOpen,open,onMenuChange,weekly=false}:{weekly?:boolean;filters:SummaryFilters;options?:SummaryFilterOptions;onChange:(filters:SummaryFilters)=>void;onOpen:()=>void;open:QuickFilterMenu;onMenuChange:(value:QuickFilterMenu)=>void}){
  const {defaultPeriod}=useDashboardValues();
  const [search,setSearch]=useState(''),[expanded,setExpanded]=useState<string[]>([]);
  const [collapsedSearch,setCollapsedSearch]=useState<string[]>([]);
@@ -78,11 +78,11 @@ export function DashboardQuickFilters({filters,options,onChange,onOpen,open,onMe
  const datesChanged=dates.from!==filters.from||dates.to!==filters.to,datesValid=validRange(dates),defaults=defaultRange(defaultPeriod);
  const filtered=!!(selected.partnerIds.length||selected.contractIds.length||selected.farmIds.length||selected.plotIds.length||filters.status||filters.from!==defaults.from||filters.to!==defaults.to);
  return <div className="dashboard-quick-filters" aria-label="Filtros rápidos do Dashboard">
-  <form className="dashboard-period-filter" onSubmit={event=>{event.preventDefault();if(datesValid&&datesChanged)onChange({...filters,...dates});}}>
+  <form className="dashboard-period-filter" title={weekly?'Últimos 7 dias corridos, incluindo hoje':undefined} onSubmit={event=>{event.preventDefault();if(datesValid&&datesChanged)onChange({...filters,...dates});}}>
    <CalendarDays size={13} aria-hidden="true"/>
-   <label><span className="sr-only">Data inicial</span><input aria-label="Data inicial" type="date" min="1900-01-01" max={dates.to||'9999-12-31'} value={dates.from} onChange={event=>setDates(value=>({...value,from:event.target.value}))}/></label>
+   <label><span className="sr-only">Data inicial</span><input aria-label="Data inicial" readOnly={weekly} type="date" min="1900-01-01" max={dates.to||'9999-12-31'} value={dates.from} onChange={event=>setDates(value=>({...value,from:event.target.value}))}/></label>
    <span aria-hidden="true">—</span>
-   <label><span className="sr-only">Data final</span><input aria-label="Data final" type="date" min={dates.from||'1900-01-01'} max="9999-12-31" value={dates.to} onChange={event=>setDates(value=>({...value,to:event.target.value}))}/></label>
+   <label><span className="sr-only">Data final</span><input aria-label="Data final" readOnly={weekly} type="date" min={dates.from||'1900-01-01'} max="9999-12-31" value={dates.to} onChange={event=>setDates(value=>({...value,to:event.target.value}))}/></label>
    {datesChanged&&<button type="submit" disabled={!datesValid} aria-label="Aplicar período" title={datesValid?'Aplicar período':'Escolha um período entre 1 dia e 5 anos'}><Check size={15}/></button>}
    {datesChanged&&!datesValid&&<span className="dashboard-period-error" role="alert">Escolha um período entre 1 dia e 5 anos.</span>}
   </form>

@@ -1,5 +1,6 @@
 export const DASHBOARD_SCENES=[
  {id:'dashboard-general',label:'Geral'},
+ {id:'dashboard-weekly',label:'Semanal'},
  {id:'dashboard-production',label:'Produção e ATR'},
  {id:'dashboard-financial',label:'Faturamento'},
  {id:'dashboard-suppliers',label:'Clientes'},

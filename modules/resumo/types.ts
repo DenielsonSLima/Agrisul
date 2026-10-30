@@ -15,6 +15,14 @@ export type SummarySelection = {
  partnerIds?:string[];contractIds?:string[];farmIds?:string[];plotIds?:string[];
 };
 export type SummaryFilters = SummarySelection & {from:string;to:string};
+export type WeeklyContractMethod=''|'1'|'2'|'unknown';
+export type WeeklyMetrics={loadCount:number;loadedVolume:string;averageAtr:string;grossAmount:string;netAmount:string;billingPending:boolean;pendingLoadCount:number};
+export type WeeklySummaryData={
+ range:SummaryRange;totals:WeeklyMetrics;days:(WeeklyMetrics&{date:string})[];
+ contractMethods:{code:'1'|'2'|'unknown';label:string;loadCount:number;loadedVolume:string;averageAtr:string}[];
+ comparison:WeeklyMetrics&{from:string;to:string;loadChangePercent:string;volumeChangePercent:string;atrChange:string;grossChangePercent:string};
+ filters:SummarySelection&{companyId:string;contractMethod:WeeklyContractMethod};filterOptions:SummaryFilterOptions;
+};
 export type SummaryFilterOptions = {
  contracts:{id:string;clientId?:string;clientName:string;contractNumber:string;title:string;status:string}[];
  statuses:string[];

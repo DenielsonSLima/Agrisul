@@ -33,7 +33,7 @@ const fixture={
 };
 const renderMetrics=({visible=true,totals={},operation={}}={})=>{
  display.visible=visible;
- return renderToStaticMarkup(createElement(DashboardMetrics,{scene:3,data:{...fixture,totals:{...fixture.totals,...totals},operationalTotals:{...fixture.operationalTotals,...operation}}}));
+ return renderToStaticMarkup(createElement(DashboardMetrics,{scene:'dashboard-suppliers',data:{...fixture,totals:{...fixture.totals,...totals},operationalTotals:{...fixture.operationalTotals,...operation}}}));
 };
 const card=(html,marker)=>{
  const match=html.match(new RegExp(`data-dashboard-metric="${marker}"[^>]*>([\\s\\S]*?)<\\/dd>`));
@@ -75,7 +75,7 @@ test('refund-only and empty periods preserve negative cash and zero official val
 });
 test('the separate Contract scene has three modality cards and never reuses client financial indicators',()=>{
  display.visible=true;
- const html=renderToStaticMarkup(createElement(DashboardMetrics,{scene:4,data:fixture}));
+ const html=renderToStaticMarkup(createElement(DashboardMetrics,{scene:'dashboard-contracts',data:fixture}));
  assert.match(html,/data-metric-count="3"/);assert.equal([...html.matchAll(/<dt>/g)].length,3);
  assert.doesNotMatch(html,/received-amount|pending-amount|R\$ 1\.200,13|R\$ 7\.319,62|Faturamento médio/);
  assert.match(html,/Atualizando comparativo dos contratos/);

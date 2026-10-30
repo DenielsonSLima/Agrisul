@@ -9,19 +9,19 @@ const settingsUrl=dataUrl(await transpile('../modules/resumo/presentationSetting
 const {DASHBOARD_SCENES,DASHBOARD_SCENE_IDS,PRESENTATION_INTERVALS,formatPresentationInterval,defaultPresentationMinutes,isPresentationMinutes,isDashboardSceneIndex,presentationSettingsKey,readPresentationSettings,serializePresentationSettings,updateSceneMinutes,updateAllSceneMinutes}=await import(settingsUrl);
 
 test('every scene defaults to two minutes and only supported intervals and scene indices are accepted',()=>{
- assert.deepEqual(PRESENTATION_INTERVALS,[10/60,20/60,30/60,1,2,5,10]);assert.equal(DASHBOARD_SCENES.length,7);assert.equal(DASHBOARD_SCENES[2].label,'Faturamento');assert.equal(DASHBOARD_SCENES[3].label,'Clientes');assert.equal(DASHBOARD_SCENES[3].id,'dashboard-suppliers');assert.equal(DASHBOARD_SCENES.at(-1).label,'Notícias');
+ assert.deepEqual(PRESENTATION_INTERVALS,[10/60,20/60,30/60,1,2,5,10]);assert.equal(DASHBOARD_SCENES.length,8);assert.equal(DASHBOARD_SCENES[3].label,'Faturamento');assert.equal(DASHBOARD_SCENES[4].label,'Clientes');assert.equal(DASHBOARD_SCENES[4].id,'dashboard-suppliers');assert.equal(DASHBOARD_SCENES.at(-1).label,'Notícias');
  assert.deepEqual(PRESENTATION_INTERVALS.map(formatPresentationInterval),['10 segundos','20 segundos','30 segundos','1 minuto','2 minutos','5 minutos','10 minutos']);
  assert.deepEqual(Object.keys(defaultPresentationMinutes()),DASHBOARD_SCENE_IDS);assert.equal(Object.values(defaultPresentationMinutes()).every(value=>value===2),true);
  for(const value of PRESENTATION_INTERVALS)assert.equal(isPresentationMinutes(value),true);
  for(const value of [0,3,-1,Infinity,NaN,'2',null])assert.equal(isPresentationMinutes(value),false);
- for(const value of [-1,0.5,7,Infinity,NaN,'0',null])assert.equal(isDashboardSceneIndex(value),false);
- for(const value of [0,1,2,3,4,5,6])assert.equal(isDashboardSceneIndex(value),true);
+ for(const value of [-1,0.5,8,Infinity,NaN,'0',null])assert.equal(isDashboardSceneIndex(value),false);
+ for(const value of [0,1,2,3,4,5,6,7])assert.equal(isDashboardSceneIndex(value),true);
 });
 test('preferences serialize by canonical scene ID and partial valid settings fill remaining defaults',()=>{
- const values=updateSceneMinutes(defaultPresentationMinutes(),1,5);values['dashboard-types']=10;
+ const values=updateSceneMinutes(defaultPresentationMinutes(),2,5);values['dashboard-types']=10;
  const raw=serializePresentationSettings(values);assert.deepEqual(readPresentationSettings(raw),values);assert.equal(JSON.parse(raw).version,1);
  const partial=readPresentationSettings(JSON.stringify({version:1,minutesByScene:{'dashboard-general':1}}));
- assert.equal(partial['dashboard-general'],1);assert.equal(partial['dashboard-production'],2);assert.equal(partial['dashboard-news'],2);assert.equal(partial['dashboard-financial'],2);assert.equal(Object.keys(partial).length,7);
+ assert.equal(partial['dashboard-general'],1);assert.equal(partial['dashboard-production'],2);assert.equal(partial['dashboard-news'],2);assert.equal(partial['dashboard-financial'],2);assert.equal(Object.keys(partial).length,8);
  const oldFive={...values};delete oldFive['dashboard-news'];const migrated=readPresentationSettings(JSON.stringify({version:1,minutesByScene:oldFive}));assert.equal(migrated['dashboard-production'],5);assert.equal(migrated['dashboard-types'],10);assert.equal(migrated['dashboard-news'],2);
  const oldSix={...values};delete oldSix['dashboard-financial'];oldSix['dashboard-news']=5;const withFinancial=readPresentationSettings(JSON.stringify({version:1,minutesByScene:oldSix}));assert.equal(withFinancial['dashboard-financial'],2);assert.equal(withFinancial['dashboard-news'],5);assert.equal(withFinancial['dashboard-production'],5);
  const withUnknown={...values,unknown:999};assert.equal('unknown' in JSON.parse(serializePresentationSettings(withUnknown)).minutesByScene,false);
@@ -29,10 +29,10 @@ test('preferences serialize by canonical scene ID and partial valid settings fil
 test('renaming the supplier tab to Clients preserves its existing saved duration and canonical ID',()=>{
  const previous=JSON.stringify({version:1,minutesByScene:{'dashboard-suppliers':10,'dashboard-production':5}});
  const restored=readPresentationSettings(previous);
- assert.equal(DASHBOARD_SCENES[3].label,'Clientes');assert.equal(DASHBOARD_SCENES[3].id,'dashboard-suppliers');
- assert.equal(restored[DASHBOARD_SCENES[3].id],10);assert.equal(restored['dashboard-production'],5);
+ assert.equal(DASHBOARD_SCENES[4].label,'Clientes');assert.equal(DASHBOARD_SCENES[4].id,'dashboard-suppliers');
+ assert.equal(restored[DASHBOARD_SCENES[4].id],10);assert.equal(restored['dashboard-production'],5);
  assert.equal(JSON.parse(serializePresentationSettings(restored)).minutesByScene['dashboard-suppliers'],10);
- const changed=updateSceneMinutes(restored,3,1);assert.equal(changed['dashboard-suppliers'],1);assert.equal(restored['dashboard-suppliers'],10);
+ const changed=updateSceneMinutes(restored,4,1);assert.equal(changed['dashboard-suppliers'],1);assert.equal(restored['dashboard-suppliers'],10);
 });
 test('malformed JSON, unknown versions, keys and unsupported values never enter presentation state',()=>{
  const defaults=defaultPresentationMinutes();
@@ -40,9 +40,9 @@ test('malformed JSON, unknown versions, keys and unsupported values never enter 
  for(const raw of invalid)assert.deepEqual(readPresentationSettings(raw),defaults,raw);
 });
 test('editing one scene preserves all others and global compatibility updates all scenes without mutating prior state',()=>{
- const previous=defaultPresentationMinutes();const next=updateSceneMinutes(previous,4,10);
+ const previous=defaultPresentationMinutes();const next=updateSceneMinutes(previous,5,10);
  assert.equal(next['dashboard-contracts'],10);assert.equal(next['dashboard-general'],2);assert.equal(previous['dashboard-contracts'],2);
- for(const index of [-1,7,NaN])assert.equal(updateSceneMinutes(previous,index,1),null);
+ for(const index of [-1,8,NaN])assert.equal(updateSceneMinutes(previous,index,1),null);
  assert.equal(updateSceneMinutes(previous,1,3),null);assert.equal(updateAllSceneMinutes(3),null);
  assert.equal(Object.values(updateAllSceneMinutes(5)).every(value=>value===5),true);
 });
@@ -94,7 +94,7 @@ test('per-scene timer advances once using each duration; editing a different sce
    assert.equal(model.setSceneMinutes(1,seconds/60),true);model=fixture.render();
    assert.equal([...state.timers.values()][0].delay,seconds*1000);
    const stored=readPresentationSettings(fixture.storage.getItem(presentationSettingsKey(state.user.id)));
-   assert.equal(stored['dashboard-production'],seconds/60);
+   assert.equal(stored['dashboard-weekly'],seconds/60);
   }
   assert.equal(model.setMinutes(10/60),true);model=fixture.render();
   assert.ok(Object.values(model.minutesByScene).every(minutes=>minutes===10/60));

@@ -72,18 +72,24 @@ test('opening and changing defaults applies dates while retaining selections and
 
 const groupingUrl=dataUrl(transpile('../modules/resumo/financialGrouping.ts'));
 const providerUrl=dataUrl(transpile('../modules/resumo/dashboardValues.tsx').replace(/from ['"]react(?:\/jsx-runtime)?['"]/g,`from ${JSON.stringify(fixtureUrl)}`).replace(/from ['"]@\/shared\/utils\/presentation['"]/g,`from ${JSON.stringify(sharedUrl)}`).replace(/from ['"]\.\/financialGrouping['"]/g,`from ${JSON.stringify(groupingUrl)}`).replace(/from ['"]\.\/defaultPeriod['"]/g,`from ${JSON.stringify(periodUrl)}`));
-const {DashboardValuesProvider}=await import(providerUrl);
+const {DashboardValuesProvider,dashboardNewsScopeKey}=await import(providerUrl);
 test('browser preferences reload per account, synchronize across tabs and survive blocked storage in this session',()=>{
  const previousWindow=globalThis.window,values=new Map(),listeners=new Map();let blocked=false;
  globalThis.window={localStorage:{getItem(key){if(blocked)throw Error('blocked');return values.get(key)??null;},setItem(key,value){if(blocked)throw Error('blocked');values.set(key,value);}},addEventListener(name,handler){listeners.set(name,handler);},removeEventListener(){},dispatchEvent(){return true;}};
  const render=userId=>DashboardValuesProvider({userId,children:null}).props.value;
  try{
   let model=render('owner-a');assert.equal(model.defaultPeriod,'last-365-days');assert.equal(model.setDefaultPeriod('month'),true);
+  assert.equal(model.newsScope,'all');assert.equal(model.setNewsScope('cane'),true);
+  assert.equal(render('owner-a').newsScope,'cane');assert.equal(values.get(dashboardNewsScopeKey('owner-a')),'cane');assert.equal(render('owner-b').newsScope,'all');
   model=render('owner-a');assert.equal(model.defaultPeriod,'month');assert.equal(values.get(defaultPeriodKey('owner-a')),'month');
   assert.equal(render('owner-b').defaultPeriod,'last-365-days');
   blocked=true;model=render('owner-a');assert.equal(model.setDefaultPeriod('last-6-months'),false);assert.equal(render('owner-a').defaultPeriod,'last-6-months');assert.equal(render('owner-b').defaultPeriod,'last-365-days');
+  assert.equal(model.setNewsScope('all'),false);assert.equal(render('owner-a').newsScope,'all');assert.equal(render('owner-b').newsScope,'all');
   blocked=false;model=render('owner-a');assert.equal(model.setDefaultPeriod('last-90-days'),true);assert.equal(render('owner-a').defaultPeriod,'last-90-days');
   values.set(defaultPeriodKey('owner-a'),'previous-month');listeners.get('storage')({key:defaultPeriodKey('owner-a')});assert.equal(render('owner-a').defaultPeriod,'previous-month');
+  values.set(dashboardNewsScopeKey('owner-a'),'cane');listeners.get('storage')({key:dashboardNewsScopeKey('owner-a')});assert.equal(render('owner-a').newsScope,'cane');
+  values.set(dashboardNewsScopeKey('owner-a'),'invalid');listeners.get('storage')({key:dashboardNewsScopeKey('owner-a')});assert.equal(render('owner-a').newsScope,'all');
   assert.equal(render(null).defaultPeriod,'last-365-days');assert.equal(render(null).setDefaultPeriod('month'),false);
+  assert.equal(render(null).newsScope,'all');assert.equal(render(null).setNewsScope('cane'),false);
  }finally{globalThis.window=previousWindow;}
 });

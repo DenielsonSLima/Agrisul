@@ -1,14 +1,15 @@
 'use client';
 import {FINANCIAL_GROUPINGS,readFinancialGrouping,type FinancialGrouping} from '../financialGrouping';
 import {useEffect,useRef,useSyncExternalStore,type ReactNode} from 'react';
-import {Building2,ChartNoAxesCombined,ChevronLeft,ChevronRight,Layers3,LayoutDashboard,FileChartColumn,Newspaper,Settings2,Wallet,X} from 'lucide-react';
+import {Building2,CalendarDays,ChartNoAxesCombined,ChevronLeft,ChevronRight,Layers3,LayoutDashboard,FileChartColumn,Newspaper,Settings2,Wallet,X} from 'lucide-react';
 import {notifications} from '@/shared/feedback';
 import {DASHBOARD_SCENES,PRESENTATION_INTERVALS,useDashboardPresentation} from '../hooks/useDashboardPresentation';
 import {formatPresentationInterval} from '../presentationSettings';
 import {DASHBOARD_CALENDAR_PERIODS,DASHBOARD_ROLLING_PERIODS,defaultPeriodDescription,readDefaultPeriod,type DashboardDefaultPeriod} from '../defaultPeriod';
+import {readDashboardNewsScope,type DashboardNewsScope} from '../dashboardValues';
 
 export type Presentation=ReturnType<typeof useDashboardPresentation>;
-const sceneIcons=[LayoutDashboard,ChartNoAxesCombined,Wallet,Building2,FileChartColumn,Layers3,Newspaper];
+const sceneIcons={'dashboard-general':LayoutDashboard,'dashboard-weekly':CalendarDays,'dashboard-production':ChartNoAxesCombined,'dashboard-financial':Wallet,'dashboard-suppliers':Building2,'dashboard-contracts':FileChartColumn,'dashboard-types':Layers3,'dashboard-news':Newspaper};
 const clockTime=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
 const clockDate=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',year:'numeric'});
 const clockCalendar=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'short',year:'numeric'});
@@ -29,20 +30,22 @@ export function DashboardSceneNavigation({presentation}:{presentation:Presentati
    if(event.key==='ArrowLeft')next=(p.scene+DASHBOARD_SCENES.length-1)%DASHBOARD_SCENES.length;
    if(event.key==='Home')next=0;if(event.key==='End')next=DASHBOARD_SCENES.length-1;
    if(next!==undefined){event.preventDefault();focusTab(next);}
-  }}>{DASHBOARD_SCENES.map((scene,index)=>{const Icon=sceneIcons[index];return <button key={scene.id} id={`tab-${scene.id}`} type="button" role="tab" aria-selected={p.scene===index} aria-controls={scene.id} tabIndex={p.scene===index?0:-1} onClick={()=>p.selectScene(index)}><Icon size={17}/><span>{scene.label}</span></button>;})}</div>
+  }}>{DASHBOARD_SCENES.map((scene,index)=>{const Icon=sceneIcons[scene.id];return <button key={scene.id} id={`tab-${scene.id}`} type="button" role="tab" aria-selected={p.scene===index} aria-controls={scene.id} tabIndex={p.scene===index?0:-1} onClick={()=>p.selectScene(index)}><Icon size={17}/><span>{scene.label}</span></button>;})}</div>
   <div className="executive-page-controls"><span>{String(p.scene+1).padStart(2,'0')} <i>/ {String(DASHBOARD_SCENES.length).padStart(2,'0')}</i></span><button type="button" aria-label="Painel anterior" onClick={()=>p.selectScene((p.scene+DASHBOARD_SCENES.length-1)%DASHBOARD_SCENES.length)}><ChevronLeft size={16}/></button><button type="button" aria-label="Próximo painel" onClick={()=>p.selectScene((p.scene+1)%DASHBOARD_SCENES.length)}><ChevronRight size={16}/></button></div>
  </div>;
 }
 
-export function DashboardSettings({presentation,open,onToggle,onClose,financialGrouping,onFinancialGroupingChange,defaultPeriod,onDefaultPeriodChange}:{presentation:Presentation;open:boolean;onToggle:()=>void;onClose:()=>void;financialGrouping:FinancialGrouping;onFinancialGroupingChange:(value:FinancialGrouping)=>boolean;defaultPeriod:DashboardDefaultPeriod;onDefaultPeriodChange:(value:DashboardDefaultPeriod)=>boolean}){
+export function DashboardSettings({presentation,open,onToggle,onClose,financialGrouping,onFinancialGroupingChange,defaultPeriod,onDefaultPeriodChange,newsScope,onNewsScopeChange}:{presentation:Presentation;open:boolean;onToggle:()=>void;onClose:()=>void;financialGrouping:FinancialGrouping;onFinancialGroupingChange:(value:FinancialGrouping)=>boolean;defaultPeriod:DashboardDefaultPeriod;onDefaultPeriodChange:(value:DashboardDefaultPeriod)=>boolean;newsScope:DashboardNewsScope;onNewsScopeChange:(value:DashboardNewsScope)=>boolean}){
  const trigger=useRef<HTMLButtonElement>(null);
  const commonMinutes=DASHBOARD_SCENES.every(scene=>presentation.minutesByScene[scene.id]===presentation.minutesByScene[DASHBOARD_SCENES[0].id])?presentation.minutesByScene[DASHBOARD_SCENES[0].id]:'';
  const feedback=(saved:boolean)=>saved?notifications.saved('Tempos de apresentação salvos neste navegador.'):notifications.error('Não foi possível salvar os tempos neste navegador.');
  return <div className="executive-settings-anchor"><button ref={trigger} className="executive-settings-trigger" type="button" aria-label="Configurações do Dashboard" aria-expanded={open} aria-controls="dashboard-settings" onClick={onToggle}><Settings2 size={18}/></button>
   {open&&<DashboardPopover title="Configurações do Dashboard" id="dashboard-settings" onClose={onClose} onReturnFocus={()=>trigger.current?.focus({preventScroll:true})} settings>
-   <p className="executive-setting-caption">Ajuste o período padrão, os tempos da apresentação e o agrupamento dos gráficos de todas as abas.</p>
+   <p className="executive-setting-caption">Ajuste o período padrão, as notícias, os tempos da apresentação e o agrupamento dos gráficos. A aba Semanal usa sete dias e evolução diária.</p>
    <label className="executive-setting-field">Período padrão do Dashboard<select aria-label="Período padrão do Dashboard" aria-describedby="dashboard-default-period-caption" value={defaultPeriod} onChange={event=>{const saved=onDefaultPeriodChange(readDefaultPeriod(event.target.value));if(saved)notifications.saved('Período padrão salvo neste navegador.');else notifications.error('Período aplicado nesta sessão; não foi possível salvar neste navegador.');}}><optgroup label="Meses e anos do calendário">{DASHBOARD_CALENDAR_PERIODS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</optgroup><optgroup label="Dias corridos">{DASHBOARD_ROLLING_PERIODS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</optgroup></select></label>
    <p id="dashboard-default-period-caption" className="executive-setting-caption">{defaultPeriodDescription(defaultPeriod)} Aplicado ao abrir o Dashboard e ao limpar filtros. Alterar esta opção também atualiza o período exibido.</p>
+   <label className="executive-setting-field">Notícias do Dashboard<select aria-label="Notícias do Dashboard" aria-describedby="dashboard-news-scope-caption" value={newsScope} onChange={event=>{const saved=onNewsScopeChange(readDashboardNewsScope(event.target.value));if(saved)notifications.saved('Preferência de notícias salva neste navegador.');else notifications.error('Preferência aplicada nesta sessão; não foi possível salvar neste navegador.');}}><option value="all">Visão geral</option><option value="cane">Só cana</option></select></label>
+   <p id="dashboard-news-scope-caption" className="executive-setting-caption">Visão geral inclui cana, soja, milho e agronegócio. Só cana exibe notícias de cana, açúcar e etanol em todos os painéis de notícias.</p>
    <label className="executive-setting-field">Aplicar o mesmo tempo a todas as abas<select aria-label="Intervalo de troca dos painéis" value={commonMinutes} onChange={event=>feedback(presentation.setMinutes(Number(event.target.value)))}><option value="" disabled>Personalizado por aba</option>{PRESENTATION_INTERVALS.map(minutes=><option key={minutes} value={minutes}>{formatPresentationInterval(minutes)}</option>)}</select></label>
    <fieldset className="executive-duration-list"><legend>Tempo por aba</legend>{DASHBOARD_SCENES.map((scene,index)=><label className="executive-duration-row" key={scene.id} htmlFor={`duration-${scene.id}`}><span>{scene.label}</span><select id={`duration-${scene.id}`} aria-label={`Tempo da aba ${scene.label}`} value={presentation.minutesByScene[scene.id]} onChange={event=>feedback(presentation.setSceneMinutes(index,Number(event.target.value)))}>{PRESENTATION_INTERVALS.map(minutes=><option key={minutes} value={minutes}>{formatPresentationInterval(minutes)}</option>)}</select></label>)}</fieldset>
    {presentation.settingsError&&<p className="executive-settings-error" role="alert">{presentation.settingsError}</p>}

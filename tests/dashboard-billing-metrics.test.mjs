@@ -32,7 +32,7 @@ const fixture={
  dailyProductivity:{productionDayCount:7,averageLoadedVolume:'176.367',averageNetAmount:'38669.01',billingPending:false},
  averageGrossPricePerTon:'420.55',
 };
-const render=({scene=2,visible=true,totals={},comparison={}}={})=>{
+const render=({scene='dashboard-financial',visible=true,totals={},comparison={}}={})=>{
  display.visible=visible;
  return renderToStaticMarkup(createElement(DashboardMetrics,{scene,data:{...fixture,totals:{...fixture.totals,...totals},comparison:{...fixture.comparison,...comparison}}}));
 };
@@ -83,8 +83,8 @@ test('financial comparisons preserve unavailable and zero RPC percentages withou
  const unavailable=render({comparison:{netChangePercent:'',netAmount:'0'}});
  assert.match(unavailable,/Sem comparação/);assert.match(unavailable,/Anterior: R\$ 0,00/);assert.doesNotMatch(unavailable,/88,88%/);
  const zero=render({comparison:{netChangePercent:'0'}});assert.match(zero,/0,00%/);assert.doesNotMatch(zero,/Sem comparação/);
- const clients=render({scene:3});assert.match(clients,/-12,34%/);assert.match(clients,/Anterior: R\$ 3\.000,00/);
- const hiddenClients=render({scene:3,visible:false});assert.doesNotMatch(hiddenClients,/-12,34%|3\.000,00|R\$/);
+ const clients=render({scene:'dashboard-suppliers'});assert.match(clients,/-12,34%/);assert.match(clients,/Anterior: R\$ 3\.000,00/);
+ const hiddenClients=render({scene:'dashboard-suppliers',visible:false});assert.doesNotMatch(hiddenClients,/-12,34%|3\.000,00|R\$/);
 });
 
 test('zero, negative and long RPC amounts are displayed directly without client-side financial reconciliation',()=>{
@@ -96,11 +96,11 @@ test('zero, negative and long RPC amounts are displayed directly without client-
 });
 
 test('dedicated billing metrics preserve the existing production and remaining Dashboard metric sets',()=>{
- const production=render({scene:1});assert.match(production,/data-metric-count="4"/);assert.equal(cardCount(production),4);
+ const production=render({scene:'dashboard-production'});assert.match(production,/data-metric-count="4"/);assert.equal(cardCount(production),4);
  assert.match(production,/ATR médio ponderado/);assert.match(production,/Média carregada \/ dia/);assert.match(production,/Venda média bruta \/ t/);assert.doesNotMatch(production,/data-dashboard-metric="gross-amount"/);
- const clients=render({scene:3});assert.match(clients,/data-metric-count="4"/);assert.equal(cardCount(clients),4);
+ const clients=render({scene:'dashboard-suppliers'});assert.match(clients,/data-metric-count="4"/);assert.equal(cardCount(clients),4);
  assert.match(clients,/Recebido no período/);assert.match(clients,/A receber no período/);assert.doesNotMatch(clients,/Faturamento médio \/ dia/);
- const contracts=render({scene:4});assert.match(contracts,/data-metric-count="3"/);assert.equal(cardCount(contracts),3);
+ const contracts=render({scene:'dashboard-contracts'});assert.match(contracts,/data-metric-count="3"/);assert.equal(cardCount(contracts),3);
  assert.deepEqual(markers(contracts),['loaded-volume','manual-volume','mechanized-volume']);assert.doesNotMatch(contracts,/Faturamento médio \/ dia|R\$/);
  for(const scene of [0,5]){
   const html=render({scene});assert.match(html,/data-metric-count="5"/);assert.equal(cardCount(html),5);

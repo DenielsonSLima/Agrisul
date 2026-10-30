@@ -10,15 +10,15 @@ import type {useAgroNews} from './useAgroNews';
 import type {useDashboardAtr} from './useDashboardAtr';
 import {DashboardWeather} from './DashboardWeather';
 import {headlineIntervalMs,usableNewsImage,newsForScope,newsTopicLabel} from './presentation';
-import {DASHBOARD_MONEY_MASK,useDashboardValues} from '@/modules/resumo/dashboardValues';
+import {DASHBOARD_MONEY_MASK,useDashboardValues,type DashboardNewsScope} from '@/modules/resumo/dashboardValues';
 
 type NewsQuery=ReturnType<typeof useAgroNews>;
 type AtrQuery=ReturnType<typeof useDashboardAtr>;
 const publicationFormat=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
 const publication=(value:string)=>publicationFormat.format(new Date(value)).replace(/ de /g,' ').replace('.','');
 
-export function DashboardNews({news,atr,presenting,slideDurationMs}:{news:NewsQuery;atr:AtrQuery;presenting:boolean;slideDurationMs:number}){
- const [scope,setScope]=useState<'cane'|'all'>('all'),[selected,setSelected]=useState<string|null>(null),[latestPage,setLatestPage]=useState(0),[portraitSelected,setPortraitSelected]=useState<string|null>(null),[cardsPerPage,setCardsPerPage]=useState(4);
+export function DashboardNews({news,atr,presenting,slideDurationMs,scope}:{news:NewsQuery;atr:AtrQuery;presenting:boolean;slideDurationMs:number;scope:DashboardNewsScope}){
+ const [selected,setSelected]=useState<string|null>(null),[latestPage,setLatestPage]=useState(0),[portraitSelected,setPortraitSelected]=useState<string|null>(null),[cardsPerPage,setCardsPerPage]=useState(4);
  const latestRef=useRef<HTMLDivElement>(null);
  const articles=news.data?.articles;
  const stories=useMemo(()=>newsForScope(articles??[],scope),[articles,scope]);
@@ -47,11 +47,7 @@ export function DashboardNews({news,atr,presenting,slideDurationMs}:{news:NewsQu
   observer.observe(node);return()=>observer.disconnect();
  },[]);
  const choose=(offset:number)=>{if(stories.length)setSelected(stories[(index+offset+stories.length)%stories.length].id);};
- const changeScope=(value:'cane'|'all')=>{setScope(value);setSelected(null);setPortraitSelected(null);setLatestPage(0);};
  return <div className="agro-news-dashboard" data-headline-interval={interval??undefined}>
-  <div className="agro-news-editorial">
-   <div className="agro-news-scope" role="group" aria-label="Filtrar todas as notícias"><button type="button" aria-pressed={scope==='all'} onClick={()=>changeScope('all')}>Visão geral</button><button type="button" aria-pressed={scope==='cane'} onClick={()=>changeScope('cane')}>Só cana</button></div>
-  </div>
   <div className="agro-news-layout">
    <aside className="agro-news-sidebar" aria-label="Últimas notícias e histórico de ATR">
     <NewsPortrait article={portrait} index={portraitIndex} count={secondary.length} onChange={offset=>{if(secondary.length)setPortraitSelected(secondary[(portraitIndex+offset+secondary.length)%secondary.length].id);}}/>
