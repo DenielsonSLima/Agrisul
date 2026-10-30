@@ -1,0 +1,14 @@
+.employees-workspace{min-width:0}
+.employees-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px;padding:14px;border:1px solid #e0e8e2;border-radius:11px;background:#fff}
+.employees-toolbar .local-search{flex:1;max-width:none}
+.employees-toolbar>span{color:#819087;font-size:12px;white-space:nowrap}
+.employees-table-wrap{overflow-x:auto;border:1px solid #dfe8e2;border-radius:12px;background:#fff}
+.employees-table{width:100%;border-collapse:collapse;text-align:left}
+.employees-table th{padding:14px 18px;background:#f5f9f6;color:#617769;font-size:12px;font-weight:600}
+.employees-table td{padding:14px 18px;border-top:1px solid #e8eeea;color:#35523f;font-size:13px;overflow-wrap:anywhere}
+.employee-actions-heading{text-align:right}
+.employee-actions{display:flex;align-items:center;justify-content:flex-end;gap:5px}
+.employee-delete{color:#9c625b}
+.employee-form{display:grid;gap:14px}
+.employee-modal{max-width:540px!important}
+@media(max-width:600px){.employees-toolbar{align-items:stretch;flex-direction:column}.employees-toolbar>span{align-self:flex-end}.employees-table th,.employees-table td{padding:12px}.employee-actions .btn{font-size:11px}}

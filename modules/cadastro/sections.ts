@@ -1,6 +1,7 @@
 import {lazy} from "react";
 import {Users,Tractor,FileText,ChartNoAxesCombined,Sprout,Shovel,Signature,Files,Wrench,PackageOpen,Truck,Tags,CreditCard} from "lucide-react";
 const PrestadoresPage=lazy(()=>import('./prestadores/components/PrestadoresPage').then(module=>({default:module.PrestadoresPage})));
+const FuncionariosPage=lazy(()=>import('./funcionarios/components/FuncionariosPage').then(module=>({default:module.FuncionariosPage})));
 const ClientesPage=lazy(()=>import("./clientes/components/ClientesPage").then(module=>({default:module.ClientesPage})));
 const AtrPage=lazy(()=>import("./atr/components/AtrPage").then(module=>({default:module.AtrPage})));
 const FazendaPage=lazy(()=>import("./fazenda/components/FazendaPage").then(module=>({default:module.FazendaPage})));
@@ -16,6 +17,7 @@ const ModelosDocumentosPage=lazy(()=>import("./modelos-documentos/components/Mod
 
 export const cadastroSections = [
   {id:"clientes",name:"Clientes",href:"/cadastro?secao=clientes",icon:Users,component:ClientesPage},
+  {id:"funcionarios",name:"Funcionários",href:"/cadastro?secao=funcionarios",icon:Users,component:FuncionariosPage},
   {id:"prestadores",name:"Prestador",href:"/cadastro?secao=prestadores",icon:Wrench,component:PrestadoresPage},
   {id:"atr",name:"ATR",href:"/cadastro?secao=atr",icon:ChartNoAxesCombined,component:AtrPage},
   {id:"fazenda",name:"Fazenda",href:"/cadastro?secao=fazenda",icon:Tractor,component:FazendaPage},
