@@ -48,12 +48,9 @@ export function DashboardNews({news,atr,presenting,slideDurationMs}:{news:NewsQu
  },[]);
  const choose=(offset:number)=>{if(stories.length)setSelected(stories[(index+offset+stories.length)%stories.length].id);};
  const changeScope=(value:'cane'|'all')=>{setScope(value);setSelected(null);setPortraitSelected(null);setLatestPage(0);};
- const counts=(articles??[]).reduce((result,article)=>{result[article.topic]++;return result;},{cane:0,grains:0,agro:0});
- const completeMix=counts.cane===15&&counts.grains===6&&counts.agro===9;
  return <div className="agro-news-dashboard" data-headline-interval={interval??undefined}>
   <div className="agro-news-editorial">
-   <div className="agro-news-scope" role="group" aria-label="Filtrar todas as notícias" aria-describedby="agro-news-selection"><button type="button" aria-pressed={scope==='all'} onClick={()=>changeScope('all')}>Visão geral</button><button type="button" aria-pressed={scope==='cane'} onClick={()=>changeScope('cane')}>Só cana</button></div>
-   <p id="agro-news-selection">{scope==='cane'?'Cana, açúcar e etanol em todos os painéis':'Prioridade: 50% cana · 20% soja e milho · 30% agro geral'}<small>{news.isPending?'Consultando fontes…':scope==='cane'?`${stories.length} notícias de cana`:completeMix?'Seleção de 30 notícias':`Disponíveis: ${counts.cane} cana · ${counts.grains} soja/milho · ${counts.agro} gerais`}{news.data?.sources.some(source=>source.status!=='current')?' · Fontes com atraso':''}</small></p>
+   <div className="agro-news-scope" role="group" aria-label="Filtrar todas as notícias"><button type="button" aria-pressed={scope==='all'} onClick={()=>changeScope('all')}>Visão geral</button><button type="button" aria-pressed={scope==='cane'} onClick={()=>changeScope('cane')}>Só cana</button></div>
   </div>
   <div className="agro-news-layout">
    <aside className="agro-news-sidebar" aria-label="Últimas notícias e histórico de ATR">
