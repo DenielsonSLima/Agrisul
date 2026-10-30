@@ -1,15 +1,18 @@
 'use client';
 import {FINANCIAL_GROUPINGS,readFinancialGrouping,type FinancialGrouping} from '../financialGrouping';
-import {useEffect,useRef,useSyncExternalStore,type ReactNode} from 'react';
-import {Building2,CalendarDays,ChartNoAxesCombined,ChevronLeft,ChevronRight,Layers3,LayoutDashboard,FileChartColumn,Newspaper,Settings2,Wallet,X} from 'lucide-react';
+import {useEffect,useRef,useState,useSyncExternalStore,type ReactNode} from 'react';
+import {createPortal} from 'react-dom';
+import {Building2,CalendarDays,ChartNoAxesCombined,ChevronLeft,ChevronRight,Layers3,LayoutDashboard,FileChartColumn,Newspaper,Save,Settings2,Tv,Wallet,X} from 'lucide-react';
 import {notifications} from '@/shared/feedback';
 import {DASHBOARD_SCENES,PRESENTATION_INTERVALS,useDashboardPresentation} from '../hooks/useDashboardPresentation';
-import {formatPresentationInterval} from '../presentationSettings';
+import {formatPresentationInterval,isPresentationMinutes,type DashboardSceneId} from '../presentationSettings';
 import {DASHBOARD_CALENDAR_PERIODS,DASHBOARD_ROLLING_PERIODS,defaultPeriodDescription,readDefaultPeriod,type DashboardDefaultPeriod} from '../defaultPeriod';
 import {readDashboardNewsScope,type DashboardNewsScope} from '../dashboardValues';
+import {TV_CHANNELS} from '@/modules/dashboard-tv/catalog';
+import '../dashboardSettings.css';
 
 export type Presentation=ReturnType<typeof useDashboardPresentation>;
-const sceneIcons={'dashboard-general':LayoutDashboard,'dashboard-weekly':CalendarDays,'dashboard-production':ChartNoAxesCombined,'dashboard-financial':Wallet,'dashboard-suppliers':Building2,'dashboard-contracts':FileChartColumn,'dashboard-types':Layers3,'dashboard-news':Newspaper};
+const sceneIcons={'dashboard-general':LayoutDashboard,'dashboard-weekly':CalendarDays,'dashboard-production':ChartNoAxesCombined,'dashboard-financial':Wallet,'dashboard-suppliers':Building2,'dashboard-contracts':FileChartColumn,'dashboard-types':Layers3,'dashboard-news':Newspaper,'dashboard-tv':Tv};
 const clockTime=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
 const clockDate=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',year:'numeric'});
 const clockCalendar=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'short',year:'numeric'});
@@ -22,40 +25,92 @@ function subscribeClock(changed:()=>void){
 
 export function DashboardSceneNavigation({presentation}:{presentation:Presentation}){
  const p=presentation;
- const focusTab=(index:number)=>{p.selectScene(index);document.getElementById(`tab-${DASHBOARD_SCENES[index].id}`)?.focus();};
+ const visible=DASHBOARD_SCENES.map((scene,index)=>({...scene,index})).filter(scene=>p.enabledSceneIds.includes(scene.id));
+ const current=Math.max(0,visible.findIndex(scene=>scene.index===p.scene));
+ const adjacent=(offset:number)=>visible[(current+offset+visible.length)%visible.length]?.index;
+ const focusTab=(index:number|undefined)=>{if(index===undefined)return;p.selectScene(index);document.getElementById(`tab-${DASHBOARD_SCENES[index].id}`)?.focus();};
  return <div className="executive-navigation">
   <div className="executive-tabs" role="tablist" aria-label="Visões do Dashboard" onKeyDown={event=>{
    let next:number|undefined;
-   if(event.key==='ArrowRight')next=(p.scene+1)%DASHBOARD_SCENES.length;
-   if(event.key==='ArrowLeft')next=(p.scene+DASHBOARD_SCENES.length-1)%DASHBOARD_SCENES.length;
-   if(event.key==='Home')next=0;if(event.key==='End')next=DASHBOARD_SCENES.length-1;
+   if(event.key==='ArrowRight')next=adjacent(1);
+   if(event.key==='ArrowLeft')next=adjacent(-1);
+   if(event.key==='Home')next=visible[0]?.index;if(event.key==='End')next=visible.at(-1)?.index;
    if(next!==undefined){event.preventDefault();focusTab(next);}
-  }}>{DASHBOARD_SCENES.map((scene,index)=>{const Icon=sceneIcons[scene.id];return <button key={scene.id} id={`tab-${scene.id}`} type="button" role="tab" aria-selected={p.scene===index} aria-controls={scene.id} tabIndex={p.scene===index?0:-1} onClick={()=>p.selectScene(index)}><Icon size={17}/><span>{scene.label}</span></button>;})}</div>
-  <div className="executive-page-controls"><span>{String(p.scene+1).padStart(2,'0')} <i>/ {String(DASHBOARD_SCENES.length).padStart(2,'0')}</i></span><button type="button" aria-label="Painel anterior" onClick={()=>p.selectScene((p.scene+DASHBOARD_SCENES.length-1)%DASHBOARD_SCENES.length)}><ChevronLeft size={16}/></button><button type="button" aria-label="Próximo painel" onClick={()=>p.selectScene((p.scene+1)%DASHBOARD_SCENES.length)}><ChevronRight size={16}/></button></div>
+  }}>{visible.map(scene=>{const Icon=sceneIcons[scene.id];return <button key={scene.id} id={`tab-${scene.id}`} type="button" role="tab" aria-selected={p.scene===scene.index} aria-controls={scene.id} tabIndex={p.scene===scene.index?0:-1} onClick={()=>p.selectScene(scene.index)}><Icon size={17}/><span>{scene.label}</span></button>;})}</div>
+  <div className="executive-page-controls"><span>{String(current+1).padStart(2,'0')} <i>/ {String(visible.length).padStart(2,'0')}</i></span><button type="button" aria-label="Painel anterior" disabled={visible.length<2} onClick={()=>{const index=adjacent(-1);if(index!==undefined)p.selectScene(index);}}><ChevronLeft size={16}/></button><button type="button" aria-label="Próximo painel" disabled={visible.length<2} onClick={()=>{const index=adjacent(1);if(index!==undefined)p.selectScene(index);}}><ChevronRight size={16}/></button></div>
  </div>;
 }
 
-export function DashboardSettings({presentation,open,onToggle,onClose,financialGrouping,onFinancialGroupingChange,defaultPeriod,onDefaultPeriodChange,newsScope,onNewsScopeChange}:{presentation:Presentation;open:boolean;onToggle:()=>void;onClose:()=>void;financialGrouping:FinancialGrouping;onFinancialGroupingChange:(value:FinancialGrouping)=>boolean;defaultPeriod:DashboardDefaultPeriod;onDefaultPeriodChange:(value:DashboardDefaultPeriod)=>boolean;newsScope:DashboardNewsScope;onNewsScopeChange:(value:DashboardNewsScope)=>boolean}){
+type SettingsProps={presentation:Presentation;open:boolean;onToggle:()=>void;onClose:()=>void;financialGrouping:FinancialGrouping;onFinancialGroupingChange:(value:FinancialGrouping)=>boolean;defaultPeriod:DashboardDefaultPeriod;onDefaultPeriodChange:(value:DashboardDefaultPeriod)=>boolean;newsScope:DashboardNewsScope;onNewsScopeChange:(value:DashboardNewsScope)=>boolean};
+const SETTINGS_TABS=[{id:'general',label:'Geral',Icon:LayoutDashboard},{id:'tabs',label:'Abas do dashboard',Icon:Layers3},{id:'presentation',label:'Apresentação',Icon:CalendarDays},{id:'news',label:'Notícias',Icon:Newspaper},{id:'tv',label:'TV Agro',Icon:Tv}] as const;
+type SettingsTab=typeof SETTINGS_TABS[number]['id'];
+
+export function DashboardSettings(props:SettingsProps){
  const trigger=useRef<HTMLButtonElement>(null);
- const commonMinutes=DASHBOARD_SCENES.every(scene=>presentation.minutesByScene[scene.id]===presentation.minutesByScene[DASHBOARD_SCENES[0].id])?presentation.minutesByScene[DASHBOARD_SCENES[0].id]:'';
- const feedback=(saved:boolean)=>saved?notifications.saved('Tempos de apresentação salvos neste navegador.'):notifications.error('Não foi possível salvar os tempos neste navegador.');
- return <div className="executive-settings-anchor"><button ref={trigger} className="executive-settings-trigger" type="button" aria-label="Configurações do Dashboard" aria-expanded={open} aria-controls="dashboard-settings" onClick={onToggle}><Settings2 size={18}/></button>
-  {open&&<DashboardPopover title="Configurações do Dashboard" id="dashboard-settings" onClose={onClose} onReturnFocus={()=>trigger.current?.focus({preventScroll:true})} settings>
-   <p className="executive-setting-caption">Ajuste o período padrão, as notícias, os tempos da apresentação e o agrupamento dos gráficos. A aba Semanal usa sete dias e evolução diária.</p>
-   <label className="executive-setting-field">Período padrão do Dashboard<select aria-label="Período padrão do Dashboard" aria-describedby="dashboard-default-period-caption" value={defaultPeriod} onChange={event=>{const saved=onDefaultPeriodChange(readDefaultPeriod(event.target.value));if(saved)notifications.saved('Período padrão salvo neste navegador.');else notifications.error('Período aplicado nesta sessão; não foi possível salvar neste navegador.');}}><optgroup label="Meses e anos do calendário">{DASHBOARD_CALENDAR_PERIODS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</optgroup><optgroup label="Dias corridos">{DASHBOARD_ROLLING_PERIODS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</optgroup></select></label>
-   <p id="dashboard-default-period-caption" className="executive-setting-caption">{defaultPeriodDescription(defaultPeriod)} Aplicado ao abrir o Dashboard e ao limpar filtros. Alterar esta opção também atualiza o período exibido.</p>
-   <label className="executive-setting-field">Notícias do Dashboard<select aria-label="Notícias do Dashboard" aria-describedby="dashboard-news-scope-caption" value={newsScope} onChange={event=>{const saved=onNewsScopeChange(readDashboardNewsScope(event.target.value));if(saved)notifications.saved('Preferência de notícias salva neste navegador.');else notifications.error('Preferência aplicada nesta sessão; não foi possível salvar neste navegador.');}}><option value="all">Visão geral</option><option value="cane">Só cana</option></select></label>
-   <p id="dashboard-news-scope-caption" className="executive-setting-caption">Visão geral inclui cana, soja, milho e agronegócio. Só cana exibe notícias de cana, açúcar e etanol em todos os painéis de notícias.</p>
-   <label className="executive-setting-field">Aplicar o mesmo tempo a todas as abas<select aria-label="Intervalo de troca dos painéis" value={commonMinutes} onChange={event=>feedback(presentation.setMinutes(Number(event.target.value)))}><option value="" disabled>Personalizado por aba</option>{PRESENTATION_INTERVALS.map(minutes=><option key={minutes} value={minutes}>{formatPresentationInterval(minutes)}</option>)}</select></label>
-   <fieldset className="executive-duration-list"><legend>Tempo por aba</legend>{DASHBOARD_SCENES.map((scene,index)=><label className="executive-duration-row" key={scene.id} htmlFor={`duration-${scene.id}`}><span>{scene.label}</span><select id={`duration-${scene.id}`} aria-label={`Tempo da aba ${scene.label}`} value={presentation.minutesByScene[scene.id]} onChange={event=>feedback(presentation.setSceneMinutes(index,Number(event.target.value)))}>{PRESENTATION_INTERVALS.map(minutes=><option key={minutes} value={minutes}>{formatPresentationInterval(minutes)}</option>)}</select></label>)}</fieldset>
-   {presentation.settingsError&&<p className="executive-settings-error" role="alert">{presentation.settingsError}</p>}
-   <label className="executive-setting-field">Agrupamento dos gráficos<select aria-label="Agrupamento dos gráficos" value={financialGrouping} onChange={event=>{const saved=onFinancialGroupingChange(readFinancialGrouping(event.target.value));if(saved)notifications.saved('Agrupamento dos gráficos salvo neste navegador.');else notifications.error('Agrupamento aplicado nesta sessão; não foi possível salvar neste navegador.');}}>{FINANCIAL_GROUPINGS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
-   <p className="executive-setting-caption">Semanas de segunda a domingo. Quinzenas: 1 a 15 e 16 ao fim do mês.</p>
-   <p className="executive-setting-note">As alterações são aplicadas imediatamente e salvas neste navegador. Esc encerra a tela cheia.</p>
-  </DashboardPopover>}
+ return <div className="executive-settings-anchor"><button ref={trigger} className="executive-settings-trigger" type="button" aria-label="Configurações do Dashboard" aria-expanded={props.open} aria-controls="dashboard-settings" onClick={props.onToggle}><Settings2 size={18}/></button>
+  {props.open&&<DashboardSettingsModal {...props} onReturnFocus={()=>trigger.current?.focus({preventScroll:true})}/>}
  </div>;
 }
 
+function DashboardSettingsModal({presentation,onClose,onReturnFocus,financialGrouping,onFinancialGroupingChange,defaultPeriod,onDefaultPeriodChange,newsScope,onNewsScopeChange}:SettingsProps&{onReturnFocus:()=>void}){
+ const panel=useRef<HTMLDivElement>(null),returnFocusRef=useRef(onReturnFocus);
+ const [tab,setTab]=useState<SettingsTab>('general');
+ const [period,setPeriod]=useState(defaultPeriod),[grouping,setGrouping]=useState(financialGrouping),[scope,setScope]=useState(newsScope);
+ const [minutes,setMinutes]=useState(()=>({...presentation.minutesByScene}));
+ const [enabled,setEnabled]=useState<DashboardSceneId[]>(()=>[...presentation.enabledSceneIds]);
+ const [tv,setTv]=useState(()=>({...presentation.tvSettings,channelIds:[...presentation.tvSettings.channelIds]}));
+ const [error,setError]=useState(''),[saving,setSaving]=useState(false);
+ const commonMinutes=DASHBOARD_SCENES.every(scene=>minutes[scene.id]===minutes[DASHBOARD_SCENES[0].id])?minutes[DASHBOARD_SCENES[0].id]:'';
+ useEffect(()=>{
+  const previousOverflow=document.body.style.overflow;document.body.style.overflow='hidden';
+  const modal=panel.current,restoreFocus=returnFocusRef.current;
+  modal?.querySelector<HTMLElement>('button')?.focus({preventScroll:true});
+  const retainFocus=(event:FocusEvent)=>{if(modal&&!modal.contains(event.target as Node))modal.querySelector<HTMLElement>('button')?.focus({preventScroll:true});};
+  document.addEventListener('focusin',retainFocus);
+  return()=>{document.body.style.overflow=previousOverflow;document.removeEventListener('focusin',retainFocus);restoreFocus();};
+ },[]);
+ const close=()=>{if(!saving)onClose();};
+ const setSceneEnabled=(id:DashboardSceneId,checked:boolean)=>{setEnabled(previous=>checked?[...previous,id]:previous.filter(value=>value!==id));setError('');};
+ const save=()=>{
+  if(saving)return;
+  if(!enabled.length){setTab('tabs');setError('Mantenha pelo menos uma aba ativa no dashboard.');notifications.error('Ative pelo menos uma aba antes de salvar.');return;}
+  if(enabled.includes('dashboard-tv')&&!tv.channelIds.length){setTab('tv');setError('Selecione pelo menos um canal para a TV Agro.');notifications.error('Selecione pelo menos um canal antes de salvar.');return;}
+  setSaving(true);setError('');
+  try{
+   const results=[presentation.savePreferences({minutesByScene:minutes,enabledSceneIds:enabled,tvSettings:tv}),onDefaultPeriodChange(period),onFinancialGroupingChange(grouping),onNewsScopeChange(scope)];
+   if(results.every(Boolean)){notifications.saved('Configurações do Dashboard salvas neste navegador.');onClose();}
+   else{setError('As configurações foram aplicadas nesta sessão, mas o navegador não permitiu salvar todas as preferências.');notifications.error('Não foi possível salvar todas as configurações neste navegador.');}
+  }catch{setError('Não foi possível salvar as configurações. Tente novamente.');notifications.error('Não foi possível salvar as configurações do Dashboard.');}
+  finally{setSaving(false);}
+ };
+ const content=<div className="dashboard-settings-backdrop"><div ref={panel} id="dashboard-settings" className="dashboard-settings-modal" data-dashboard-settings="true" role="dialog" aria-modal="true" aria-labelledby="dashboard-settings-title" aria-describedby="dashboard-settings-description" aria-busy={saving} onKeyDown={event=>{
+  if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close();return;}
+  if(event.key!=='Tab')return;
+  const fields=Array.from(panel.current?.querySelectorAll<HTMLElement>('button:not(:disabled),select:not(:disabled),input:not(:disabled),a[href],[tabindex]')??[]).filter(field=>field.tabIndex>=0&&field.getClientRects().length>0);
+  if(!fields?.length)return;const first=fields[0],last=fields[fields.length-1];
+  if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+ }}>
+  <header className="dashboard-settings-header"><div><span>PERSONALIZE SEU PAINEL</span><h2 id="dashboard-settings-title">Configurações do Dashboard</h2><p id="dashboard-settings-description">Organize as abas, ajuste a apresentação e escolha o conteúdo que deseja acompanhar.</p></div><button type="button" className="dashboard-settings-close" aria-label="Fechar Configurações do Dashboard" disabled={saving} onClick={close}><X size={22}/></button></header>
+  <div className="dashboard-settings-layout"><nav className="dashboard-settings-tabs" role="tablist" aria-label="Categorias das configurações" aria-orientation="vertical" onKeyDown={event=>{
+   const index=SETTINGS_TABS.findIndex(item=>item.id===tab);let next:number|undefined;
+   if(event.key==='ArrowDown'||event.key==='ArrowRight')next=(index+1)%SETTINGS_TABS.length;
+   if(event.key==='ArrowUp'||event.key==='ArrowLeft')next=(index+SETTINGS_TABS.length-1)%SETTINGS_TABS.length;
+   if(event.key==='Home')next=0;if(event.key==='End')next=SETTINGS_TABS.length-1;
+   if(next!==undefined){event.preventDefault();const id=SETTINGS_TABS[next].id;setTab(id);document.getElementById(`dashboard-settings-tab-${id}`)?.focus();}
+  }}>{SETTINGS_TABS.map(({id,label,Icon})=><button type="button" key={id} role="tab" id={`dashboard-settings-tab-${id}`} aria-selected={tab===id} aria-controls={`dashboard-settings-panel-${id}`} tabIndex={tab===id?0:-1} onClick={()=>setTab(id)}><Icon size={19}/><span>{label}</span><ChevronRight size={15}/></button>)}</nav>
+   <div className="dashboard-settings-content" role="tabpanel" id={`dashboard-settings-panel-${tab}`} aria-labelledby={`dashboard-settings-tab-${tab}`} tabIndex={0}>
+    {tab==='general'&&<><h3>Preferências gerais</h3><p className="dashboard-settings-intro">Defina como o dashboard abre e como os gráficos organizam o período.</p><label className="dashboard-settings-field">Período padrão do Dashboard<select aria-label="Período padrão do Dashboard" aria-describedby="dashboard-default-period-caption" value={period} onChange={event=>setPeriod(readDefaultPeriod(event.target.value))}><optgroup label="Meses e anos do calendário">{DASHBOARD_CALENDAR_PERIODS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</optgroup><optgroup label="Dias corridos">{DASHBOARD_ROLLING_PERIODS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</optgroup></select></label><p id="dashboard-default-period-caption" className="dashboard-settings-help">{defaultPeriodDescription(period)} Aplicado ao abrir o Dashboard e ao limpar filtros. Salvar também atualiza o período exibido.</p><label className="dashboard-settings-field">Agrupamento dos gráficos<select aria-label="Agrupamento dos gráficos" value={grouping} onChange={event=>setGrouping(readFinancialGrouping(event.target.value))}>{FINANCIAL_GROUPINGS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</select></label><p className="dashboard-settings-help">Semanas de segunda a domingo. Quinzenas: 1 a 15 e 16 ao fim do mês. A aba Semanal usa sete dias e evolução diária.</p></>}
+    {tab==='tabs'&&<><h3>Abas do dashboard</h3><p className="dashboard-settings-intro">Escolha quais abas aparecem na navegação e participam da apresentação automática. Mantenha pelo menos uma ativa.</p><div className="dashboard-settings-options">{DASHBOARD_SCENES.map(scene=>{const Icon=sceneIcons[scene.id];return <label key={scene.id} className="dashboard-settings-toggle"><span className="dashboard-settings-option-icon"><Icon size={20}/></span><span><strong>{scene.label}</strong><small>{enabled.includes(scene.id)?'Visível no dashboard':'Oculta no dashboard'}</small></span><input type="checkbox" role="switch" aria-label={`Ativar aba ${scene.label}`} checked={enabled.includes(scene.id)} onChange={event=>setSceneEnabled(scene.id,event.target.checked)}/></label>;})}</div></>}
+    {tab==='presentation'&&<><h3>Apresentação</h3><p className="dashboard-settings-intro">Controle o tempo de permanência de cada aba durante a apresentação do dashboard.</p><label className="dashboard-settings-field">Aplicar o mesmo tempo a todas as abas<select aria-label="Intervalo de troca dos painéis" value={commonMinutes} onChange={event=>{const value=Number(event.target.value);if(isPresentationMinutes(value))setMinutes(Object.fromEntries(DASHBOARD_SCENES.map(scene=>[scene.id,value])) as typeof minutes);}}><option value="" disabled>Personalizado por aba</option>{PRESENTATION_INTERVALS.map(value=><option key={value} value={value}>{formatPresentationInterval(value)}</option>)}</select></label><fieldset className="dashboard-settings-durations"><legend>Tempo por aba</legend>{DASHBOARD_SCENES.map(scene=><label key={scene.id} htmlFor={`duration-${scene.id}`}><span>{scene.label}{!enabled.includes(scene.id)&&<small>Aba desativada</small>}</span><select id={`duration-${scene.id}`} aria-label={`Tempo da aba ${scene.label}`} value={minutes[scene.id]} onChange={event=>{const value=Number(event.target.value);if(isPresentationMinutes(value))setMinutes(previous=>({...previous,[scene.id]:value}));}}>{PRESENTATION_INTERVALS.map(value=><option key={value} value={value}>{formatPresentationInterval(value)}</option>)}</select></label>)}</fieldset></>}
+    {tab==='news'&&<><h3>Notícias</h3><p className="dashboard-settings-intro">Escolha os assuntos exibidos nos painéis de notícias.</p><label className="dashboard-settings-field">Notícias do Dashboard<select aria-label="Notícias do Dashboard" aria-describedby="dashboard-news-scope-caption" value={scope} onChange={event=>setScope(readDashboardNewsScope(event.target.value))}><option value="all">Visão geral</option><option value="cane">Só cana</option></select></label><p id="dashboard-news-scope-caption" className="dashboard-settings-help">Visão geral inclui cana, soja, milho e agronegócio. Só cana exibe notícias de cana, açúcar e etanol em todos os painéis de notícias.</p></>}
+    {tab==='tv'&&<><h3>TV Agro</h3><p className="dashboard-settings-intro">Acompanhe os vídeos dos canais selecionados e escolha o comportamento durante a apresentação.</p><fieldset className="dashboard-settings-modes"><legend>Modo de reprodução</legend>{([{id:'autoplay',label:'Reprodução automática',description:'Solicita a reprodução do vídeo ao abrir a aba. O navegador pode exigir um clique para liberar o som.'},{id:'preview',label:'Prévia',description:'Mostra os vídeos em destaque sem iniciar a reprodução. Clique no vídeo para assistir.'},{id:'skip',label:'Só passar',description:'Segue para a próxima aba sem abrir a TV Agro na apresentação. Os vídeos continuam acessíveis manualmente.'}] as const).map(mode=><label key={mode.id} className="dashboard-settings-mode"><input type="radio" name="dashboard-tv-mode" value={mode.id} checked={tv.mode===mode.id} onChange={()=>setTv(previous=>({...previous,mode:mode.id}))}/><span><strong>{mode.label}</strong><small>{mode.description}</small></span></label>)}</fieldset><h4>Canais da TV Agro</h4><p className="dashboard-settings-help">Selecione os canais que deseja acompanhar.</p><div className="dashboard-settings-options">{TV_CHANNELS.map(channel=><label key={channel.id} className="dashboard-settings-toggle"><span className="dashboard-settings-option-icon"><Tv size={20}/></span><span><strong>{channel.name}</strong><small>{tv.channelIds.includes(channel.id)?'Incluído na programação':'Fora da programação'}</small></span><input type="checkbox" role="switch" aria-label={`Ativar canal ${channel.name}`} checked={tv.channelIds.includes(channel.id)} onChange={event=>{const checked=event.target.checked;setTv(previous=>({...previous,channelIds:checked?[...previous.channelIds,channel.id]:previous.channelIds.filter(id=>id!==channel.id)}));setError('');}}/></label>)}</div></>}
+    {error&&<p className="dashboard-settings-error" role="alert">{error}</p>}
+   </div>
+  </div>
+  <footer className="dashboard-settings-footer"><p>As alterações são aplicadas ao salvar e ficam vinculadas à sua conta neste navegador.</p><div><button className="dashboard-settings-cancel" type="button" disabled={saving} onClick={close}>Cancelar</button><button className="dashboard-settings-save" type="button" disabled={saving} onClick={save}><Save size={17}/>{saving?'Salvando…':'Salvar configurações'}</button></div></footer>
+ </div></div>;
+ return createPortal(content,document.fullscreenElement??document.body);
+}
 export function DashboardPopover({title,id,children,onClose,onReturnFocus,settings=false}:{title:string;id:string;children:ReactNode;onClose:()=>void;onReturnFocus?:()=>void;settings?:boolean}){
  const panel=useRef<HTMLDivElement>(null);
  useEffect(()=>{

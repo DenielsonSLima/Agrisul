@@ -1,0 +1,25 @@
+.git
+.vercel
+.sites-runtime
+.agents
+.codex
+.aws
+.openai
+.env*
+node_modules
+.next
+.vinext
+.output
+.wrangler
+dist
+out
+coverage
+outputs
+work
+documentos
+pinheiro
+pinheiro 2
+supabase/.temp
+*.tsbuildinfo
+*.pem
+*-debug.log*

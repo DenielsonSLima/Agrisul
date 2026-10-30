@@ -13,7 +13,19 @@ export default defineConfig(({ command }) => ({
   ssr: {
     // Keep tslib as native ESM in the Node bundle. Bundling its UMD fallback
     // breaks the Radix dialog stack used by contracts and quotations.
-    external: ["tslib"],
+    external: ["tslib", "youtubei.js", "quickjs-emscripten"],
   },
-  plugins: [vinext(), ...(command === "build" ? [nitro()] : []), sites()],
+  plugins: [vinext(), ...(command === "build" ? [nitro({
+    // Preserve the media parser's classes and QuickJS's relative WASM loader.
+    // Nitro produces the deployed server, so its trace must include the binaries.
+    traceDeps: [
+      "youtubei.js",
+      "quickjs-emscripten*",
+      "quickjs-emscripten-core*",
+      "@jitl/quickjs-wasmfile-release-sync*",
+      "@jitl/quickjs-wasmfile-release-asyncify*",
+      "@jitl/quickjs-wasmfile-debug-sync*",
+      "@jitl/quickjs-wasmfile-debug-asyncify*",
+    ],
+  })] : []), sites()],
 }));

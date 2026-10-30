@@ -1,0 +1,22 @@
+.dashboard-tv-native-player>video{display:block;width:100%;height:100%;object-fit:contain;background:#080e0b}
+.dashboard-tv-native-error>button{display:inline-flex;align-items:center;gap:7px;padding:9px 13px;background:#fff;color:#205741;border:0;border-radius:7px;font-size:12px}
+.dashboard-tv-native-error>p{max-width:540px;margin:0;line-height:1.6}
+.dashboard-tv-native-player>.dashboard-tv-player-blocked{bottom:88px}
+.dashboard-tv-native-controls{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:30px 18px 13px;background:linear-gradient(transparent,#000d);color:#fff}
+.dashboard-tv-native-controls input[type=range]{display:block;height:4px;margin:0;accent-color:#7fc6a0;cursor:pointer}
+.dashboard-tv-seek{width:100%;margin-bottom:11px!important}
+.dashboard-tv-native-toolbar{display:flex;align-items:center;gap:12px;min-height:34px}
+.dashboard-tv-native-toolbar button{display:grid;place-items:center;flex-shrink:0;width:32px;height:32px;padding:0;border:0;border-radius:6px;background:transparent;color:#fff}
+.dashboard-tv-native-toolbar button:hover{background:#ffffff1a}
+.dashboard-tv-native-time{font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.dashboard-tv-native-time>span{color:#c2cdc5}
+.dashboard-tv-native-volume{display:flex;align-items:center;gap:5px;margin-left:auto}
+.dashboard-tv-native-volume input{width:60px}
+.dashboard-tv-native-quality{display:flex;align-items:center;gap:7px;font-size:10px;color:#c2cdc5}
+.dashboard-tv-native-quality select{max-width:120px;padding:6px 8px;border:1px solid #ffffff28;border-radius:6px;background:#17221d;color:#fff;font-size:11px}
+.dashboard-tv-native-quality select:disabled{opacity:.55}
+.dashboard-tv-control-error{display:block;margin-top:6px;font-size:11px;color:#f0d59c}
+.dashboard-tv-native-player:fullscreen{width:100%;height:100%;max-height:none;aspect-ratio:auto}
+.dashboard-tv-native-player:fullscreen .dashboard-tv-native-controls{padding:45px 28px 20px}
+@media(max-width:760px){.dashboard-tv-native-controls{padding:20px 10px 8px}.dashboard-tv-native-toolbar{gap:5px}.dashboard-tv-native-quality>span,.dashboard-tv-native-volume input{display:none}.dashboard-tv-native-quality select{max-width:100px}.dashboard-tv-native-time{font-size:10px}}
+.dashboard-tv-playback-note{flex-shrink:0;margin:0;padding:10px 13px;border:1px solid #e5d6b7;border-radius:8px;background:#fff9eb;color:#80653d;font-size:12px;line-height:1.5}
