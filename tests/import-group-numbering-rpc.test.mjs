@@ -55,12 +55,12 @@ test('authoritative group entry numbering: import continuity, overlap reuse, ato
   for(const entry of [...next.entries]) next=(await action('save-entry',next,{entryId:entry.id,date:entry.date,values:entry.values,reviewed:true})).document;
   next=(await action('finalize',next)).document;assert.equal(next.status,'finished');
   await rejected(()=>action('number-groups',next,{start:'810'}),'23514',/Reabra/);
-  // Taquari defaults never inherit Pinheiro 806 or invent 1.
+  // A layout without its own start continues the workspace's last saved code.
   const tqFields=[field('COD_ENTRADA','L','decimal','entradaSequencialConjunto'),field('OBS','A','text'),field('OTHER','B','text')];
   let tqProfile=(await profiles('save',{...input,name:'Taquari auto',parser:'taquari-equipment-v1',fields:tqFields})).profile;
   assert.equal(tqProfile.entrySequenceStart,undefined);
   let tq=(await imported(tqProfile,'tq-empty',[...tqGroup(100),...tqGroup(101,2),...tqGroup(102,3,'2026-10-26')])).document;
-  assert.equal(codes(tq).every(c=>c===''),true);
+  assert.deepEqual(codes(tq),['812','812','812','813','813','814','814','814']);
   tq=(await action('save-bulk',tq,{entryIds:[tq.entries[1].id],fieldKey:'COD_ENTRADA',value:'921'})).document;
   assert.deepEqual(codes(tq),['921','921','921','922','922','923','923','923']);
   assert.equal(tq.profileSnapshot.entrySequenceStart,'921');
@@ -103,5 +103,48 @@ test('authoritative group entry numbering: import continuity, overlap reuse, ato
   const otherProfile=(await profiles('save',{...input,clientId:ids.otherPartner,name:'Other owner'})).profile;
   const otherDoc=(await imported(otherProfile,'other-owner',pinGroup('08:00'),ids.otherPartner)).document;assert.deepEqual(codes(otherDoc),['806','806']);
   await rejected(()=>db.query('select billing_private.number_import_groups($1,$2,$3::jsonb,$4::jsonb)',[ids.otherOwner,ids.otherPartner,'{}','[]']),'42501');
+ }finally{await db.close();}
+});
+
+test('entry sequence is global across clients and layouts, reuses only the same source identity and keeps account isolation',async()=>{
+ const {db,ids,setActor}=await createCaneWeighingDb();
+ const rpc=async(resource,action,payload={})=>(await db.query('select public.billing_rpc($1,$2,$3::jsonb) result',[resource,action,JSON.stringify(payload)])).rows[0].result;
+ const client='10000000-0000-4000-8000-000000000099';
+ await db.exec('RESET ROLE');await db.query("INSERT INTO public.billing_clients(id,owner_id,legal_name,cnpj) VALUES($1,$2,'Second own client','11111111111111')",[client,ids.owner]);await setActor();
+ const field={key:'COD_ENTRADA',column:'L',type:'decimal',source:'pdf',sourceKey:'entradaSequencialConjunto',label:'Entrada',required:false,defaultValue:'',mappings:{},pattern:''};
+ const profile=async(name,clientId,parser,start,manual=false)=>(await rpc('import-profiles','save',{name,clientId,parser,sheetName:'Plan1',startRow:2,fields:[manual?{...field,source:'manual',sourceKey:''}:field],...(start?{entrySequenceStart:start}:{})})).profile;
+ const pin=(time,analysis)=>({date:'2026-10-29',source:{periodoInicio:'2026-10-29T06:00',periodoFim:'2026-10-30T05:59',dataHoraBA:`2026-10-29T${time}`,dataHoraTara:`2026-10-29T${time}`,numeroAnalise:String(analysis),pesoAnalisado:'20'},values:{COD_ENTRADA:''},sourcePage:1,sourceLine:'Original Pinheiro'});
+ const tq=entry=>({date:'2026-10-29',source:{dataMovimento:'2026-10-29',entrada:String(entry),sequencia:'1'},values:{COD_ENTRADA:''},sourcePage:1,sourceLine:'Original Taquari'});
+ const imported=async(p,label,entries)=>(await rpc('import-documents','import',{profileId:p.id,clientId:p.clientId,sourceName:label,sourceHash:createHash('sha256').update(label).digest('hex'),entries})).document;
+ const codes=doc=>doc.entries.map(e=>e.values.COD_ENTRADA);
+ const number=(doc,extra={})=>rpc('import-documents','number-groups',{id:doc.id,expectedUpdatedAt:doc.updatedAt,...extra});
+ try{
+  const p=await profile('Pinheiro workspace sequence',ids.partner,'pinheiro-usjp-v1','1180');
+  const first=await imported(p,'global-pin-first',[pin('08:00',1),pin('09:00',2)]);assert.deepEqual(codes(first),['1180','1181']);
+  const t=await profile('Taquari other client',client,'taquari-equipment-v1','5000');
+  let second=await imported(t,'global-tq-second',[tq(3528),tq(3534)]);assert.deepEqual(codes(second),['1182','1183'],'Existing workspace history overrides a separate profile starting point');
+  const otherPin=await profile('Pinheiro other client',client,'pinheiro-usjp-v1','806');
+  const sameTimes=await imported(otherPin,'same-times-other-client',[pin('08:00',1)]);assert.deepEqual(codes(sameTimes),['1184'],'Equal BA/tare timestamps in another client do not reuse a code');
+  const overlap=await imported(p,'global-overlap',[pin('08:00',1)]);assert.deepEqual(codes(overlap),['1180']);
+  const taqSameClient=await profile('Taquari original client',ids.partner,'taquari-equipment-v1');
+  const sameEntry=await imported(taqSameClient,'same-entry-other-client',[tq(3528)]);assert.deepEqual(codes(sameEntry),['1185']);
+  await assert.rejects(()=>number(sameEntry,{start:'1182'}),e=>e.code==='23514'&&/outro conjunto/.test(e.message));
+  second=(await number(second)).document;assert.deepEqual(codes(second),['1186','1187'],'Automatic continuation consults all other documents, not the current document itself');
+  const future=await imported(p,'global-pin-future',[pin('10:00',3)]);assert.deepEqual(codes(future),['1188']);
+  assert.deepEqual((await rpc('import-documents','get',{id:first.id})).document,first,'Previous documents are never renumbered as a side effect');
+  await assert.rejects(()=>number(first,{start:'1190'}),e=>e.code==='23514'&&/histórico/.test(e.message));
+  const legacyProfile=await profile('Legacy auto continuation',client,'taquari-equipment-v1',undefined,true);
+  let legacy=await imported(legacyProfile,'global-legacy-manual', [{...tq(3900),values:{COD_ENTRADA:'1149'}}]);
+  legacy=(await number(legacy)).document;assert.deepEqual(codes(legacy),['1189'],'Explicit auto action also works with legacy manual entry fields');
+  const manual=(await rpc('import-documents','save-entry',{id:legacy.id,date:'2026-10-29',values:{COD_ENTRADA:'1199'},reviewed:false,expectedUpdatedAt:legacy.updatedAt})).document;
+  const afterManual=await imported(p,'global-after-manual',[pin('11:00',4)]);assert.deepEqual(codes(afterManual),['1200'],'Manual saved codes also advance the global maximum');
+  await assert.rejects(()=>number(afterManual,{start:'1199'}),e=>e.code==='23514');
+  await assert.rejects(()=>number(afterManual,{expectedUpdatedAt:first.updatedAt}),e=>e.code==='PT409');
+  assert.equal(manual.entries.at(-1).values.COD_ENTRADA,'1199');
+  await setActor(ids.reader);await assert.rejects(()=>number(afterManual),e=>e.code==='42501');
+  await setActor(null);await assert.rejects(()=>number(afterManual),e=>e.code==='28000');
+  await setActor(ids.otherOwner);await assert.rejects(()=>number(afterManual),e=>e.code==='P0002');
+  const isolatedProfile=await profile('Other account sequence',ids.otherPartner,'pinheiro-usjp-v1','806');
+  const isolated=await imported(isolatedProfile,'global-other-account',[pin('08:00',1)]);assert.deepEqual(codes(isolated),['806']);
  }finally{await db.close();}
 });

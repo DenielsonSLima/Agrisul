@@ -75,6 +75,16 @@ test('Pinheiro: separate source contract, agricultural period, conventional NUME
 
   const boundary=[row('950001','2026-10-25T05:59','2026-10-25T06:30'),row('950002','2026-10-25T05:59','2026-10-25T06:30')];
   const late=(await imported(profile.id,'closing-minute',boundary)).document;assert.equal(late.entries[0].date,'2026-10-24');assert.equal(late.entries[0].values.HORASAIDA,'06:30');
+  const early=(tare='2026-10-24T06:13',flag='true')=>[0,1,2].map(i=>{
+   const entry=row(String(951001+i),'2026-10-24T05:22',tare,'18.760');entry.source.relatorioPorDataTara=flag;return entry;
+  });
+  const taraPeriod=(await imported(profile.id,'data-tara-opening',early())).document;
+  assert.equal(taraPeriod.entries.length,3);assert.equal(taraPeriod.entries[0].source.dataHoraBA,'2026-10-24T05:22');
+  assert.equal(taraPeriod.entries[0].source.dataHoraTara,'2026-10-24T06:13');assert.equal(taraPeriod.entries[0].date,'2026-10-24');
+  assert.deepEqual(taraPeriod.entries.map(e=>e.values.TARA),['1','2','3']);
+  await denied(()=>imported(profile.id,'pre-opening-no-evidence',early(undefined,'')),/dentro do período/);
+  await denied(()=>imported(profile.id,'pre-opening-tare-before',early('2026-10-24T05:59')),/dentro do período/);
+  await denied(()=>imported(profile.id,'pre-opening-tare-after',early('2026-10-25T06:00')),/dentro do período/);
   for(const quantity of [1,2,3,4,5,6]){
    const minute=String(quantity).padStart(2,'0');
    const groupRows=Array.from({length:quantity},(_,index)=>row(String(960000+quantity*10+index),`2026-10-24T09:${minute}`,`2026-10-24T10:${minute}`,'12345678901234.123456'));

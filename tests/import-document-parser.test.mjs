@@ -144,5 +144,5 @@ test('Taquari sequential entry preview remains empty until the RPC numbers the s
  Object.assign(field,{pattern:'(2874)',defaultValue:'921',mappings:{'2874':'999'}});
  const parsed=parseTaquariPages([{number:1,lines:[line1,line2]}],profile);
  for(const entry of parsed.entries){assert.equal(entry.values.COD_ENTRADA,'');assert.equal(entry.source.entradaSequencialConjunto,'');}
- assert.ok(parsed.warnings.some(warning=>warning.includes('calculadas no banco')));
+ assert.ok(parsed.warnings.some(warning=>warning.includes('última entrada geral da conta')));
 });

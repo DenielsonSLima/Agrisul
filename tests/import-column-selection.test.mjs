@@ -41,10 +41,10 @@ test('clearing selected filtered rows removes only visible IDs and retains the h
 // with deterministic hook state and an isolated mutation adapter.
 const dataUrl=value=>'data:text/javascript;base64,'+Buffer.from(value).toString('base64');
 const fixtureUrl=dataUrl(`
-export const state={slots:[],cursor:0,calls:[],entryCalls:[],confirmations:[]};
+export const state={slots:[],cursor:0,calls:[],entryCalls:[],numberCalls:[],confirmations:[]};
 export function useState(initial){const index=state.cursor++;if(!(index in state.slots))state.slots[index]=typeof initial==='function'?initial():initial;return [state.slots[index],next=>{state.slots[index]=typeof next==='function'?next(state.slots[index]):next;}];}
 export const useRef=value=>({current:value}),useMounted=()=>({current:true});
-export const useImportMutations=()=>({saving:false,saveBulk:async payload=>{state.calls.push(payload);},saveEntry:async payload=>{state.entryCalls.push(payload);}});
+export const useImportMutations=()=>({saving:false,saveBulk:async payload=>{state.calls.push(payload);},saveEntry:async payload=>{state.entryCalls.push(payload);},numberGroups:async payload=>{state.numberCalls.push(payload);}});
 export const useConfirmation=()=>async options=>{state.confirmations.push(options);return true;};
 export const notifications={updated(){}},message=String,dateLabel=String;
 export const Field='label',CalendarDays='i',Pencil='i',Loader2='i',Check='i',Trash2='i',FileText='i',Settings2='i',EntrySourceNotes='div',ImportColumnFilter='i',ImportEditableCell='i';
@@ -60,7 +60,7 @@ assert.ok(tableStart>=0&&tableEnd>tableStart);
 const tableSource=`import {useState,useRef,useMounted,useImportMutations,useConfirmation,notifications,message,dateLabel,Field,CalendarDays,Pencil,Loader2,Check,Trash2,FileText,Settings2,EntrySourceNotes,ImportColumnFilter,ImportEditableCell} from ${JSON.stringify(fixtureUrl)};
 import {resolveColumnType,visibleImportSelection,toggleVisibleImportSelection} from ${JSON.stringify(dataUrl(source))};
 import {MAIN_IMPORT_COLUMNS,mainImportFields,importFieldLabel,importCount,importGroupDecoration} from ${JSON.stringify(presentationUrl)};
-import {importValueFields} from ${JSON.stringify(dataUrl(compile(readFileSync(new URL('../modules/importacoes/utils/equipmentFields.ts',import.meta.url),'utf8'))))};
+import {importValueFields,IMPORT_EQUIPMENT_HELP} from ${JSON.stringify(dataUrl(compile(readFileSync(new URL('../modules/importacoes/utils/equipmentFields.ts',import.meta.url),'utf8'))))};
 const typeLabel={text:'Texto',decimal:'Número',date:'Data'},entrySequenceHelp='Entradas por conjunto';
 ${internalAtrSource}
 export ${tableFile.slice(tableStart,tableEnd)}`;
@@ -68,7 +68,7 @@ const jsxUrl=pathToFileURL(createRequire(import.meta.url).resolve('react/jsx-run
 const {ImportDayTable}=await import(dataUrl(compile(tableSource,true).replace(/from ['"]react\/jsx-runtime['"]/g,`from ${JSON.stringify(jsxUrl)}`)));
 function elements(node,predicate){if(Array.isArray(node))return node.flatMap(child=>elements(child,predicate));if(!node||typeof node!=='object'||!node.props)return [];return [...(predicate(node)?[node]:[]),...elements(node.props.children,predicate)];}
 function tableFixture(){
- fixture.state.slots=[];fixture.state.cursor=0;fixture.state.calls=[];fixture.state.entryCalls=[];fixture.state.confirmations=[];
+ fixture.state.slots=[];fixture.state.cursor=0;fixture.state.calls=[];fixture.state.entryCalls=[];fixture.state.numberCalls=[];fixture.state.confirmations=[];
  const fields=[['COD_ENTRADA','L'],['COD_FAZENDA','F'],['COD_TALHAO','H'],['COD_TIPOCOLHEITA','K'],['COD_EQUIPAMENTO_TRANSPORTE','S'],['COD_EQUIPAMENTO_COMPARTIMENTO','Y']].map(([key,column])=>({key,column,label:key,type:'decimal',source:'manual',required:true}));
  const entries=Array.from({length:9},(_,index)=>({id:`row-${index+1}`,date:'2026-10-29',values:{COD_TALHAO:'21'},reviewed:false}));
  const props={date:'2026-10-29',document:{id:'document',profileSnapshot:{fields,parser:'pinheiro-usjp-v1'},updatedAt:'revision'},entries,editable:true,onEdit(){},onRemove(){}};
@@ -108,9 +108,21 @@ test('editing either equipment column previews and sends both fields, limited to
   assert.match(fixture.state.confirmations[0].description,/2 linha\(s\) e 2 coluna\(s\)/);
  }
 });
-test('direct equipment-cell saves mirror both fields only in that cell row',async()=>{
+test('direct equipment-cell saves send one anchor and both fields for server-owned group expansion, even when re-entering its current value',async()=>{
  const table=tableFixture();const cell=elements(table.render(),node=>node.props.entryId==='row-2'&&node.props.field?.key==='COD_EQUIPAMENTO_COMPARTIMENTO')[0];
  await cell.props.onSave('142','revision');assert.deepEqual(fixture.state.calls[0].entryIds,['row-2']);assert.deepEqual(new Set(fixture.state.calls[0].fieldKeys),new Set(['COD_EQUIPAMENTO_TRANSPORTE','COD_EQUIPAMENTO_COMPARTIMENTO']));
+ assert.equal(cell.props.saveUnchanged,true);
+ const other=elements(table.render(),node=>node.props.entryId==='row-2'&&node.props.field?.key==='COD_TALHAO')[0];assert.equal(other.props.saveUnchanged,false);
+});
+
+test('continue general sequence delegates allocation to the server without a typed start or filtered row restriction',async()=>{
+ const table=tableFixture();column(table.render(),'COD_ENTRADA').props.onClick();
+ table.props.entries=table.props.entries.slice(0,1);
+ const action=elements(table.render(),node=>node.props['aria-label']==='Continuar sequência geral')[0];assert.ok(action);
+ action.props.onClick();await new Promise(setImmediate);
+ assert.deepEqual(fixture.state.numberCalls,[{id:'document',expectedUpdatedAt:'revision'}]);assert.deepEqual(fixture.state.calls,[]);
+ assert.match(fixture.state.confirmations[0].description,/independentemente do cliente ou contrato/);
+ assert.match(fixture.state.confirmations[0].description,/incluindo linhas fora do filtro/);
 });
 test('the entry form immediately repeats S/Y changes in the other input and submits both values',async()=>{
  const end=tableFile.indexOf('\nfunction ',tableEnd+1),formSource=tableSource.slice(0,tableSource.indexOf('export function ImportDayTable'))+'export '+tableFile.slice(tableEnd+1,end);

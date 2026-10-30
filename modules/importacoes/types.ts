@@ -33,6 +33,9 @@ export interface ImportEntryInput {
 export interface ImportRevisionInput { id: string; expectedUpdatedAt: string }
 export interface ImportAtrInput extends ImportRevisionInput {entries:Array<{entryId:string;atr:string}>}
 export interface ImportNumberGroupsInput extends ImportRevisionInput { start?: string; anchorEntryId?: string }
+export interface ImportHarvestOrder {farm:string;farmName:string;plot:string;entryCount:number;currentOrders:string[]}
+export interface ImportHarvestOrderOptions {orders:ImportHarvestOrder[];missingCount:number;updatedAt:string}
+export interface ImportHarvestOrdersInput extends ImportRevisionInput {orders:Array<{farm:string;plot:string;order:string}>}
 export interface ImportBulkInput extends ImportRevisionInput { entryIds: string[]; fieldKey?: string; fieldKeys?: string[]; value: string }
 export interface ImportColumnTypeInput extends ImportRevisionInput { fieldKey?: string; fieldKeys?: string[]; type: ImportField['type'] }
 export interface ImportOperationalSummary {dayCount:number;documentCount:number;entryCount:number;groupCount:number;pendingCount:number;reviewedCount:number;dateFrom:string|null;dateTo:string|null}

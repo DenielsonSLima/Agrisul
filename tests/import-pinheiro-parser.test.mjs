@@ -56,6 +56,20 @@ test('tara can finish after the entry period without shifting the movement or in
  const explicit=parsePinheiroPages(pages([row('5','25/10/2027 06:30')]),profile).entries[0];assert.equal(explicit.source.dataHoraTara,'2027-10-25T06:30');
 });
 
+test('explicit Data Tara reports preserve pre-opening BAs only when tare is inside the printed period',()=>{
+ const title='Listagem dos Boletins de Análises por FA / Data Tara (Detalhado)';
+ const extract=(tara,ba)=>parsePinheiroPages(pages([title,row('945917',tara,ba)]),profile).entries[0];
+ const entry=extract('24/10 06:13','24/10 05:22');
+ assert.equal(entry.source.dataHoraBA,'2026-10-24T05:22');assert.equal(entry.source.dataHoraTara,'2026-10-24T06:13');
+ assert.equal(entry.source.relatorioPorDataTara,'true');assert.equal(entry.date,'2026-10-24');
+ assert.throws(()=>extract('24/10 05:59','24/10 05:22'),/fora do período/);
+ assert.throws(()=>extract('25/10 06:00','24/10 05:22'),/fora do período/);
+ assert.throws(()=>extract('24/10 06:13','24/10 24:00'),/Hora inválida/);
+ assert.throws(()=>extract('24/10/2026 06:13','24/10 06:48'),/tara.*anterior ao BA/);
+ const rollover=parsePinheiroPages([{number:1,lines:[title,'Início: 01/01/2027 06:00 Fim: 02/01/2027 05:59',row('1','01/01 06:13','31/12 23:22')]}],profile).entries[0];
+ assert.equal(rollover.source.dataHoraBA,'2026-12-31T23:22');assert.equal(rollover.source.dataHoraTara,'2027-01-01T06:13');
+});
+
 test('refuses malformed candidates, duplicate BAs, invalid dates/hours and conflicting/outside periods',()=>{
  assert.throws(()=>parsePinheiroPages(pages([row(),row()]),profile),/BA repetido/);
  assert.throws(()=>parsePinheiroPages(pages([row(),row('2').replace('31,650','31?650')]),profile),/não puderam ser lidos/);
@@ -80,5 +94,5 @@ test('sequential entries remain server-owned for every source row regardless of 
  assert.equal(result.entries.length,3);
  for(const entry of result.entries){assert.equal(entry.values.COD_ENTRADA,'');assert.equal(entry.source.entradaSequencialConjunto,'');assert.equal(entry.reviewed,undefined);}
  assert.equal(configured.entrySequenceStart,'999999999999999');
- assert.ok(result.warnings.some(warning=>warning.includes('conjuntos já importados reaproveitam o código')));
+ assert.ok(result.warnings.some(warning=>warning.includes('Conjuntos já importados no mesmo cliente e modelo reaproveitam o código')));
 });

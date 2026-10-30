@@ -44,9 +44,11 @@ test('imports may export and finish incomplete data without changing cells, snap
   await denied(()=>action('finalize',document),'42501');
   await setActor(ids.otherOwner);await denied(()=>docs('export',{id:document.id}),'P0002');await denied(()=>action('finalize',document),'P0002');
   await setActor(null);await denied(()=>docs('export',{id:document.id}),'28000');await denied(()=>action('finalize',document),'28000');
-  await setActor(ids.owner);
-  const taquariProfile=(await profiles('save',{...input,name:'Taquari incomplete allowed',parser:'taquari-equipment-v1',fields:[field('COD_ENTRADA','L','decimal','entradaSequencialConjunto'),field('TEXT','A','text')]})).profile;
-  let taquari=(await docs('import',{profileId:taquariProfile.id,clientId:ids.partner,sourceName:'incomplete-tq.pdf',sourceHash:'f'.repeat(64),entries:[{date:'2026-10-25',source:{dataMovimento:'2026-10-25',entrada:'100'},values:{COD_ENTRADA:'',TEXT:''},sourcePage:1,sourceLine:'Taquari original'}]})).document;
+  // An independent workspace has neither history nor a configured Taquari
+  // start. Another workspace's Pinheiro counter must not fill its blank cells.
+  await setActor(ids.otherOwner);
+  const taquariProfile=(await profiles('save',{...input,clientId:ids.otherPartner,name:'Taquari incomplete allowed',parser:'taquari-equipment-v1',fields:[field('COD_ENTRADA','L','decimal','entradaSequencialConjunto'),field('TEXT','A','text')]})).profile;
+  let taquari=(await docs('import',{profileId:taquariProfile.id,clientId:ids.otherPartner,sourceName:'incomplete-tq.pdf',sourceHash:'f'.repeat(64),entries:[{date:'2026-10-25',source:{dataMovimento:'2026-10-25',entrada:'100'},values:{COD_ENTRADA:'',TEXT:''},sourcePage:1,sourceLine:'Taquari original'}]})).document;
   assert.equal(taquari.entries[0].values.COD_ENTRADA,'');taquari=(await action('finalize',taquari)).document;
   assert.equal(taquari.status,'finished');assert.equal(taquari.pendingCount,1);assert.equal(taquari.entries[0].values.COD_ENTRADA,'');
   assert.equal((await docs('export',{id:taquari.id})).rows[0].values.L,'');

@@ -56,6 +56,28 @@ function resolveTaraMinute(date:string,time:string,ba:string):string {
   if(value<ba)throw new Error(`Data/hora da tara ${date} ${time} anterior ao BA. Confira o ano e os horários.`);
   return value;
 }
+function resolveAnalysis(baDate:string,baTime:string,taraDate:string,taraTime:string,range:{start:string;end:string},byTara:boolean):{ba:string;tare:string;taraBoundary:boolean} {
+  let ba:string;
+  try {
+    ba=resolveMinute(baDate,baTime,range);
+  } catch(error) {
+    if(!byTara)throw error;
+    // Reports explicitly selected by Data Tara can contain an analysis taken
+    // before 06:00 whose tare was recorded inside the printed period.
+    const years=[...new Set([Number(range.start.slice(0,4))-1,Number(range.start.slice(0,4)),Number(range.end.slice(0,4))])];
+    const dates=baDate.length===10?[baDate]:years.map(year=>`${baDate}/${year}`);
+    const candidates:Array<{ba:string;tare:string;taraBoundary:boolean}>=[];
+    for(const date of dates){
+      try {
+        const ba=minute(date,baTime),tare=resolveTaraMinute(taraDate,taraTime,ba);
+        if(ba<range.start&&tare>=range.start&&tare<=range.end)candidates.push({ba,tare,taraBoundary:true});
+      } catch { /* The original error remains useful if no year is valid. */ }
+    }
+    if(candidates.length!==1)throw error;
+    return candidates[0];
+  }
+  return {ba,tare:resolveTaraMinute(taraDate,taraTime,ba),taraBoundary:false};
+}
 function analysisValues(tail:string):Record<string,string> {
   const tokens=tail.trim().split(/\s+/);
   if(tokens.length<14||tokens.length>16)throw new Error(`Esperadas 14 a 16 colunas analíticas; encontradas ${tokens.length}.`);
@@ -98,6 +120,7 @@ function fieldValue(field:ImportField,source:Record<string,string>,line:string):
 export function parsePinheiroPages(pages:ExtractedPage[],profile:Pick<ImportProfileInput,'parser'|'fields'>):ParsedImport {
   if(profile.parser!=='pinheiro-usjp-v1')throw new Error('Este perfil não possui o extrator Pinheiro/USJP.');
   const range=period(pages),entries:ParsedImportEntry[]=[],seen=new Set<string>();
+  const byTara=/Listagem\s+dos\s+Boletins\s+de\s+An[aá]lises\s+por\s+FA\s*\/\s*Data\s+Tara/i.test(pages.flatMap(page=>page.lines).join(' '));
   const malformed:Array<{page:number;line:string;reason:string}>=[];
   for(const page of pages)for(const original of page.lines){
     const line=original.replace(/\u00a0/g,' ').trim();
@@ -106,8 +129,10 @@ export function parsePinheiroPages(pages:ExtractedPage[],profile:Pick<ImportProf
       const match=rowPattern.exec(line);if(!match)throw new Error('Estrutura da linha não reconhecida.');
       const [,fazendaOrigem,fazendaNome,taraDate,taraTime,baDate,baTime,numeroAnalise,tail]=match;
       if(seen.has(numeroAnalise))throw new Error(`BA repetido ${numeroAnalise}.`);
-      const dataHoraBA=resolveMinute(baDate,baTime,range),dataHoraTara=resolveTaraMinute(taraDate,taraTime,dataHoraBA);
+      const resolved=resolveAnalysis(baDate,baTime,taraDate,taraTime,range,byTara);
+      const dataHoraBA=resolved.ba,dataHoraTara=resolved.tare;
       const source:Record<string,string>={
+        ...(resolved.taraBoundary?{relatorioPorDataTara:'true'}:{}),
         periodoInicio:range.start,periodoFim:range.end,dataHoraBA,dataHoraTara,
         dataChegada:dataHoraBA.slice(0,10),horaChegada:baTime,dataSaida:dataHoraTara.slice(0,10),horaSaida:taraTime,
         dataMovimento:range.start.slice(0,10),fazendaOrigem,fazendaNome:fazendaNome.trim(),numeroAnalise,
@@ -124,7 +149,7 @@ export function parsePinheiroPages(pages:ExtractedPage[],profile:Pick<ImportProf
   return {entries,warnings:[
     'Cada BA é um lançamento. Conjuntos, entradas sequenciais, sequências, tara convencional e bruto convencional serão calculados e validados no banco ao importar.',
     'Datas de chegada e saída preservam o dia civil; o movimento usa o início do período agrícola e será validado pelo servidor.',
-    'A entrada se repete no conjunto; próximos PDFs continuam a sequência do cliente e conjuntos já importados reaproveitam o código. Guias, talhões e equipamentos exigem vínculo e conferência. Nenhum código de caminhão foi gerado a partir da placa.',
+    'A entrada se repete no conjunto; próximos PDFs continuam a sequência geral da conta, independentemente do cliente ou contrato. Conjuntos já importados no mesmo cliente e modelo reaproveitam o código. Guias, talhões e equipamentos exigem vínculo e conferência. Nenhum código de caminhão foi gerado a partir da placa.',
     'Os campos analíticos originais ficam preservados na origem. Campos de destino vazios da amostra continuam manuais até configurar um mapeamento.',
   ]};
 }

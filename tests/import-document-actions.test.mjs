@@ -16,9 +16,10 @@ export const state={document:null,saving:false,calls:[]};
 export function useImportDocument(){return {data:{document:state.document},loading:false,error:'',reload:async()=>{}}}
 export function useImportTable(){return {data:{entries:state.document.entries,summary:{entryCount:state.document.entries.length},facets:{},updatedAt:state.document.updatedAt},loading:false,error:'',reload:async()=>{}}}
 export function ImportWeightSummary(){return null}
+export function ImportHarvestOrders(){return null}
 export function ImportColumnFilter({field}){return createElement('button',{'aria-label':'Filtrar e ordenar '+field.label},'Filtro')}
 export function ImportEditableCell({field,value,blocked}){return createElement('button',{disabled:blocked,'aria-label':'Editar '+field.label},value||'—')}
-export function useImportProfiles(){return {data:{profiles:[],canManage:true},loading:false,error:'',reload:async()=>{}}}
+export function useImportProfiles(){return {data:{profiles:[],canManage:state.canManage!==false},loading:false,error:'',reload:async()=>{}}}
 export function useImportDocuments(){return {}}
 export function useImportMutations(){return {saving:state.saving,finalize:async()=>{state.calls.push('finalize')},exportDocument:async()=>{state.calls.push('export')}}}
 export function useAuth(){return {user:{id:'owner'}}}
@@ -62,4 +63,13 @@ test('empty table results disable export while keeping column filters available'
  state.document=fixture('open');state.document.entries=[];state.saving=false;
  const html=renderToStaticMarkup(createElement(ImportDocumentPage,{id:'doc'}));
  assert.match(button(html,'Baixar Excel'),/disabled/);assert.match(html,/Nenhum lançamento neste filtro/);assert.match(html,/Filtrar e ordenar Entrada/);
+});
+
+test('harvest orders are available for open documents with farm, plot and order columns and write permission',()=>{
+ const supported=status=>{const doc=fixture(status);doc.profileSnapshot.fields.push(...['COD_FAZENDA','COD_TALHAO','NR_ORDEM_COLHEITA'].map((key,i)=>({key,label:key,column:['F','H','AC'][i],source:'manual',type:'decimal',required:false,defaultValue:''})));return doc;};
+ state.document=supported('open');state.canManage=true;state.saving=false;
+ assert.notEqual(button(renderToStaticMarkup(createElement(ImportDocumentPage,{id:'doc'})),'Ordens por talhão'),undefined);
+ state.document=supported('finished');assert.equal(button(renderToStaticMarkup(createElement(ImportDocumentPage,{id:'doc'})),'Ordens por talhão'),undefined);
+ state.document=supported('open');state.canManage=false;assert.equal(button(renderToStaticMarkup(createElement(ImportDocumentPage,{id:'doc'})),'Ordens por talhão'),undefined);
+ state.canManage=true;state.document=fixture('open');assert.equal(button(renderToStaticMarkup(createElement(ImportDocumentPage,{id:'doc'})),'Ordens por talhão'),undefined);
 });

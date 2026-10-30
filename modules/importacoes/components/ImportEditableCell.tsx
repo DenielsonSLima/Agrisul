@@ -5,9 +5,9 @@ import type {ImportCellMove} from '../utils/cellNavigation';
 import {importFieldLabel,importValue} from '../utils/presentation';
 
 type Draft={value:string;initial:string;revision:string;error:string};
-type Props={entryId:string;field:ImportField;value:string;revision:string;rowNumber:number;blocked:boolean;onSave:(value:string,revision:string)=>Promise<boolean>;onNavigate:(move:ImportCellMove)=>void};
+type Props={entryId:string;field:ImportField;value:string;revision:string;rowNumber:number;blocked:boolean;saveUnchanged?:boolean;onSave:(value:string,revision:string)=>Promise<boolean>;onNavigate:(move:ImportCellMove)=>void};
 
-export function ImportEditableCell({entryId,field,value,revision,rowNumber,blocked,onSave,onNavigate}:Props){
+export function ImportEditableCell({entryId,field,value,revision,rowNumber,blocked,saveUnchanged=false,onSave,onNavigate}:Props){
  blocked=blocked||field.key==='NUMERO_ANALISE';
  const [draft,setDraft]=useState<Draft|null>(null);const [saving,setSaving]=useState(false);
  const input=useRef<HTMLInputElement>(null);const button=useRef<HTMLButtonElement>(null);const locked=useRef(false);const suppressBlur=useRef(false);const selectOnFocus=useRef(true);const mounted=useRef(true);
@@ -19,7 +19,7 @@ export function ImportEditableCell({entryId,field,value,revision,rowNumber,block
  async function commit(move?:ImportCellMove){
   if(!draft||locked.current||suppressBlur.current||blocked)return;
   locked.current=true;
-  if(draft.value===draft.initial){setDraft(null);locked.current=false;if(move)onNavigate(move);return;}
+  if(draft.value===draft.initial&&!saveUnchanged){setDraft(null);locked.current=false;if(move)onNavigate(move);return;}
   setSaving(true);
   try{
    const saved=await onSave(draft.value,draft.revision);

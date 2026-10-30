@@ -109,6 +109,6 @@ export function parseTaquariPages(pages:ExtractedPage[], profile:Pick<ImportProf
     warnings.push('Códigos de destino e informações manuais ausentes ficam pendentes de conferência. Você pode finalizar ou exportar sem preenchê-los.');
   }
   warnings.push('Cada sequência do PDF é um lançamento separado. Equipamentos, entradas e ordens do sistema de destino podem ter códigos diferentes dos impressos.');
-  if(profile.fields.some(field=>field.source==='pdf'&&field.sourceKey==='entradaSequencialConjunto'))warnings.push('As entradas sequenciais por conjunto serão calculadas no banco ao salvar, usando o primeiro número configurado no perfil.');
+  if(profile.fields.some(field=>field.source==='pdf'&&field.sourceKey==='entradaSequencialConjunto'))warnings.push('As entradas sequenciais por conjunto seguem a última entrada geral da conta, independentemente do cliente ou contrato. O primeiro número do perfil é usado somente quando a conta ainda não tem histórico.');
   return {entries,warnings};
 }
