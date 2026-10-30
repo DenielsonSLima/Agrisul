@@ -1,10 +1,16 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {marketFeedGroups,marketSnapshotKey,mergeMarketFeed,parseMarketFeed,readMarketSnapshot,saveMarketSnapshot} from './marketSnapshot.mjs';
+import {marketFeedGroups,marketSnapshotKey,mergeMarketFeed,parseMarketFeed,parseMarketHistory,readMarketSnapshot,saveMarketSnapshot} from './marketSnapshot.mjs';
 
 const checkedAt='2026-10-29T12:00:00.000Z';
 const quote=(id='usd',extra={})=>({id,value:'5.1234',date:'2026-10-29',observedAt:checkedAt,changePercent:'-0.1250',source:'Fonte pública',sourceUrl:'https://example.org/reference',note:'Referência publicada',status:'available',...extra});
 const feed=(quotes=[quote()],extra={})=>({quotes,checkedAt,refreshSeconds:60,...extra});
+test('comparison metadata survives snapshots and malformed bases or duplicate history days are rejected',()=>{
+ const reference={changeBasis:'previous-publication',previousValue:'5',previousDate:'2026-10-28',previousSourceUrl:'https://example.org/previous'};
+ assert.deepEqual(parseMarketFeed(feed([quote('usd',reference)]),'currency').quotes[0],quote('usd',reference));
+ for(const extra of [{previousValue:'0'},{previousDate:'2026-10-29'},{previousSourceUrl:'javascript:bad'},{changeBasis:'guessed'}])assert.equal(parseMarketFeed(feed([quote('usd',{...reference,...extra})]),'currency'),null);
+ const history={id:'usd',days:[{day:'2026-10-29',value:'5.1234',date:'2026-10-28',capturedAt:checkedAt,source:'Official daily'}]};assert.deepEqual(parseMarketHistory(history,'usd'),history);assert.equal(parseMarketHistory({...history,days:[...history.days,...history.days]},'usd'),null);assert.equal(parseMarketHistory(history,'eur'),null);
+});
 function memoryStorage(){const values=new Map();return {getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),values};}
 test('group validation keeps exact decimal strings and source dates without mixing provider groups',()=>{
   assert.deepEqual(parseMarketFeed(feed(),'currency'),feed());

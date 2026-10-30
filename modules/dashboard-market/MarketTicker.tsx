@@ -2,8 +2,13 @@
 import {useEffect,useId,useRef,useState,useSyncExternalStore,type ReactNode} from 'react';
 import {AlertTriangle,Info,Pause,Play,Plus,RefreshCw,TrendingUp,X} from 'lucide-react';
 import {useAuth} from '@/shared/supabase/AuthProvider';
+import {useQuery} from '@tanstack/react-query';
+import {rpcRequest} from '@/shared/supabase/rpc';
+import {assertSessionActor} from '@/shared/supabase/sessionActor';
+import {billingKeys} from '@/shared/query/keys';
 import {notifications} from '@/shared/feedback';
-import {defaultMarketIds,marketCatalog,readMarketSelection,type MarketId,type MarketQuote} from './catalog';
+import {defaultMarketIds,marketCatalog,readMarketSelection,type MarketHistory,type MarketId,type MarketQuote} from './catalog';
+import {parseMarketHistory} from './marketSnapshot.mjs';
 import {DEFAULT_TICKER_SPEED,marketDirection,readTickerSpeed} from './tickerMotion.mjs';
 import {useTickerMotion} from './useTickerMotion';
 import {useMarketFeed} from './useMarketFeed';
@@ -15,6 +20,7 @@ const changeFormat=new Intl.NumberFormat('pt-BR',{minimumFractionDigits:2,maximu
 const observedFormat=new Intl.DateTimeFormat('pt-BR',{dateStyle:'short',timeStyle:'short',timeZone:'America/Sao_Paulo'});
 const dateLabel=(value:string|null)=>value?value.split('-').reverse().join('/'):'Sem publicação';
 const publication=(quote:MarketQuote|undefined)=>quote?.observedAt?`${observedFormat.format(new Date(quote.observedAt))} (Brasília)`:dateLabel(quote?.date??null);
+const comparison=(quote:MarketQuote|undefined)=>quote?.changeBasis==='previous-publication'&&quote.previousDate?`Comparação interna com a publicação de ${dateLabel(quote.previousDate)}: ${marketPrice(quote.id,quote.previousValue!)}.`:quote?.changePercent!==undefined?'Variação informada pela fonte.':'Sem publicação anterior disponível para comparação.';
 const selectionEvent='billing:dashboard-market-selection';
 function subscribeSelection(changed:()=>void){
   window.addEventListener('storage',changed);window.addEventListener(selectionEvent,changed);
@@ -38,6 +44,7 @@ function MarketTickerForUser({userId,actions}:{userId:string;actions?:ReactNode}
   const speed=speedDraft??persistedSpeed;
   const [draft,setDraft]=useState<MarketId[]>(defaultMarketIds);
   const [panel,setPanel]=useState<'selection'|'details'|null>(null);
+  const [historyId,setHistoryId]=useState<MarketId|null>(null);
   const [paused,setPaused]=useState(false),[saveError,setSaveError]=useState('');
   const [hovered,setHovered]=useState(false),[focused,setFocused]=useState(false);
   useEffect(()=>{
@@ -83,12 +90,12 @@ function MarketTickerForUser({userId,actions}:{userId:string;actions?:ReactNode}
               const displayValue=available?marketPrice(item.id,quote.value!):query.isQuotePending(item.id)?'…':'Sem cotação';
               const change=quote?.changePercent;
               const hasChange=typeof change==='string'&&change.trim()!==''&&Number.isFinite(Number(change));
-              const description=`${item.name}: ${displayValue} ${item.unit}.${hasChange?` Variação: ${changeFormat.format(Number(change))}%.`:''} ${item.description}. ${quote?.note??'Consultando a fonte'}. Fonte: ${quote?.source??'aguardando consulta'}. Publicação: ${publication(quote)}.${stale?' Atualização indisponível; última referência preservada.':''}`;
+              const description=`${item.name}: ${displayValue} ${item.unit}.${hasChange?` Variação: ${changeFormat.format(Number(change))}%.`:''} ${comparison(quote)} ${item.description}. ${quote?.note??'Consultando a fonte'}. Fonte: ${quote?.source??'aguardando consulta'}. Publicação: ${publication(quote)}.${stale?' Atualização indisponível; última referência preservada.':''}`;
               const direction=marketDirection(quote?.changePercent);
               return <li data-market-id={item.id} className={`market-ticker-item${stale?' is-stale':''}`} key={`${repeat}:${item.id}`} aria-hidden={repeat>0?true:undefined} inert={repeat>0?true:undefined}><a href={quote?.sourceUrl??undefined} target="_blank" rel="noopener noreferrer" tabIndex={-1} title={description} aria-label={description}>
                 <span className="market-ticker-name">{item.name}</span>
                 <span className="market-ticker-quote"><strong className={`market-ticker-value is-${direction}`}>{displayValue}</strong><small className="market-ticker-unit">{item.unit}</small></span>
-                {hasChange?<span className={`market-ticker-change is-${direction}`}>{direction!=='neutral'&&<span className="market-ticker-direction" aria-hidden="true">{direction==='up'?'▲':'▼'}</span>}{changeFormat.format(Number(change))}%</span>:null}
+                {hasChange?<span className={`market-ticker-change is-${direction}`}>{direction!=='neutral'&&<span className="market-ticker-direction" aria-hidden="true">{direction==='up'?'▲':'▼'}</span>}{changeFormat.format(Number(change))}%</span>:available?<span className="market-ticker-change">Sem base</span>:null}
                 {stale?<AlertTriangle className="market-ticker-stale" size={12} aria-hidden="true"/>:null}
               </a></li>;
             }))}
@@ -114,9 +121,19 @@ function MarketTickerForUser({userId,actions}:{userId:string;actions?:ReactNode}
         <div className="market-ticker-actions"><span>{draft.length?'':'Selecione ao menos um indicador.'}</span><button type="button" onClick={close}>Cancelar</button><button type="button" disabled={!draft.length} onClick={save}>Aplicar indicadores</button></div>
       </>:<div className="market-ticker-details"><p>Câmbio comercial com cache público de 1 minuto; se indisponível, referência diária alternativa. Agro: publicação diária por praça. Cana: projeção mensal da safra.</p>
         {marketWarning?<p className="market-ticker-warning" role="status">Algumas fontes não puderam ser atualizadas. Os últimos valores válidos mantêm a data original.</p>:null}
-        <ul>{items.map(item=>{const quote=query.data?.quotes.find(value=>value.id===item.id);return <li key={item.id}><div><strong>{item.name}</strong><span>{quote?.value?`${marketPrice(item.id,quote.value)} ${item.unit}`:'Sem cotação'}</span></div><p>{item.description}</p><p>{quote?.note??'Aguardando consulta à fonte.'}{quote?.status==='stale'?' Última referência; atualização indisponível.':''}</p><div><a href={quote?.sourceUrl??undefined} target="_blank" rel="noopener noreferrer">{quote?.source??'Fonte indisponível'}</a><time dateTime={quote?.observedAt??quote?.date??undefined}>{publication(quote)}</time></div><button type="button" className="market-ticker-remove" data-remove-market={item.id} aria-label={`Remover ${item.name} da faixa`} title={selected.length===1?'Mantenha ao menos um indicador na faixa':`Remover ${item.name} da faixa`} disabled={selected.length===1} onClick={()=>remove(item.id)}><X size={12}/>Remover da faixa</button></li>;})}</ul>
+        <ul>{items.map(item=>{const quote=query.data?.quotes.find(value=>value.id===item.id);return <li key={item.id}><div><strong>{item.name}</strong><span>{quote?.value?`${marketPrice(item.id,quote.value)} ${item.unit}`:'Sem cotação'}</span></div><p>{item.description}</p><p>{quote?.note??'Aguardando consulta à fonte.'}{quote?.status==='stale'?' Última referência; atualização indisponível.':''}</p><p>{quote?.changePercent!==undefined?`${changeFormat.format(Number(quote.changePercent))}%. `:''}{comparison(quote)}</p>{quote?.previousSourceUrl&&<p><a href={quote.previousSourceUrl} target="_blank" rel="noopener noreferrer">Fonte da publicação anterior</a></p>}<div><a href={quote?.sourceUrl??undefined} target="_blank" rel="noopener noreferrer">{quote?.source??'Fonte indisponível'}</a><time dateTime={quote?.observedAt??quote?.date??undefined}>{publication(quote)}</time></div><div className="market-history-actions"><button type="button" aria-expanded={historyId===item.id} aria-label={`Ver histórico de 7 dias de ${item.name}`} onClick={()=>setHistoryId(historyId===item.id?null:item.id)}>Histórico de 7 dias</button><button type="button" className="market-ticker-remove" data-remove-market={item.id} aria-label={`Remover ${item.name} da faixa`} title={selected.length===1?'Mantenha ao menos um indicador na faixa':`Remover ${item.name} da faixa`} disabled={selected.length===1} onClick={()=>remove(item.id)}><X size={12}/>Remover da faixa</button></div>{historyId===item.id&&<QuoteHistory id={item.id} userId={userId}/>}</li>;})}</ul>
         {query.data?.checkedAt?<p className="market-ticker-checked">Última consulta: {observedFormat.format(new Date(query.data.checkedAt))} (Brasília).</p>:null}
       </div>}
     </div>:null}
   </section>;
+}
+
+function QuoteHistory({id,userId}:{id:MarketId;userId:string}){
+ const history=useQuery({queryKey:[...billingKeys.resource(userId,'dashboard-market'),{history:id}],staleTime:60000,
+  queryFn:async({signal}):Promise<MarketHistory>=>{await assertSessionActor(userId);const data=await rpcRequest<MarketHistory>('dashboard-market','history',{id},signal);const parsed=parseMarketHistory(data,id);if(!parsed)throw Error('Histórico de mercado inválido.');return parsed;},
+ });
+ return <section className="market-history" aria-label={`Histórico de ${marketCatalog.find(item=>item.id===id)?.name}`}>
+  <p>Última coleta de cada dia (Brasília). A publicação mantém a data da fonte. O histórico é formado pelas coletas disponíveis.</p>
+  {history.isPending?<p role="status">Consultando histórico…</p>:history.isError?<p role="alert">Não foi possível carregar o histórico. <button type="button" onClick={()=>void history.refetch()}>Tentar novamente</button></p>:history.data?.days.length?<table><thead><tr><th>Coleta</th><th>Preço</th><th>Publicação</th></tr></thead><tbody>{history.data.days.map(day=><tr key={day.day} title={`${day.source} · Coleta: ${observedFormat.format(new Date(day.capturedAt))}`}><td>{dateLabel(day.day)}</td><td>{marketPrice(id,day.value)}</td><td>{dateLabel(day.date)}</td></tr>)}</tbody></table>:<p>Aguardando a primeira coleta válida.</p>}
+ </section>;
 }

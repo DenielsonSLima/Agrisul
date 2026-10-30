@@ -37,15 +37,21 @@ export function consumeAgriculturalRow(result,values){
   const date=parsed.toISOString().slice(0,10),value=decimal(price);
   if(!value)return;
   const item=result.find(quote=>quote.id===match[0]);
-  if(!item||item.date&&item.date>=date)return;
+  if(!item||item.date===date)return;
+  if(item.date&&item.date>date){
+    if(!item.previousDate||item.previousDate<date)Object.assign(item,{previousValue:value,previousDate:date});
+    return;
+  }
+  if(item.date)Object.assign(item,{previousValue:item.value,previousDate:item.date});
   Object.assign(item,{value,date,status:'available',note:`Preço mais comum ao produtor · ${place}/SC · diário`});
 }
 export function parseCurrency(body,id){
   const expected=id==='usd'?'USD':'EUR';
-  const item=Array.isArray(body)?body.find(row=>row?.base===expected&&row?.quote==='BRL'):null;
+  const rows=Array.isArray(body)?body.filter(row=>row?.base===expected&&row?.quote==='BRL'&&/^\d{4}-\d{2}-\d{2}$/.test(row?.date??'')&&decimal(row.rate)).sort((a,b)=>b.date.localeCompare(a.date)):[];
+  const item=rows[0],previous=rows.find(row=>row.date<item.date);
   const value=decimal(item?.rate);
   if(!value||!/^\d{4}-\d{2}-\d{2}$/.test(item?.date??''))throw new Error('Cotação cambial inválida');
-  return {id,value,date:item.date,source:'Frankfurter · bancos centrais',sourceUrl:'https://frankfurter.dev/',note:'Taxa de referência diária · não é câmbio intradiário',status:'available'};
+  return {id,value,date:item.date,...(previous?{previousValue:decimal(previous.rate),previousDate:previous.date}:{}),source:'Frankfurter · bancos centrais',sourceUrl:'https://frankfurter.dev/',note:'Taxa de referência diária · não é câmbio intradiário',status:'available'};
 }
 export function parseAwesomeCurrency(body,id){
   const expected=id==='usd'?'USD':'EUR';
@@ -81,7 +87,11 @@ export async function fetchAgriculturalQuotes(){
   for await(const sheet of reader)for await(const row of sheet)consumeAgriculturalRow(quotes,row.values);
   return quotes;
 }
-async function fetchCurrency(id){return parseCurrency(await(await remote(`https://api.frankfurter.dev/v2/rates?base=${id.toUpperCase()}&quotes=BRL`,8000)).json(),id);}
+async function fetchCurrency(id){
+  const latest=parseCurrency(await(await remote(`https://api.frankfurter.dev/v2/rates?base=${id.toUpperCase()}&quotes=BRL`,8000)).json(),id);
+  const from=new Date(Date.parse(latest.date+'T00:00:00Z')-14*86400000).toISOString().slice(0,10);
+  try{return parseCurrency(await(await remote(`https://api.frankfurter.dev/v2/rates?base=${id.toUpperCase()}&quotes=BRL&from=${from}&to=${latest.date}`,8000)).json(),id);}catch{return latest;}
+}
 export async function fetchCurrencyQuotes(){
   let body;
   try{body=await(await remote(AWESOME_URL,8000)).json();}catch{}

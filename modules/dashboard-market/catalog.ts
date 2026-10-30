@@ -13,7 +13,8 @@ export const marketCatalog = [
 ] as const;
 export type MarketId=typeof marketCatalog[number]['id'];
 export const defaultMarketIds:MarketId[]=marketCatalog.slice(0,9).map(item=>item.id);
-export type MarketQuote={id:MarketId;value:string|null;date:string|null;observedAt?:string;changePercent?:string;source:string;sourceUrl:string;note:string;status:'available'|'stale'|'unavailable'};
+export type MarketQuote={id:MarketId;value:string|null;date:string|null;observedAt?:string;changePercent?:string;changeBasis?:'source'|'previous-publication';previousValue?:string;previousDate?:string;previousSourceUrl?:string;source:string;sourceUrl:string;note:string;status:'available'|'stale'|'unavailable'};
+export type MarketHistory={id:MarketId;days:{day:string;value:string;date:string;capturedAt:string;source:string}[]};
 export type MarketFeed={quotes:MarketQuote[];checkedAt:string;refreshSeconds:number};
 
 export function readMarketSelection(raw:string|null):MarketId[]{

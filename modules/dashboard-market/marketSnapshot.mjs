@@ -35,14 +35,24 @@ export function parseMarketFeed(value,group){
       !publicSource(quote.sourceUrl)||typeof quote.note!=='string'||quote.note.length>2000||
       (quote.observedAt!==undefined&&!validTimestamp(quote.observedAt))||
       (quote.changePercent!==undefined&&!decimal(quote.changePercent))||
+      (quote.changeBasis!==undefined&&!['source','previous-publication'].includes(quote.changeBasis))||
+      (quote.previousValue!==undefined&&(!decimal(quote.previousValue,true)||!validDate(quote.previousDate)||quote.previousDate>=quote.date||!publicSource(quote.previousSourceUrl)))||
+      ((quote.previousValue===undefined)!==(quote.previousDate===undefined))||((quote.previousDate===undefined)!==(quote.previousSourceUrl===undefined))||
       (quote.status==='unavailable'?(quote.value!==null||quote.date!==null):(!decimal(quote.value,true)||!validDate(quote.date))))return null;
     seen.add(quote.id);
     quotes.push({id:quote.id,value:quote.value,date:quote.date,status:quote.status,source:quote.source,sourceUrl:quote.sourceUrl,note:quote.note,
-      ...(quote.observedAt===undefined?{}:{observedAt:quote.observedAt}),...(quote.changePercent===undefined?{}:{changePercent:quote.changePercent})});
+      ...(quote.observedAt===undefined?{}:{observedAt:quote.observedAt}),...(quote.changePercent===undefined?{}:{changePercent:quote.changePercent}),
+      ...(quote.changeBasis===undefined?{}:{changeBasis:quote.changeBasis}),...(quote.previousValue===undefined?{}:{previousValue:quote.previousValue,previousDate:quote.previousDate,previousSourceUrl:quote.previousSourceUrl})});
   }
   return {quotes,checkedAt:value.checkedAt,refreshSeconds:config.refreshSeconds};
 }
 const usable=quote=>quote&&quote.status!=='unavailable'&&quote.value!==null;
+export function parseMarketHistory(value,id){
+ if(!record(value)||value.id!==id||!Array.isArray(value.days)||value.days.length>7)return null;
+ const seen=new Set();
+ for(const day of value.days){if(!record(day)||!validDate(day.day)||seen.has(day.day)||!decimal(day.value,true)||!validDate(day.date)||!validTimestamp(day.capturedAt)||typeof day.source!=='string'||!day.source.trim())return null;seen.add(day.day);}
+ return value;
+}
 function regressed(previous,next){
   if(next.date!==previous.date)return next.date<previous.date;
   if(previous.observedAt&&!next.observedAt)return true;

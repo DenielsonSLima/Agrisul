@@ -20,6 +20,21 @@ test('missing, negative and invalid date publications never manufacture a price'
   assert.equal(quotes.find(quote=>quote.id==='corn').status,'unavailable');
   assert.equal(quotes.find(quote=>quote.id==='corn').value,null);
 });
+
+test('agricultural comparisons retain the latest two distinct publications from the same product and region in any worksheet order',()=>{
+ for(const order of [[20,22,21,22,19],[22,21,20],[20,21,22]]){
+  const quotes=emptyAgriculturalQuotes();for(const day of order)consumeAgriculturalRow(quotes,[null,2026,'outubro',day,'Soja industrial - sc 60 kg','Oeste',0,100+day,0]);
+  consumeAgriculturalRow(quotes,[null,2026,'outubro',23,'Soja industrial - sc 60 kg','Litoral Norte',0,900,0]);
+  const soy=quotes.find(q=>q.id==='soy');assert.equal(soy.value,'122');assert.equal(soy.previousValue,'121');assert.equal(soy.previousDate,'2026-10-21');assert.equal(soy.changePercent,undefined,'Percentage belongs in Postgres');
+ }
+});
+
+test('daily fallback compares distinct published dates, not weekends or another currency, and retains the current reference if history fails',async()=>{
+ const parsed=parseCurrency([{base:'USD',quote:'BRL',rate:4,date:'2026-10-23'},{base:'EUR',quote:'BRL',rate:9,date:'2026-10-26'},{base:'USD',quote:'BRL',rate:5,date:'2026-10-26'}],'usd');
+ assert.equal(parsed.value,'5');assert.equal(parsed.previousValue,'4');assert.equal(parsed.previousDate,'2026-10-23');assert.equal(parsed.changePercent,undefined);
+ const original=globalThis.fetch;globalThis.fetch=async url=>String(url).includes('awesomeapi')||String(url).includes('&from=')?new Response('Unavailable',{status:503}):Response.json([{base:String(url).includes('USD')?'USD':'EUR',quote:'BRL',rate:5,date:'2026-10-26'}]);
+ try{const quotes=await fetchCurrencyQuotes();assert.ok(quotes.every(q=>q.value==='5'&&q.status==='available'&&q.previousValue===undefined));}finally{globalThis.fetch=original;}
+});
 test('arroz uses the published Litoral Sul region',()=>{
   const quotes=emptyAgriculturalQuotes();
   consumeAgriculturalRow(quotes,[null,2026,'outubro',22,'Arroz irrigado em casca - sc 50 kg','Litoral Sul',50,52.25,55]);
@@ -182,7 +197,7 @@ test('daily currency fallback uses the bounded eight-second timeout',async()=>{
   globalThis.fetch=async url=>String(url).includes('awesomeapi')?new Response('Unavailable',{status:503}):Response.json([{base:String(url).includes('USD')?'USD':'EUR',quote:'BRL',rate:5.12,date:'2026-10-27'}]);
   try{
     const quotes=await fetchCurrencyQuotes();
-    assert.equal(quotes.length,2);assert.deepEqual(timeouts,[8000,8000,8000]);
+    assert.equal(quotes.length,2);assert.deepEqual(timeouts,[8000,8000,8000,8000,8000]);
   }finally{globalThis.fetch=originalFetch;AbortSignal.timeout=originalTimeout;}
 });
 test('HTTP route authenticates before group validation and forwards only whitelisted groups',async()=>{
