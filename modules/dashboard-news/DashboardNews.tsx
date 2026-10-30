@@ -9,7 +9,7 @@ import type {AgroNewsArticle} from './catalog';
 import type {useAgroNews} from './useAgroNews';
 import type {useDashboardAtr} from './useDashboardAtr';
 import {DashboardWeather} from './DashboardWeather';
-import {headlineIntervalMs,usableNewsImage} from './presentation';
+import {headlineIntervalMs,usableNewsImage,newsForScope,newsTopicLabel} from './presentation';
 import {DASHBOARD_MONEY_MASK,useDashboardValues} from '@/modules/resumo/dashboardValues';
 
 type NewsQuery=ReturnType<typeof useAgroNews>;
@@ -18,18 +18,12 @@ const publicationFormat=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_P
 const publication=(value:string)=>publicationFormat.format(new Date(value)).replace(/ de /g,' ').replace('.','');
 
 export function DashboardNews({news,atr,presenting,slideDurationMs}:{news:NewsQuery;atr:AtrQuery;presenting:boolean;slideDurationMs:number}){
- const [scope,setScope]=useState<'cane'|'all'>('cane'),[selected,setSelected]=useState<string|null>(null),[latestPage,setLatestPage]=useState(0),[portraitSelected,setPortraitSelected]=useState<string|null>(null),[cardsPerPage,setCardsPerPage]=useState(4);
+ const [scope,setScope]=useState<'cane'|'all'>('all'),[selected,setSelected]=useState<string|null>(null),[latestPage,setLatestPage]=useState(0),[portraitSelected,setPortraitSelected]=useState<string|null>(null),[cardsPerPage,setCardsPerPage]=useState(4);
  const latestRef=useRef<HTMLDivElement>(null);
- const [failedImages,setFailedImages]=useState<string[]>([]);
  const articles=news.data?.articles;
- const stories=useMemo(()=>{
-  const all=articles??[],focused=all.filter(article=>article.topic==='cane');
-  const chosen=scope==='cane'&&focused.length?focused:all;
-  const photographed=chosen.filter(article=>usableNewsImage(article.imageUrl)&&!failedImages.includes(article.imageUrl!));
-  return photographed.length?photographed:chosen;
- },[articles,scope,failedImages]);
- const index=selected?Math.max(0,stories.findIndex(article=>article.id===selected)):Math.max(0,stories.findIndex(article=>!!article.imageUrl)),lead=stories[index];
- const secondary=useMemo(()=>(articles??[]).filter(article=>article.id!==lead?.id),[articles,lead?.id]);
+ const stories=useMemo(()=>newsForScope(articles??[],scope),[articles,scope]);
+ const index=selected?Math.max(0,stories.findIndex(article=>article.id===selected)):0,lead=stories[index];
+ const secondary=useMemo(()=>stories.filter(article=>article.id!==lead?.id),[stories,lead?.id]);
  const portraitIndex=Math.max(0,secondary.findIndex(article=>article.id===portraitSelected)),portrait=secondary[portraitIndex];
  const latest=useMemo(()=>secondary.filter(article=>article.id!==portrait?.id),[secondary,portrait?.id]);
  const latestPages=Math.max(1,Math.ceil(latest.length/cardsPerPage)),page=Math.min(latestPage,latestPages-1);
@@ -53,7 +47,14 @@ export function DashboardNews({news,atr,presenting,slideDurationMs}:{news:NewsQu
   observer.observe(node);return()=>observer.disconnect();
  },[]);
  const choose=(offset:number)=>{if(stories.length)setSelected(stories[(index+offset+stories.length)%stories.length].id);};
+ const changeScope=(value:'cane'|'all')=>{setScope(value);setSelected(null);setPortraitSelected(null);setLatestPage(0);};
+ const counts=(articles??[]).reduce((result,article)=>{result[article.topic]++;return result;},{cane:0,grains:0,agro:0});
+ const completeMix=counts.cane===15&&counts.grains===6&&counts.agro===9;
  return <div className="agro-news-dashboard" data-headline-interval={interval??undefined}>
+  <div className="agro-news-editorial">
+   <div className="agro-news-scope" role="group" aria-label="Filtrar todas as notícias" aria-describedby="agro-news-selection"><button type="button" aria-pressed={scope==='all'} onClick={()=>changeScope('all')}>Visão geral</button><button type="button" aria-pressed={scope==='cane'} onClick={()=>changeScope('cane')}>Só cana</button></div>
+   <p id="agro-news-selection">{scope==='cane'?'Cana, açúcar e etanol em todos os painéis':'Prioridade: 50% cana · 20% soja e milho · 30% agro geral'}<small>{news.isPending?'Consultando fontes…':scope==='cane'?`${stories.length} notícias de cana`:completeMix?'Seleção de 30 notícias':`Disponíveis: ${counts.cane} cana · ${counts.grains} soja/milho · ${counts.agro} gerais`}{news.data?.sources.some(source=>source.status!=='current')?' · Fontes com atraso':''}</small></p>
+  </div>
   <div className="agro-news-layout">
    <aside className="agro-news-sidebar" aria-label="Últimas notícias e histórico de ATR">
     <NewsPortrait article={portrait} index={portraitIndex} count={secondary.length} onChange={offset=>{if(secondary.length)setPortraitSelected(secondary[(portraitIndex+offset+secondary.length)%secondary.length].id);}}/>
@@ -63,12 +64,11 @@ export function DashboardNews({news,atr,presenting,slideDurationMs}:{news:NewsQu
     <div className="agro-news-top"><DashboardWeather presenting={presenting} slideDurationMs={slideDurationMs}/>
     {lead?<div className="agro-news-feature-wrap" data-dashboard-card>
      <a key={lead.id} href={lead.url} target="_blank" rel="noopener noreferrer" className="agro-news-feature" aria-label={`Ler ${lead.title} em ${lead.sourceName}`}>
-      <NewsImage key={lead.imageUrl??lead.id} src={usableNewsImage(lead.imageUrl)?lead.imageUrl:null} featured onFailure={()=>{if(lead.imageUrl)setFailedImages(previous=>previous.includes(lead.imageUrl!)?previous:[...previous,lead.imageUrl!]);}}/>
-      <div className="agro-news-feature-content"><span className="agro-news-story-label">{lead.topic==='cane'?'CANA · AÇÚCAR · ETANOL':'CENÁRIO DO AGRO'}</span><h4>{lead.title}</h4>{lead.description&&<p>{lead.description}</p>}<div className="agro-news-byline"><strong>{lead.sourceName}</strong><time dateTime={lead.publishedAt}>{publication(lead.publishedAt)}</time><ArrowUpRight size={16}/></div></div>
+      <NewsImage key={lead.imageUrl??lead.id} src={usableNewsImage(lead.imageUrl)?lead.imageUrl:null} featured/>
+      <div className="agro-news-feature-content"><span className="agro-news-story-label">{newsTopicLabel(lead)}</span><h4>{lead.title}</h4>{lead.description&&<p>{lead.description}</p>}<div className="agro-news-byline"><strong>{lead.sourceName}</strong><time dateTime={lead.publishedAt}>{publication(lead.publishedAt)}</time><ArrowUpRight size={16}/></div></div>
      </a>
-     <div className="agro-news-focus" role="group" aria-label="Tema das manchetes"><button type="button" aria-pressed={scope==='cane'} onClick={()=>{setScope('cane');setSelected(null);}}>Cana em foco</button><button type="button" aria-pressed={scope==='all'} onClick={()=>{setScope('all');setSelected(null);}}>Todo o agro</button></div>
      <nav className="agro-news-feature-pager" aria-label="Manchetes em destaque"><span>{String(index+1).padStart(2,'0')}<small> / {String(stories.length).padStart(2,'0')}</small></span><button type="button" aria-label="Manchete anterior" disabled={stories.length<2} onClick={()=>choose(-1)}><ChevronLeft size={16}/></button><button type="button" aria-label="Próxima manchete" disabled={stories.length<2} onClick={()=>choose(1)}><ChevronRight size={16}/></button></nav>
-    </div>:<div className="agro-news-empty" data-dashboard-card role="status">{news.isPending?<><Loader2 size={25} className="animate-spin"/><h4>Buscando as notícias do campo</h4><p>Reunindo as últimas publicações das fontes.</p></>:<><Newspaper size={28}/><h4>Notícias temporariamente indisponíveis</h4><p>Uma nova consulta será feita automaticamente.</p><button type="button" onClick={()=>void news.refetch()}>Tentar novamente</button></>}</div>}
+    </div>:<div className="agro-news-empty" data-dashboard-card role="status">{news.isPending?<><Loader2 size={25} className="animate-spin"/><h4>Buscando as notícias do campo</h4><p>Reunindo as últimas publicações das fontes.</p></>:<><Newspaper size={28}/><h4>{scope==='cane'?'Sem notícias recentes de cana':'Notícias temporariamente indisponíveis'}</h4><p>Uma nova consulta será feita automaticamente.</p><button type="button" onClick={()=>void news.refetch()}>Tentar novamente</button></>}</div>}
     </div>
     <section className="agro-news-latest" aria-label="Mais notícias do agronegócio"><header><h4>Mais notícias <span>do agronegócio</span></h4><nav aria-label="Páginas das últimas notícias"><span>{page+1} / {latestPages}</span><button type="button" disabled={latestPages<2} aria-label="Notícias anteriores" onClick={()=>setLatestPage((page+latestPages-1)%latestPages)}><ChevronLeft size={14}/></button><button type="button" disabled={latestPages<2} aria-label="Próximas notícias" onClick={()=>setLatestPage((page+1)%latestPages)}><ChevronRight size={14}/></button></nav></header>
      <div ref={latestRef} className="agro-news-latest-grid" style={{'--news-card-count':cardsPerPage} as CSSProperties}>{latest.slice(page*cardsPerPage,page*cardsPerPage+cardsPerPage).map(article=><NewsBrief key={article.id} article={article}/>)}{!latest.length&&<p className="agro-news-latest-placeholder">As publicações mais recentes aparecerão aqui.</p>}</div>
@@ -85,13 +85,13 @@ function NewsImage({src,featured=false,onFailure}:{src:string|null;featured?:boo
  return <img className={`agro-news-image${loaded?' is-loaded':''}`} src={src} alt="" loading={featured?'eager':'lazy'} decoding="async" referrerPolicy="no-referrer" onLoad={()=>setLoaded(true)} onError={()=>{setFailed(true);onFailure?.();}}/>;
 }
 function NewsBrief({article}:{article:AgroNewsArticle}){
- return <a href={article.url} target="_blank" rel="noopener noreferrer" className="agro-news-brief" data-dashboard-card><span className="agro-news-brief-image"><NewsImage key={article.imageUrl??article.id} src={article.imageUrl}/></span><div><span className="agro-news-brief-topic">{article.topic==='cane'?'Cana & etanol':article.category}</span><h5>{article.title}</h5><footer><strong>{article.sourceName}</strong><time dateTime={article.publishedAt}>{publication(article.publishedAt)}</time></footer></div><ArrowUpRight size={14}/></a>;
+ return <a href={article.url} target="_blank" rel="noopener noreferrer" className="agro-news-brief" data-dashboard-card><span className="agro-news-brief-image"><NewsImage key={article.imageUrl??article.id} src={article.imageUrl}/></span><div><span className="agro-news-brief-topic">{newsTopicLabel(article)}</span><h5>{article.title}</h5><footer><strong>{article.sourceName}</strong><time dateTime={article.publishedAt}>{publication(article.publishedAt)}</time></footer></div><ArrowUpRight size={14}/></a>;
 }
 function NewsPortrait({article,index,count,onChange}:{article:AgroNewsArticle|undefined;index:number;count:number;onChange:(offset:number)=>void}){
  return <section className="agro-news-portrait" data-dashboard-card aria-label="Últimas notícias com resumo"><header><h4><Newspaper size={13}/>Últimas notícias</h4><nav aria-label="Notícias do painel lateral"><span>{count?index+1:0}/{count}</span><button type="button" aria-label="Notícia lateral anterior" disabled={count<2} onClick={()=>onChange(-1)}><ChevronLeft size={13}/></button><button type="button" aria-label="Próxima notícia lateral" disabled={count<2} onClick={()=>onChange(1)}><ChevronRight size={13}/></button></nav></header>
   {article?<a key={article.id} href={article.url} target="_blank" rel="noopener noreferrer" title={article.title}>
    {article.imageUrl&&<span className="agro-news-portrait-image"><NewsImage key={article.imageUrl} src={article.imageUrl}/></span>}
-   <div className="agro-news-portrait-copy"><span className="agro-news-brief-topic">{article.topic==='cane'?'Cana & etanol':article.category}</span><h5>{article.title}</h5>{article.description&&<p>{article.description}</p>}<footer><strong>{article.sourceName}</strong><time dateTime={article.publishedAt}>{publication(article.publishedAt)}</time></footer></div>
+   <div className="agro-news-portrait-copy"><span className="agro-news-brief-topic">{newsTopicLabel(article)}</span><h5>{article.title}</h5>{article.description&&<p>{article.description}</p>}<footer><strong>{article.sourceName}</strong><time dateTime={article.publishedAt}>{publication(article.publishedAt)}</time></footer></div>
   </a>:<p className="agro-news-portrait-placeholder">Reunindo as últimas publicações.</p>}
  </section>;
 }

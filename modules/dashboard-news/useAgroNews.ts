@@ -7,7 +7,7 @@ import {isAgroNewsFeed} from './catalog';
 
 export function useAgroNews(){
  const {user,ready}=useAuth();
- return useQuery({queryKey:[...billingKeys.resource(user?.id??'','dashboard-news'),{version:2}],enabled:ready&&!!user,
+ return useQuery({queryKey:[...billingKeys.resource(user?.id??'','dashboard-news'),{version:3}],enabled:ready&&!!user,
   queryFn:async({signal})=>{
    // Bound the whole request, including session lookup and response decoding.
    // Aborting fetch alone does not release a stalled session lookup.

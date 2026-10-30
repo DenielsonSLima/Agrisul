@@ -5,3 +5,11 @@ export function usableNewsImage(value:string|null){
  if(!value)return false;
  try{const url=new URL(value);return url.protocol==='https:'&&!/(?:^|\.)(?:youtube\.com|youtu\.be|vimeo\.com|dailymotion\.com)$/.test(url.hostname);}catch{return false;}
 }
+import type {AgroNewsArticle} from './catalog';
+
+export function newsForScope(articles:AgroNewsArticle[],scope:'cane'|'all'){
+ return scope==='cane'?articles.filter(article=>article.topic==='cane'):articles;
+}
+export function newsTopicLabel(article:AgroNewsArticle){
+ return article.topic==='cane'?'Cana, açúcar e etanol':article.topic==='grains'?'Soja e milho':article.category;
+}
