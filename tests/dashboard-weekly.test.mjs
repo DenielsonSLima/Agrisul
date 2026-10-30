@@ -20,7 +20,7 @@ const {display}=await import(values);
 const fixtures=dataUrl(`import {createElement} from ${JSON.stringify(react)};
  export const CalendarDays=()=>null,Gauge=()=>null,Truck=()=>null,Wallet=()=>null;
  export const usePlotSize=()=>({ref:()=>{},size:{width:700,height:240}});
- export const DashboardAnalysis=({first,second})=>createElement('div',null,first,second);
+ export const DashboardAnalysis=({first,second,third})=>createElement('div',null,first,second,third);
  export const DashboardPanel=({title,children})=>createElement('section',null,createElement('h3',null,title),children);
  export const DashboardDataDialog=({children})=>createElement('div',null,children);`);
 const component=dataUrl(transpile('../modules/resumo/components/DashboardWeekly.tsx')
@@ -48,6 +48,20 @@ test('weekly renders six compact official KPIs with tonnes and ATR for each moda
 test('mask hides money, financial deltas, tooltip and axis values while preserving volume and ATR',()=>{
  display.visible=false;const html=renderToStaticMarkup(createElement(DashboardWeekly,{data}));
  assert.doesNotMatch(html,/17\.627,15|16\.001,13|35,64|R\$ 17|17,6 mil|16 mil/);assert.match(html,/123,46/);assert.match(html,/142,79/);assert.match(html,/•••/);
+});
+
+test('daily connectors show the server percentage between adjacent productive bars, label their dates and hide financial changes with the mask',()=>{
+ const days=[{...data.days[0],previousProductionDate:'',volumeChangePercent:'',grossChangePercent:''},{...data.days[2],previousProductionDate:data.days[0].date,volumeChangePercent:'-63.85',grossChangePercent:'98.76'}];
+ display.visible=true;let html=renderToStaticMarkup(createElement(DashboardWeekly,{data:{...data,days}}));
+ assert.match(html,/data-weekly-change="volume"/);assert.match(html,/data-weekly-change="gross"/);assert.match(html,/-63,85%/);assert.match(html,/\+98,76%/);assert.match(html,/de 24\/10 para 26\/10/);
+ display.visible=false;html=renderToStaticMarkup(createElement(DashboardWeekly,{data:{...data,days}}));assert.match(html,/-63,85%/);assert.doesNotMatch(html,/data-weekly-change="gross"|98,76%/);
+});
+
+test('contract card distinguishes contracted volume, lifetime deliveries and filtered weekly deliveries',()=>{
+ display.visible=true;const contractProgress=[{id:'contract-a',contractNumber:'MANUAL-A',title:'Contrato manual',clientName:'Cliente A',contractedVolume:'1000',deliveredVolume:'80',weeklyVolume:'60',remainingVolume:'920',previousDeliveryPercent:'2',weeklyDeliveryPercent:'6'}];
+ const html=renderToStaticMarkup(createElement(DashboardWeekly,{data:{...data,contractProgress}}));
+ for(const text of ['Entregas por contrato','MANUAL-A','Cliente A','Contratado','Entregue no contrato','Na semana','1.000,00','80,00','60,00'])assert.ok(html.includes(text),text);
+ assert.match(html,/class="weekly-contract-track"/);assert.match(html,/width:2%/);assert.match(html,/width:6%/);assert.match(html,/920,00 t a entregar/);assert.doesNotMatch(html,/<h3>Entregas por contrato/);
 });
 test('productive pending days are retained without drawing false ATR points or adding idle dates',()=>{
  display.visible=true;const days=[{...data.days[2],loadCount:1,loadedVolume:'10',averageAtr:'',billingPending:true,pendingLoadCount:1,grossAmount:'',netAmount:''}];

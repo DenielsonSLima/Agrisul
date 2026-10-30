@@ -1,5 +1,5 @@
 'use client';
-import {useId,type CSSProperties} from 'react';
+import {useEffect,useId,useState,type CSSProperties} from 'react';
 import {CalendarDays,Gauge,Truck,Wallet} from 'lucide-react';
 import {decimalLabel} from '@/shared/utils/presentation';
 import {useDashboardValues} from '../dashboardValues';
@@ -19,7 +19,7 @@ export function WeeklyContext({from,to}:{from:string;to:string}){
  return <div className="dashboard-weekly-controls"><div><strong>Últimos 7 dias <span>· {weeklyDate(from)} a {weeklyDate(to)}</span></strong><small>Hoje em andamento · comparação com os 7 dias anteriores</small></div></div>;
 }
 
-export function DashboardWeekly({data}:{data:WeeklySummaryData}){
+export function DashboardWeekly({data,presenting=false,slideDurationMs=120000}:{data:WeeklySummaryData;presenting?:boolean;slideDurationMs?:number}){
  const {money,visible}=useDashboardValues(),t=data.totals,p=data.comparison;
  const methodCard=(code:'1'|'2',name:string):WeeklyCard=>{
   const method=data.contractMethods.find(row=>row.code===code);
@@ -34,18 +34,32 @@ export function DashboardWeekly({data}:{data:WeeklySummaryData}){
  ];
  return <>
   <dl className="executive-metrics dashboard-weekly-metrics" data-metric-count={6} aria-label="Indicadores dos últimos sete dias">{cards.map((card,index)=><div key={card.id} className={`executive-metric ${card.atr!==undefined?'is-modality ':''}${index===0?'is-featured':index===2||index===5?'tone-gold':'tone-blue'}`} data-dashboard-metric={card.id}><dt><span>{card.name}</span><i><card.icon size={15}/></i></dt><dd title={card.value} style={{'--metric-value-width':Math.max(1,card.value.length)*.64,'--metric-unit-space':`${card.unit?card.unit.length*7+6:0}px`} as CSSProperties}><span>{card.value}</span>{card.unit&&<small>{card.unit}</small>}</dd><div className="dashboard-weekly-card-hint"><span>{card.hint}</span></div>{card.atr!==undefined&&<div className="dashboard-weekly-card-atr"><span>ATR médio</span><strong>{card.atr}{card.atr!=='—'&&card.atr!=='A apurar'&&<small> kg/t</small>}</strong></div>}{card.change!==undefined&&<div className="dashboard-weekly-card-comparison" title={`${weeklyDate(p.from)} a ${weeklyDate(p.to)} · Anterior: ${card.previous}`}><span>vs. 7 dias anteriores</span><strong>{card.change}</strong></div>}</div>)}</dl>
-  <DashboardAnalysis labels={['Volume e ATR','Faturamento']} first={<WeeklyChart data={data}/>} second={<WeeklyChart data={data} financial/>}/>
+  <DashboardAnalysis labels={['Volume e ATR','Faturamento','Contratos']} first={<WeeklyChart data={data}/>} second={<WeeklyChart data={data} financial/>} third={<WeeklyContracts data={data} presenting={presenting} slideDurationMs={slideDurationMs}/>}/>
  </>;
 }
 
+function WeeklyContracts({data,presenting,slideDurationMs}:{data:WeeklySummaryData;presenting:boolean;slideDurationMs:number}){
+ const {ref,size}=usePlotSize(),[page,setPage]=useState(0),rows=data.contractProgress??[];
+ const capacity=Math.max(1,Math.min(4,Math.floor(size.height/84))),pages=Math.max(1,Math.ceil(rows.length/capacity)),current=Math.min(page,pages-1);
+ useEffect(()=>{if(!presenting||pages<2)return;const timer=window.setTimeout(()=>setPage((current+1)%pages),Math.max(1000,slideDurationMs/pages));return()=>window.clearTimeout(timer);},[presenting,pages,current,slideDurationMs]);
+ const volume=(value:string)=>value===''?'Não informado':decimalLabel(value);
+ return <DashboardPanel title="" eyebrow="ACOMPANHAMENTO DOS CONTRATOS" className="dashboard-weekly-contract-panel">
+  <div className="weekly-contract-legend"><span><i/>Entregue</span><span><i/>Na semana</span><span><i/>A entregar</span></div>
+  <div ref={ref} className="dashboard-weekly-contracts" role="list" aria-label="Entregas por contrato">{rows.length?rows.slice(current*capacity,(current+1)*capacity).map(row=>{const label=row.contractNumber||row.title,description=`${label}: ${volume(row.contractedVolume)} t contratado; ${volume(row.deliveredVolume)} t entregue, incluindo ${volume(row.weeklyVolume)} t na semana; ${volume(row.remainingVolume??'')} t a entregar.`;return <article key={row.id} role="listitem"><header><strong title={`${label} · ${row.clientName}`}>{label}</strong>{!label.toLocaleLowerCase('pt-BR').includes(row.clientName.toLocaleLowerCase('pt-BR'))&&<small title={row.clientName}>{row.clientName}</small>}</header><dl><div><dt>Contratado</dt><dd>{volume(row.contractedVolume)}{row.contractedVolume!==''&&<small> t</small>}</dd></div><div><dt>Entregue no contrato</dt><dd>{volume(row.deliveredVolume)}<small> t</small></dd></div><div><dt>Na semana</dt><dd>{volume(row.weeklyVolume)}<small> t</small></dd></div></dl><div className="weekly-contract-track" role="img" aria-label={description} title={description}><span style={{width:`${Math.min(100,Math.max(0,Number(row.previousDeliveryPercent)||0))}%`}}/><span style={{width:`${Math.min(100,Math.max(0,Number(row.weeklyDeliveryPercent)||0))}%`}}/></div></article>;}):<div className="executive-empty"><strong>Nenhum contrato nesta seleção</strong><p>Ajuste os filtros para consultar outra seleção.</p></div>}</div>
+  <footer className="dashboard-weekly-contract-footer"><span>Acumulado até {weeklyDate(data.range.to)}</span>{pages>1&&<nav aria-label="Páginas de contratos"><button type="button" aria-label="Contratos anteriores" disabled={current===0} onClick={()=>setPage(current-1)}>‹</button><span>{current+1}/{pages}</span><button type="button" aria-label="Próximos contratos" disabled={current===pages-1} onClick={()=>setPage(current+1)}>›</button></nav>}
+   <DashboardDataDialog title="Entregas por contrato" description="Volume contratado e entregas acumuladas do contrato até a data final da semana. Entregue na semana respeita os filtros de cliente, contrato, modalidade e origem."><table><thead><tr><th scope="col">Contrato</th><th scope="col">Cliente</th><th scope="col">Contratado (t)</th><th scope="col">Entregue no contrato (t)</th><th scope="col">Na semana (t)</th></tr></thead><tbody>{rows.map(row=><tr key={row.id}><th scope="row">{row.contractNumber||row.title}</th><td>{row.clientName}</td><td>{volume(row.contractedVolume)}</td><td>{volume(row.deliveredVolume)}</td><td>{volume(row.weeklyVolume)}</td></tr>)}</tbody></table></DashboardDataDialog>
+  </footer>
+ </DashboardPanel>;
+}
+
 function WeeklyChart({data,financial=false}:{data:WeeklySummaryData;financial?:boolean}){
- const {ref,size}=usePlotSize(),id=useId(),{money}=useDashboardValues();
+ const {ref,size}=usePlotSize(),id=useId(),{money,visible}=useDashboardValues();
  const title=financial?'Faturamento por dia':'Volume e ATR por dia',days=data.days;
  return <DashboardPanel title={title} eyebrow={financial?'RESULTADO DAS ENTREGAS':'RITMO DA OPERAÇÃO'} subtitle={financial?'Bruto e líquido pela data do carregamento.':'Toneladas em barras · ATR ponderado em linha.'} className="dashboard-weekly-panel">
-  <div className="dashboard-weekly-legend" aria-label={`Legenda: ${title}`}><span><i style={{background:financial?'#aecfbc':'#23805b'}}/>{financial?'Bruto':'Volume (t)'}</span><span><i style={{background:financial?'#23805b':'#b87a28'}}/>{financial?'Líquido':'ATR (kg/t)'}</span></div>
+  <div className="dashboard-weekly-legend" aria-label={`Legenda: ${title}`}><span><i style={{background:financial?'#aecfbc':'#23805b'}}/>{financial?'Bruto':'Volume (t)'}</span><span><i style={{background:financial?'#23805b':'#b87a28'}}/>{financial?'Líquido':'ATR (kg/t)'}</span><span><i style={{background:'#5377ac'}}/>Variação do {financial?'bruto':'volume'} · % vs. dia anterior com produção</span></div>
   <div ref={ref} className="dashboard-weekly-plot" aria-labelledby={id}><span className="sr-only" id={id}>{title}</span>{days.length?size.width>0&&size.height>0&&<WeeklyPlot days={days} today={data.range.to} width={size.width} height={size.height} financial={financial}/>:<div className="executive-empty"><strong>Nenhum carregamento nos últimos 7 dias</strong><p>Ajuste os filtros para consultar outra seleção.</p></div>}</div>
   <footer className="dashboard-weekly-chart-footer"><span>{days.length?financial&&data.totals.billingPending?`${data.totals.pendingLoadCount} carga(s) com valor a apurar`:`${days.length} dia(s) com produção · últimos 7 dias`:'Nenhum carregamento nesta seleção'}</span>
-   <DashboardDataDialog title={title+' · últimos 7 dias'} description="Somente dias com produção dentro dos últimos sete dias corridos. ATR ponderado pelas toneladas. Faturamento pela data da carga; hoje ainda está em andamento."><table><caption className="sr-only">Dados diários da semana</caption><thead><tr><th scope="col">Data</th><th scope="col">Cargas</th><th scope="col">Volume (t)</th><th scope="col">ATR (kg/t)</th><th scope="col">Bruto</th><th scope="col">Líquido</th></tr></thead><tbody>{days.map(day=><tr key={day.date}><th scope="row">{weeklyDate(day.date)}{day.date===data.range.to?' · hoje parcial':''}</th><td>{day.loadCount}</td><td>{decimalLabel(day.loadedVolume)}</td><td>{atrText(day)}</td><td>{money(day.grossAmount)}</td><td>{money(day.netAmount)}</td></tr>)}</tbody></table></DashboardDataDialog>
+   <DashboardDataDialog title={title+' · últimos 7 dias'} description="Somente dias com produção dentro dos últimos sete dias corridos. Variações comparadas com o dia anterior com produção desta seleção. ATR ponderado pelas toneladas. Faturamento pela data da carga; hoje ainda está em andamento."><table><caption className="sr-only">Dados diários da semana</caption><thead><tr><th scope="col">Data</th><th scope="col">Cargas</th><th scope="col">Volume (t)</th><th scope="col">Variação do volume</th><th scope="col">ATR (kg/t)</th><th scope="col">Bruto</th><th scope="col">Variação do bruto</th><th scope="col">Líquido</th></tr></thead><tbody>{days.map(day=><tr key={day.date}><th scope="row">{weeklyDate(day.date)}{day.date===data.range.to?' · hoje parcial':''}</th><td>{day.loadCount}</td><td>{decimalLabel(day.loadedVolume)}</td><td>{delta(day.volumeChangePercent??'')}</td><td>{atrText(day)}</td><td>{money(day.grossAmount)}</td><td>{visible?delta(day.grossChangePercent??''):'••••••'}</td><td>{money(day.netAmount)}</td></tr>)}</tbody></table></DashboardDataDialog>
   </footer>
  </DashboardPanel>;
 }
@@ -71,5 +85,14 @@ export function WeeklyPlot({days,today,width,height,financial}:{days:Day[];today
    </g>;
   })}
   {!financial&&<><path d={path} fill="none" stroke="#b87a28" strokeWidth={2.5} strokeDasharray="5 4"/>{days.map((day,index)=>atrKnown(day)&&<circle key={day.date} cx={x(index)} cy={qualityScale(Number(day.averageAtr))} r={3.5} fill="#fff" stroke="#b87a28" strokeWidth={2}/>)}</>}
+  {(!financial||visible)&&days.map((day,index)=>{
+   const previous=days[index-1],change=financial?day.grossChangePercent:day.volumeChangePercent;
+   if(!previous||!day.previousProductionDate||change===undefined||change===''||financial&&(day.billingPending||previous.billingPending))return null;
+   const currentY=scale(Number(financial?day.grossAmount:day.loadedVolume)),previousY=scale(Number(financial?previous.grossAmount:previous.loadedVolume));
+   const center=(x(index-1)+x(index))/2,label=slot<65?`${Number(change)>0?'+':''}${decimalLabel(change,0)}%`:delta(change),labelWidth=Math.max(40,label.length*(font-1)*.62+12);
+   const labelY=Math.min(zero-12,Math.max(top+14,(currentY+previousY)/2+(slot<65?(index%2?14:-14):0)));
+   const description=`Variação do ${financial?'bruto':'volume'} de ${weeklyDate(day.previousProductionDate)} para ${weeklyDate(day.date)}: ${delta(change)}`;
+   return <g key={day.date} data-weekly-change={financial?'gross':'volume'} role="img" aria-label={description}><title>{description}</title><line x1={x(index-1)+barWidth*.6+3} y1={previousY} x2={x(index)-barWidth*.6-3} y2={currentY} stroke="#5377ac" strokeWidth={1.8} strokeDasharray="3 4"/><rect x={center-labelWidth/2} y={labelY-font/2-5} width={labelWidth} height={font+10} rx={4} fill="#fff" stroke="#dce7e0"/><text x={center} y={labelY+3} textAnchor="middle" fontSize={font-1} fontWeight={650} fill={Number(change)<0?'#b43b36':Number(change)>0?'#176344':'#546b5c'}>{label}</text></g>;
+  })}
  </svg>;
 }

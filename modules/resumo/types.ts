@@ -11,15 +11,16 @@ export type SummaryData = {month: string; totals: {
 
 export type SummaryRange = {from:string;to:string;dayCount:number;generatedAt:string};
 export type SummarySelection = {
- contractId:string;status:string;partnerId?:string;farmId?:string;plotId?:string;
+ contractId:string;status:string;partnerId?:string;farmId?:string;plotId?:string;contractMethod?:WeeklyContractMethod;
  partnerIds?:string[];contractIds?:string[];farmIds?:string[];plotIds?:string[];
 };
 export type SummaryFilters = SummarySelection & {from:string;to:string};
 export type WeeklyContractMethod=''|'1'|'2'|'unknown';
 export type WeeklyMetrics={loadCount:number;loadedVolume:string;averageAtr:string;grossAmount:string;netAmount:string;billingPending:boolean;pendingLoadCount:number};
 export type WeeklySummaryData={
- range:SummaryRange;totals:WeeklyMetrics;days:(WeeklyMetrics&{date:string})[];
+ range:SummaryRange;totals:WeeklyMetrics;days:(WeeklyMetrics&{date:string;previousProductionDate:string;volumeChangePercent:string;grossChangePercent:string})[];
  contractMethods:{code:'1'|'2'|'unknown';label:string;loadCount:number;loadedVolume:string;averageAtr:string}[];
+ contractProgress:{id:string;contractNumber:string;title:string;clientName:string;contractedVolume:string;deliveredVolume:string;weeklyVolume:string;remainingVolume:string;previousDeliveryPercent:string;weeklyDeliveryPercent:string}[];
  comparison:WeeklyMetrics&{from:string;to:string;loadChangePercent:string;volumeChangePercent:string;atrChange:string;grossChangePercent:string};
  filters:SummarySelection&{companyId:string;contractMethod:WeeklyContractMethod};filterOptions:SummaryFilterOptions;
 };
@@ -105,6 +106,8 @@ export type ExecutivePlanningSummary = {
 export type ExecutiveSummaryData = {
  contractComparison?:ExecutiveContractComparison;
  averageGrossPricePerTon?:string;
+ averageNetPricePerTon?:string;
+ billingPriceMethods?:{code:'1'|'2'|'unknown';label:string;loadedVolume:string;billingPending:boolean;averageGrossPricePerTon:string;averageNetPricePerTon:string}[];
  dailyProductivity?:{productionDayCount:number;averageLoadedVolume:string;averageNetAmount:string;billingPending:boolean;pendingLoadCount:number};
  financialTimeline?:ExecutiveFinancialDay[];
  financialGroupings?:{week:ExecutiveFinancialPeriod[];fortnight:ExecutiveFinancialPeriod[]};

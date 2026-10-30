@@ -31,6 +31,7 @@ const fixture={
  comparison:{from:'2025-10-01',to:'2025-10-31',loadedVolume:'694.46',netAmount:'143311.23',receivedAmount:'3000',volumeChangePercent:'77.77',netChangePercent:'88.88',receivedChangePercent:'-12.34'},
  dailyProductivity:{productionDayCount:7,averageLoadedVolume:'176.367',averageNetAmount:'38669.01',billingPending:false},
  averageGrossPricePerTon:'420.55',
+ averageNetPricePerTon:'219.25',billingPriceMethods:[{code:'1',label:'Manual',loadedVolume:'400',billingPending:false,averageGrossPricePerTon:'400.01',averageNetPricePerTon:'200.02'},{code:'2',label:'Mecanizada',loadedVolume:'834.567',billingPending:false,averageGrossPricePerTon:'500.03',averageNetPricePerTon:'250.04'}],
 };
 const render=({scene='dashboard-financial',visible=true,totals={},comparison={}}={})=>{
  display.visible=visible;
@@ -43,14 +44,15 @@ const card=(html,marker)=>{
 const markers=html=>[...html.matchAll(/data-dashboard-metric="([^"]+)"/g)].map(match=>match[1]);
 const cardCount=html=>[...html.matchAll(/<dt>/g)].length;
 
-test('billing renders four dedicated RPC metrics with exact labels and no operational or volume-change badge',()=>{
+test('billing renders six compact RPC metrics with gross/net prices per tonne and modality prices',()=>{
  const before=structuredClone(fixture),html=render();
- assert.match(html,/data-metric-count="4"/);assert.equal(cardCount(html),4);
- assert.deepEqual(markers(html),['gross-amount','net-amount','discount-amount','loaded-volume']);
+ assert.match(html,/data-metric-count="6"/);assert.equal(cardCount(html),6);
+ assert.deepEqual(markers(html),['gross-amount','net-amount','discount-amount','loaded-volume','average-net-price','average-gross-price']);
  for(const [marker,name,amount] of [['gross-amount','Faturamento bruto','R$ 519.190,29'],['net-amount','Faturamento líquido','R$ 270.683,04'],['discount-amount','Descontos','R$ 248.507,25'],['loaded-volume','Toneladas carregadas','1.234,57']]){
   const output=card(html,marker);assert.ok(output.includes(name));assert.ok(output.includes(`title="${amount}"`));assert.ok(output.includes(`<span>${amount}</span>`));
  }
  assert.match(card(html,'loaded-volume'),/<small>t<\/small>/);
+ for(const text of ['Preço médio líquido / t','Preço médio bruto / t','R$ 219,25','R$ 420,55','Mecanizada','Manual','R$ 200,02','R$ 250,04','R$ 400,01','R$ 500,03'])assert.ok(html.includes(text),text);assert.equal((html.match(/class="billing-price-methods"/g)??[]).length,2);
  assert.doesNotMatch(html,/ATR médio ponderado|Média carregada \/ dia|Faturamento médio \/ dia|Venda média bruta \/ t/);
  assert.doesNotMatch(html,/77,77%/);
  assert.match(html,/\+88,88%/);assert.match(html,/vs\. período anterior/);assert.match(html,/01\/10\/2025 a 31\/10\/2025/);assert.match(html,/Anterior: R\$ 143\.311,23/);

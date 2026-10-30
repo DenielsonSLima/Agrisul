@@ -40,11 +40,15 @@ try{
  const shift=(days)=>{const date=new Date(`${today}T12:00:00Z`);date.setUTCDate(date.getUTCDate()+days);return date.toISOString().slice(0,10);};
  const contract=async(client,kind,title)=>(await call('contracts','save',{title,contractNumber:title,companyId:company.id,clientId:client.id,typeId:kinds.find(k=>k.name===kind).id,status:'Ativo',startDate:shift(-30),endDate:'',contractedVolume:'1000',value:'',notes:'',atrPriceType:'gross',atrPeriodType:'monthly'})).contract;
  const manual=await contract(ca,'Manual','MANUAL-A'),mechanized=await contract(ca,'Mecanizado','MECANIZADO-A'),other=await contract(cb,'Manual','MANUAL-B');
+ await contract(cb,'Manual','MANUAL-C');
  for(const reference of new Set([today.slice(0,7),shift(-7).slice(0,7)])){const [year,month]=reference.split('-').map(Number);await call('atr','save',{year,month,monthlyGrossValue:'1',monthlyNetValue:'1',accumulatedGrossValue:'1',accumulatedNetValue:'1'});}
  const load=async(contract,date,volume,atr)=>(await call('contracts','save-load',{companyId:company.id,contractId:contract.id,loadedAt:date,farmId:farm.id,plotId:'',volume,atr,document:'Semanal fixture',notes:''})).load;
  await load(manual,today,'10','100');await load(manual,shift(-6),'30','140');await load(mechanized,shift(-1),'20','150');await load(other,shift(-2),'5','110');await load(manual,shift(-7),'10','120');
  const scope={companyId:company.id,from:shift(-6),to:today};
  const all=await call('summary','weekly',scope);assert.equal(all.totals.loadedVolume,'65');assert.equal(all.days.length,4);assert.equal(all.contractMethods.find(row=>row.code==='2').loadedVolume,'20');assert.equal(all.contractMethods.find(row=>row.code==='1').loadedVolume,'45');
+ const progress=all.contractProgress.find(row=>row.id===manual.id);assert.equal(progress.contractedVolume,'1000');assert.equal(progress.deliveredVolume,'50');assert.equal(progress.weeklyVolume,'40');assert.equal(all.days[1].previousProductionDate,shift(-6));assert.equal(all.days[1].volumeChangePercent,'-83.33');
+ assert.equal(progress.remainingVolume,'950');assert.equal(progress.previousDeliveryPercent,'1');assert.equal(progress.weeklyDeliveryPercent,'4');assert.equal(all.contractProgress.length,4);
+ const general=await call('summary','dashboard',{...scope,contractMethod:'2'});assert.equal(general.totals.loadedVolume,'20');assert.equal(general.operationalTotals.loadedVolume,'20');assert.equal(general.contractComparison.overall.loadedVolume,'20');assert.equal(general.filters.contractMethod,'2');
  assert.equal((await call('summary','weekly',{...scope,partnerIds:[ca.id],contractIds:[manual.id]})).totals.loadedVolume,'40');
  await assert.rejects(()=>rpc(b.client,'summary','weekly',scope));
  browser=await browserConnection(a.session);const {send,evaluate,wait,click,capture}=browser;
@@ -58,12 +62,20 @@ try{
  assert.equal(await evaluate("document.querySelectorAll('.dashboard-quick-filters').length"),1);
  assert.equal(await evaluate("document.querySelectorAll('.dashboard-weekly-controls button,.dashboard-weekly-controls select').length"),0);
  assert.match(await evaluate("document.querySelector('[data-dashboard-metric=weekly-volume] dd').textContent"),/65,00/);
+ await send('Emulation.setDeviceMetricsOverride',{width:1920,height:1080,deviceScaleFactor:1,mobile:false});await wait("document.querySelectorAll('.dashboard-weekly-contracts article').length===4",'Four adaptive contracts');assert.ok(await evaluate("!document.querySelector('.dashboard-weekly-contract-panel h3')&&!document.querySelector('.dashboard-weekly-contract-panel .executive-panel-header p')"));await capture('contract-bars-four');
+ await send('Emulation.setDeviceMetricsOverride',{width:1593,height:797,deviceScaleFactor:1,mobile:false});
+ assert.equal(await evaluate("document.querySelectorAll('[data-weekly-change]').length"),6);assert.ok(await evaluate("Boolean(document.querySelector('.dashboard-weekly-contract-panel .weekly-contract-track'))"));assert.equal(await evaluate("document.body.innerText.includes('INTELIGÊNCIA DA OPERAÇÃO')"),false);
+ const method=async value=>evaluate(`(()=>{const select=document.querySelector('[aria-label="Filtrar por modalidade de colheita"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(select,${JSON.stringify(value)});select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+ await method('2');await wait("document.querySelector('[data-dashboard-metric=weekly-volume] dd')?.textContent.includes('20,00')",'Weekly global modality');await click('#tab-dashboard-general');await wait("document.querySelector('[data-dashboard-metric=loaded-volume] dd')?.textContent.includes('20,00')",'General global modality');
+ await click('#tab-dashboard-weekly');await wait("document.querySelector('[data-dashboard-metric=weekly-volume]')",'Weekly return');await method('');await wait("document.querySelector('[data-dashboard-metric=weekly-volume] dd')?.textContent.includes('65,00')",'Clear modality');
  await click('[aria-label^="Filtrar por cliente:"]');await click(`[aria-label="Selecionar cliente ${ca.legalName}"]`);
  await evaluate("[...document.querySelectorAll('#dashboard-partner-filter button')].find(n=>n.textContent==='Aplicar').click()");
  await wait("document.querySelector('[data-dashboard-metric=weekly-volume] dd')?.textContent.includes('60,00')",'Existing client filter');
  await click('[aria-label^="Filtrar por contrato:"]');await click('[aria-label="Selecionar contrato MANUAL-A · MANUAL-A"]');
  await evaluate("[...document.querySelectorAll('#dashboard-contract-filter button')].find(n=>n.textContent==='Aplicar').click()");
  await wait("document.querySelector('[data-dashboard-metric=weekly-volume] dd')?.textContent.includes('40,00')",'Existing manual contract filter');
+ await click('#tab-dashboard-financial');await wait("document.querySelectorAll('.executive-billing-metrics [data-dashboard-metric]').length===6&&document.querySelector('[data-dashboard-metric=average-net-price] dd')?.textContent.includes('128,00')",'Six compact billing prices');assert.ok(await evaluate("document.querySelector('[data-dashboard-metric=average-gross-price] dd').textContent.includes('128,00')"));assert.equal(await evaluate("document.querySelectorAll('.billing-price-methods').length"),2);assert.equal(await evaluate("getComputedStyle(document.querySelector('.billing-price-methods>div>span')).color"),'rgb(255, 255, 255)');await capture('billing-average-prices');
+ await click('#tab-dashboard-weekly');await wait("document.querySelector('[data-dashboard-metric=weekly-volume]')",'Return from billing');
  await click('[aria-label="Ocultar valores financeiros"]');assert.ok(!/R\$/.test(await evaluate("document.querySelector('[data-dashboard-metric=weekly-gross]').textContent")));
  await click('.dashboard-weekly-panel .dashboard-data-trigger');await wait("document.querySelector('dialog[open] tbody tr')",'Weekly data dialog');assert.equal(await evaluate("document.querySelectorAll('dialog[open] tbody tr').length"),2);await click('dialog[open] [aria-label="Fechar dados"]');
  for(const view of [{width:1593,height:797,mobile:false},{width:1366,height:768,mobile:false},{width:390,height:844,mobile:true}]){
@@ -81,7 +93,7 @@ try{
  const independent=createClient(url,pub,{...options,global:{headers:{Authorization:`Bearer ${a.session.access_token}`}}});clients.push(independent);
  await rpc(independent,'contracts','save-load',{companyId:company.id,contractId:manual.id,loadedAt:today,farmId:farm.id,plotId:'',volume:'1',atr:'100',document:'Weekly Realtime',notes:''});
  await wait("document.querySelector('[data-dashboard-metric=weekly-volume] dd')?.textContent.includes('41,00')",'Weekly Realtime refresh');
- await evaluate('document.exitFullscreen()');assert.deepEqual(browser.errors,[]);console.log('PASS weekly live: authenticated RPC, account isolation, eight tabs, productive dates, six compact metrics with modality tonnes/ATR, existing filters, mask, productive-day table, desktop/mobile layout, restored General period, fullscreen rotation and Realtime.');
+ await evaluate('document.exitFullscreen()');assert.deepEqual(browser.errors,[]);console.log('PASS weekly live: global modality on Weekly and General, real daily percentages, three panels with contract progress, compact header, authenticated RPC, account isolation, existing filters, mask, desktop/mobile layout, fullscreen and Realtime.');
 }catch(error){if(browser)await browser.capture('failure').catch(()=>{});throw error;}
 finally{
  if(browser)await browser.close();

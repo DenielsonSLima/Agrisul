@@ -1,5 +1,5 @@
 'use client';
-import {useEffect,useState,useSyncExternalStore,type CSSProperties,type ReactNode} from 'react';
+import {Fragment,useEffect,useState,useSyncExternalStore,type CSSProperties,type ReactNode} from 'react';
 import {ArrowUpRight,ChevronLeft,ChevronRight,Layers3,Leaf,Target} from 'lucide-react';
 import {Bar,CartesianGrid,ComposedChart,LabelList,ResponsiveContainer,Tooltip,XAxis,YAxis} from 'recharts';
 import {ModuleLink} from '@/shared/navigation/ModuleNavigation';
@@ -14,14 +14,18 @@ const compact=(value:number)=>new Intl.NumberFormat('pt-BR',{notation:'compact',
 const narrowQuery='(max-width: 760px)';
 const subscribeNarrow=(change:()=>void)=>{const media=window.matchMedia(narrowQuery);media.addEventListener('change',change);return()=>media.removeEventListener('change',change);};
 const isNarrow=()=>window.matchMedia(narrowQuery).matches;
+const threePanelQuery='(max-width: 1100px)';
+const subscribeThreePanels=(change:()=>void)=>{const media=window.matchMedia(threePanelQuery);media.addEventListener('change',change);return()=>media.removeEventListener('change',change);};
+const isThreePanelsNarrow=()=>window.matchMedia(threePanelQuery).matches;
 
-export function DashboardAnalysis({first,second,labels=['Gráfico','Detalhes']}:{first:ReactNode;second:ReactNode;labels?:[string,string]}){
- const narrow=useSyncExternalStore(subscribeNarrow,isNarrow,()=>false),[view,setView]=useState(0);
- return <div className="executive-analysis-shell">{narrow&&<div className="executive-mobile-views" role="group" aria-label="Conteúdo desta aba">{labels.map((label,index)=><button type="button" key={label} aria-pressed={view===index} onClick={()=>setView(index)}>{label}</button>)}</div>}<div className={`executive-analysis ${narrow?'executive-analysis-single':''}`}>{(!narrow||view===0)&&first}{(!narrow||view===1)&&second}</div></div>;
+export function DashboardAnalysis({first,second,third,labels=['Gráfico','Detalhes']}:{first:ReactNode;second:ReactNode;third?:ReactNode;labels?:[string,string,string?]}){
+ const narrow=useSyncExternalStore(third===undefined?subscribeNarrow:subscribeThreePanels,third===undefined?isNarrow:isThreePanelsNarrow,()=>false),[view,setView]=useState(0);
+ const panels=third===undefined?[first,second]:[first,second,third],current=Math.min(view,panels.length-1);
+ return <div className="executive-analysis-shell">{narrow&&<div className="executive-mobile-views" role="group" aria-label="Conteúdo desta aba">{panels.map((_,index)=><button type="button" key={index} aria-pressed={current===index} onClick={()=>setView(index)}>{labels[index]}</button>)}</div>}<div className={`executive-analysis ${narrow?'executive-analysis-single':''} ${third!==undefined?'has-third':''}`}>{panels.map((panel,index)=>(!narrow||current===index)?<Fragment key={index}>{panel}</Fragment>:null)}</div></div>;
 }
 
 export function DashboardPanel({eyebrow,title,subtitle,children,actions,className=''}:{eyebrow:string;title:string;subtitle?:string;children:ReactNode;actions?:ReactNode;className?:string}){
- return <section className={`executive-panel ${className}`}><header className="executive-panel-header"><div><span className="executive-panel-eyebrow">{eyebrow}</span><h3>{title}</h3>{subtitle&&<p>{subtitle}</p>}</div>{actions}</header>{children}</section>;
+ return <section className={`executive-panel ${className}`}><header className="executive-panel-header"><div><span className="executive-panel-eyebrow">{eyebrow}</span>{title&&<h3>{title}</h3>}{subtitle&&<p>{subtitle}</p>}</div>{actions}</header>{children}</section>;
 }
 
 export function DashboardBars({rows,title,eyebrow='VOLUME CARREGADO',subtitle,showValues=false,showAtr=false,minRowHeight=0,presenting=false,slideDurationMs=120000}:{rows:{id:string;name:string;loadedVolume:string;averageAtr?:string}[];title:string;eyebrow?:string;subtitle?:string;showValues?:boolean;showAtr?:boolean;minRowHeight?:number;presenting?:boolean;slideDurationMs?:number}){

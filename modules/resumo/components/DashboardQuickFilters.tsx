@@ -3,7 +3,7 @@
 import {useCallback,useRef,useState,type ReactNode} from 'react';
 import {Building2,CalendarDays,Check,ChevronDown,ChevronRight,FileText,MapPin,Search,X} from 'lucide-react';
 import {defaultRange,validRange} from '../filters';
-import type {SummaryFilters,SummaryFilterOptions} from '../types';
+import type {SummaryFilters,SummaryFilterOptions,WeeklyContractMethod} from '../types';
 import {DashboardPopover} from './DashboardControls';
 import {useDashboardValues} from '../dashboardValues';
 
@@ -76,7 +76,7 @@ export function DashboardQuickFilters({filters,options,onChange,onOpen,open,onMe
  const contractLabel=selected.contractIds.length===1?(()=>{const item=contracts.find(item=>item.id===selected.contractIds[0]);return item?contractName(item):'1 contrato';})():selected.contractIds.length?`${selected.contractIds.length} contratos`:'Contrato';
  const originLabel=selected.farmIds.length+selected.plotIds.length===1?(selected.farmIds.length?farms.find(item=>item.id===selected.farmIds[0])?.name||'1 fazenda':(()=>{const farm=farms.find(item=>item.plots.some(plot=>plot.id===selected.plotIds[0]));return farm?`${farm.name} · ${farm.plots.find(plot=>plot.id===selected.plotIds[0])?.name}`:'1 talhão';})()):[selected.farmIds.length?`${selected.farmIds.length} fazendas`:'',selected.plotIds.length?`${selected.plotIds.length} talhões`:''].filter(Boolean).join(' · ')||'Fazenda / talhão';
  const datesChanged=dates.from!==filters.from||dates.to!==filters.to,datesValid=validRange(dates),defaults=defaultRange(defaultPeriod);
- const filtered=!!(selected.partnerIds.length||selected.contractIds.length||selected.farmIds.length||selected.plotIds.length||filters.status||filters.from!==defaults.from||filters.to!==defaults.to);
+ const filtered=!!(selected.partnerIds.length||selected.contractIds.length||selected.farmIds.length||selected.plotIds.length||filters.status||filters.contractMethod||filters.from!==defaults.from||filters.to!==defaults.to);
  return <div className="dashboard-quick-filters" aria-label="Filtros rápidos do Dashboard">
   <form className="dashboard-period-filter" title={weekly?'Últimos 7 dias corridos, incluindo hoje':undefined} onSubmit={event=>{event.preventDefault();if(datesValid&&datesChanged)onChange({...filters,...dates});}}>
    <CalendarDays size={13} aria-hidden="true"/>
@@ -126,6 +126,7 @@ export function DashboardQuickFilters({filters,options,onChange,onOpen,open,onMe
     </div>{footer}
    </DashboardPopover>}
   </div>
+  <label className={`dashboard-method-filter ${filters.contractMethod?'has-selection':''}`} title="Modalidade de colheita salva no contrato"><span className="sr-only">Modalidade de colheita</span><FileText size={13} aria-hidden="true"/><select aria-label="Filtrar por modalidade de colheita" value={filters.contractMethod??''} onChange={event=>{onOpen();close();onChange({...filters,contractMethod:event.target.value as WeeklyContractMethod});}}><option value="">Todas as modalidades</option><option value="1">Manual</option><option value="2">Mecanizada</option><option value="unknown">Não classificado</option></select><ChevronDown size={12} aria-hidden="true"/></label>
   {(filtered||datesChanged)&&<button type="button" className="dashboard-clear-filters" aria-label="Limpar filtros" onClick={()=>{const cleared=defaultRange(defaultPeriod);setDates(cleared);onChange(cleared);close();}} title="Limpar filtros e restaurar o período padrão"><X size={12}/><span>Limpar</span></button>}
  </div>;
 }
