@@ -28,7 +28,7 @@ try{
  catch{throw Error('Não foi possível configurar o segredo da função coletora.');}
 }finally{unlinkSync(path);rmdirSync(directory);}
 console.log('Scoped refresh token configured in Vault and Edge secrets.');
-for(const group of ['currency','cane','agriculture']){
+for(const group of ['currency','cane','agriculture','exchange']){
  const response=await fetch(`https://${ref}.supabase.co/functions/v1/dashboard-market-refresh`,{method:'POST',headers:{'Content-Type':'application/json','x-market-refresh-token':token},body:JSON.stringify({group}),signal:AbortSignal.timeout(100000)});
  const body=await response.json();console.log(JSON.stringify({group,status:response.status,...body}));
  if(!response.ok)process.exitCode=1;

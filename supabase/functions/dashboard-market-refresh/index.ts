@@ -18,10 +18,10 @@ Deno.serve(async request=>{
  if(!await authorized(request.headers.get('x-market-refresh-token')??''))return reply({error:'Coletor não autorizado.'},401);
  if(!url||!serviceKey)return reply({error:'Coletor indisponível.'},503);
  const raw=await request.text();if(raw.length>1000)return reply({error:'Dados inválidos.'},400);
- let group:'currency'|'agriculture'|'cane';
+ let group:'currency'|'agriculture'|'cane'|'exchange';
  try{
   const body=JSON.parse(raw);
-  if(!body||Array.isArray(body)||Object.keys(body).some(key=>key!=='group')||!['currency','agriculture','cane'].includes(body.group))throw Error();
+  if(!body||Array.isArray(body)||Object.keys(body).some(key=>key!=='group')||!['currency','agriculture','cane','exchange'].includes(body.group))throw Error();
   group=body.group;
  }catch{return reply({error:'Grupo de mercado inválido.'},400);}
  const client=createClient(url,serviceKey,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
@@ -35,7 +35,8 @@ Deno.serve(async request=>{
   if(!lease)return reply({group,skipped:true});
   const feed=group==='agriculture'?await getAgriculturalFeed({unzipSync,strFromU8}):await getMarketFeed(group);
   await call('finish',{group,token:lease,quotes:feed.quotes});
-  return reply({group,updated:true,available:feed.quotes.filter(quote=>quote.status==='available').length});
+  return reply({group,updated:true,available:feed.quotes.filter(quote=>quote.status==='available').length,
+   unavailable:feed.quotes.filter(quote=>quote.status==='unavailable').map(quote=>({id:quote.id,note:quote.note}))});
  }catch{
   if(lease)await call('finish',{group,token:lease,quotes:[],error:'Consulta externa interrompida; última publicação preservada.'}).catch(()=>{});
   return reply({error:'Não foi possível atualizar as referências de mercado.'},503);

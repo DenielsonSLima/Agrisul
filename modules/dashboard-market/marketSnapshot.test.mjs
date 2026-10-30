@@ -22,6 +22,11 @@ test('group validation keeps exact decimal strings and source dates without mixi
   assert.equal(parseMarketFeed(feed([quote('soy')]),'agriculture').refreshSeconds,600);
   assert.equal(parseMarketFeed(feed([quote('cane')]),'cane').refreshSeconds,600);
   assert.equal(marketFeedGroups.currency.refreshSeconds,60);
+  assert.equal(marketFeedGroups.exchange.refreshSeconds,60);
+  for(const id of ['ibovespa','sp500','gold']){
+    assert.equal(parseMarketFeed(feed([quote(id)]),'exchange').quotes[0].id,id);
+    assert.equal(parseMarketFeed(feed([quote(id)]),'currency'),null);
+  }
 });
 test('malformed decimal, calendar dates, timestamps, URLs and feed fields are rejected',()=>{
   const invalid=[{value:'NaN'},{value:'Infinity'},{value:'5,12'},{value:'-1'},{value:'0'},{value:5.12},{date:'2026-02-31'},{date:null},{status:'bogus'},{status:'stale',value:null},{status:'unavailable'},

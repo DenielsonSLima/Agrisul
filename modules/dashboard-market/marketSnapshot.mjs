@@ -2,6 +2,7 @@
 // loading it never turns a previous publication into a newly observed price.
 export const marketFeedGroups={
   currency:{ids:['usd','eur'],refreshSeconds:60},
+  exchange:{ids:['ibovespa','sp500','gold'],refreshSeconds:60},
   agriculture:{ids:['soy','corn','cattle','wheat','rice','beans','pork','chicken'],refreshSeconds:600},
   cane:{ids:['cane'],refreshSeconds:600},
 };

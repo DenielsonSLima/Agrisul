@@ -5,6 +5,35 @@ export const EPAGRI_URL='https://docweb.epagri.sc.gov.br/website_cepa/precos/His
 export const EPAGRI_SOURCE='https://cepa.epagri.sc.gov.br/index.php/mercado-agricola/';
 export const CANE_URL='https://www.sistemafaep.org.br/consecana/';
 export const AWESOME_URL='https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL';
+export const exchangeInstruments={
+  ibovespa:{symbol:'^BVSP',currency:'BRL',type:'INDEX',description:'Índice Ibovespa · B3 · pontos'},
+  sp500:{symbol:'^GSPC',currency:'USD',type:'INDEX',description:'S&P 500 · bolsa dos EUA · pontos'},
+  gold:{symbol:'GC=F',currency:'USD',type:'FUTURE',description:'Ouro futuro · COMEX · US$ por onça troy'},
+};
+const exchangeSourceUrl=id=>`https://finance.yahoo.com/quote/${encodeURIComponent(exchangeInstruments[id].symbol)}/`;
+export function parseExchangeQuote(body,id){
+  const instrument=Object.hasOwn(exchangeInstruments,id)?exchangeInstruments[id]:undefined;
+  const meta=body?.chart?.result?.[0]?.meta;
+  const value=decimal(meta?.regularMarketPrice),seconds=meta?.regularMarketTime;
+  if(!instrument||body?.chart?.error||meta?.symbol!==instrument.symbol||meta.currency!==instrument.currency||meta.instrumentType!==instrument.type||
+    !value||!Number.isInteger(seconds)||seconds<946684800||seconds>4102444800)throw new Error('Referência de bolsa ou ouro inválida');
+  const observedAt=new Date(seconds*1000).toISOString();
+  const date=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(observedAt));
+  const percent=meta.regularMarketChangePercent;
+  const change=typeof percent==='number'&&Number.isFinite(percent)&&/^-?\d+(?:\.\d+)?$/.test(String(percent))?String(percent):undefined;
+  return {id,value,date,observedAt,...(change===undefined?{}:{changePercent:change}),source:'Yahoo Finance',sourceUrl:exchangeSourceUrl(id),
+    note:`${instrument.description} · ${meta.shortName??instrument.symbol} · última negociação informada pela fonte, sujeita a atraso · consulta a cada minuto`,status:'available'};
+}
+export async function fetchExchangeQuotes(){
+  return Promise.all(Object.keys(exchangeInstruments).map(async id=>{
+    let failure;
+    for(const host of ['query1.finance.yahoo.com','query2.finance.yahoo.com'])try{
+      const url=`https://${host}/v8/finance/chart/${encodeURIComponent(exchangeInstruments[id].symbol)}?interval=1d&range=5d`;
+      return parseExchangeQuote(await(await remote(url,8000,{'User-Agent':'Mozilla/5.0'})).json(),id);
+    }catch(error){failure=error;}
+    return unavailable(id,'Yahoo Finance',exchangeSourceUrl(id),`Fonte temporariamente indisponível${failure?.message?.match(/HTTP \d{3}/)?` (${failure.message.match(/HTTP \d{3}/)[0]})`:''}`);
+  }));
+}
 const months=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
 export const agriculturalProducts=[
   ['soy','Soja industrial - sc 60 kg','Oeste'],
@@ -70,9 +99,9 @@ export function parseCane(html){
   if(!section||!value)throw new Error('Referência de cana não publicada');
   return {id:'cane',value,date:`${section[3]}-${section[2]}-${section[1]}`,source:'Consecana-PR · Sistema FAEP',sourceUrl:CANE_URL,note:'Cana básica no campo · PR · projeção de safra · data da publicação',status:'available'};
 }
-async function remote(url,timeout=25000){
-  const response=await fetch(url,{signal:AbortSignal.timeout(timeout),headers:{Accept:'application/json, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/html'}});
-  if(!response.ok)throw new Error('Fonte indisponível');
+async function remote(url,timeout=25000,headers={}){
+  const response=await fetch(url,{signal:AbortSignal.timeout(timeout),headers:{Accept:'application/json, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/html',...headers}});
+  if(!response.ok)throw new Error(`Fonte indisponível (HTTP ${response.status})`);
   return response;
 }
 export async function fetchAgriculturalQuotes(){
@@ -140,16 +169,17 @@ export function createMarketProvider(fetcher,fallback,ttl,now=Date.now){
 const currencyProvider=createMarketProvider(fetchCurrencyQuotes,()=>['usd','eur'].map(id=>unavailable(id,'AwesomeAPI / Frankfurter','https://docs.awesomeapi.com.br/api-de-moedas')),60000);
 const agriculturalProvider=createMarketProvider(fetchAgriculturalQuotes,emptyAgriculturalQuotes,600000);
 const caneProvider=createMarketProvider(()=>remote(CANE_URL).then(response=>response.text()).then(parseCane),()=>[unavailable('cane','Consecana-PR · Sistema FAEP',CANE_URL)],600000);
-const marketProviders={currency:currencyProvider,agriculture:agriculturalProvider,cane:caneProvider};
-/** @param {'currency'|'agriculture'|'cane'} [group] */
+const exchangeProvider=createMarketProvider(fetchExchangeQuotes,()=>Object.keys(exchangeInstruments).map(id=>unavailable(id,'Yahoo Finance',exchangeSourceUrl(id))),60000);
+const marketProviders={currency:currencyProvider,agriculture:agriculturalProvider,cane:caneProvider,exchange:exchangeProvider};
+/** @param {'currency'|'agriculture'|'cane'|'exchange'} [group] */
 export async function getMarketFeed(group){
   if(group!==undefined){
     if(!Object.hasOwn(marketProviders,group))throw new RangeError('Grupo de mercado inválido.');
     // Invoke only the requested provider. A currency-only request must not even
     // start downloading the multi-year agricultural workbook or the cane page.
     const quotes=await marketProviders[group]();
-    return {quotes,checkedAt:new Date().toISOString(),refreshSeconds:group==='currency'?60:600};
+    return {quotes,checkedAt:new Date().toISOString(),refreshSeconds:group==='currency'||group==='exchange'?60:600};
   }
-  const results=await Promise.all([currencyProvider(),agriculturalProvider(),caneProvider()]);
+  const results=await Promise.all([currencyProvider(),agriculturalProvider(),caneProvider(),exchangeProvider()]);
   return {quotes:results.flat(),checkedAt:new Date().toISOString(),refreshSeconds:60};
 }

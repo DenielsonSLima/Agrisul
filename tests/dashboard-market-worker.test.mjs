@@ -35,6 +35,13 @@ try{
  await import(uri(source));
 }finally{globalThis.Deno=previousDeno;}
 const request=(body={group:'currency'},token='scoped-test-token')=>new Request('https://example.test/worker',{method:'POST',headers:{'Content-Type':'application/json','x-market-refresh-token':token},body:JSON.stringify(body)});
+
+test('exchange worker accepts the new group and uses its own claim and provider',async()=>{
+ state.calls=[];state.feeds=[];state.token='exchange-lease';state.fail=false;
+ assert.equal((await handle(request({group:'exchange'}))).status,200);
+ assert.deepEqual(state.feeds,['exchange']);assert.ok(state.calls.every(call=>call.p_payload.group==='exchange'));
+ assert.deepEqual(state.calls.map(call=>call.p_action),['claim','finish']);
+});
 test('scheduled worker rejects unsigned calls and invalid groups before any provider or privileged RPC',async()=>{
  state.calls=[];state.feeds=[];
  assert.equal((await handle(request({group:'currency'},''))).status,401);

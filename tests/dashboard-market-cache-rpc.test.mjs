@@ -23,6 +23,7 @@ async function fixture(){
  await db.exec(withoutSchedulingExtensions(migration));
  await db.exec(await readFile(new URL('../supabase/migrations/20261030104655_dashboard_market_refresh_cadence.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../supabase/migrations/20261030135358_dashboard_market_variation_bases.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../supabase/migrations/20261030141139_dashboard_market_indices_gold.sql',import.meta.url),'utf8'));
  const actor=async(role='authenticated',id='11111111-1111-4111-8111-111111111111')=>{await db.exec('RESET ROLE');await db.query("select set_config('request.jwt.claims',$1,false)",[JSON.stringify({role,...(id?{sub:id}:{})})]);await db.exec(`SET ROLE ${role}`);};
  const rpc=async(payload={group:'currency'})=>(await db.query("select public.billing_rpc('dashboard-market','get',$1::jsonb) result",[JSON.stringify(payload)])).rows[0].result;
  const worker=async(action,payload)=>(await db.query('select public.refresh_dashboard_market($1,$2::jsonb) result',[action,JSON.stringify(payload)])).rows[0].result;
@@ -31,6 +32,29 @@ async function fixture(){
 }
 const quote=(value='5.12345678901234567890123456789',date='2026-10-29',observedAt='2026-10-29T15:00:00.000Z')=>({id:'usd',value,date,observedAt,changePercent:'-0.123456789',status:'available',source:'AwesomeAPI',sourceUrl:'https://docs.awesomeapi.com.br/api-de-moedas',note:'Câmbio comercial'});
 const deny=(job,code)=>assert.rejects(job,error=>error.code===code);
+
+test('indices and gold use private scheduled cache, exact decimals, history and group isolation',async()=>{
+ const {db,actor,rpc,worker}=await fixture();
+ try{
+  const job=(await db.query("SELECT schedule,active,command FROM cron.job WHERE jobname='billing-market-exchange'")).rows[0];
+  assert.equal(job.schedule,'* * * * *');assert.equal(job.active,true);assert.match(job.command,/'exchange'/);
+  await actor();const initial=await rpc({group:'exchange'});assert.equal(initial.refreshSeconds,60);assert.deepEqual(initial.quotes.map(q=>q.id),['gold','ibovespa','sp500']);
+  await deny(()=>worker('claim',{group:'exchange'}),'42501');await deny(()=>rpc({group:'exchange',ownerId:'other'}),'22023');
+  await actor('service_role',null);const {token}=await worker('claim',{group:'exchange'});
+  await deny(()=>worker('finish',{group:'exchange',token,quotes:[quote()]}),'22023');
+  const refs=['ibovespa','sp500','gold'].map(id=>({...quote('123456.1234567890123456789'),id,source:'Yahoo Finance',sourceUrl:'https://finance.yahoo.com/quote/'+id,changePercent:'-0.375'}));
+  await worker('finish',{group:'exchange',token,quotes:refs});
+  await actor();const feed=await rpc({group:'exchange'});assert.ok(feed.quotes.every(q=>q.value==='123456.1234567890123456789'&&q.changePercent==='-0.375'&&q.changeBasis==='source'));
+  assert.equal((await rpc()).quotes.length,2);assert.equal((await rpc({})).quotes.length,14);
+  for(const id of ['ibovespa','sp500','gold']){
+   const history=(await db.query("SELECT public.billing_rpc('dashboard-market','history',$1::jsonb) result",[JSON.stringify({id})])).rows[0].result;
+   assert.equal(history.days.length,1);assert.equal(history.days[0].value,'123456.1234567890123456789');
+  }
+  await actor('authenticated','22222222-2222-4222-8222-222222222222');assert.deepEqual((await rpc({group:'exchange'})).quotes,feed.quotes);
+  await deny(()=>db.query("UPDATE billing_private.market_quotes SET value=1 WHERE id='gold'"),'42501');
+  await actor('anon',null);await deny(()=>rpc({group:'exchange'}),'28000');
+ }finally{await db.close();}
+});
 const daily=(value='125',date='2026-10-29',extra={})=>({...quote(value,date),observedAt:undefined,changePercent:undefined,source:'Official daily',...extra});
 
 test('Postgres calculates exact changes against stored publications, retains bases on repeated collections and distinguishes source percentages',async()=>{
@@ -74,7 +98,7 @@ test('invalid, zero and non-earlier bases fail atomically before prices or histo
 test('private market cache is readable only through authenticated RPC, shared references never accept an owner, and clients cannot collect/write',async()=>{
  const {db,actor,rpc,worker}=await fixture();
  try{
-  const jobs=(await db.query('SELECT jobname,active FROM cron.job')).rows;assert.equal(jobs.length,4);assert.ok(jobs.every(job=>job.active));assert.ok(jobs.some(job=>job.jobname==='billing-quote-history-retention'));
+  const jobs=(await db.query('SELECT jobname,active FROM cron.job')).rows;assert.equal(jobs.length,5);assert.ok(jobs.every(job=>job.active));assert.ok(jobs.some(job=>job.jobname==='billing-quote-history-retention'));
   await actor();const first=await rpc();assert.equal(first.quotes.length,2);assert.equal(first.refreshSeconds,60);assert.ok(first.quotes.every(q=>q.value===null&&q.status==='unavailable'));
   await deny(()=>db.query('select * from billing_private.market_quotes'),'42501');
   await deny(()=>db.query("update billing_private.market_quotes set value=99 where id='usd'"),'42501');

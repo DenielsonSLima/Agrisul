@@ -25,18 +25,18 @@ const deferred=()=>{let resolve;const promise=new Promise(done=>{resolve=done;})
 test('currency renders independently while agriculture and cane are still pending, with group-scoped query keys and TTLs',async()=>{
  const previousWindow=globalThis.window;globalThis.window={localStorage:memoryStorage()};state.results=null;state.cache.clear();
  const agriculture=deferred(),cane=deferred(),requested=[];
- state.fetch=async url=>{requested.push(url);return url.endsWith('currency')?Response.json(feed('usd')):url.endsWith('agriculture')?agriculture.promise:cane.promise;};
+ state.fetch=async url=>{requested.push(url);return url.endsWith('exchange')?Response.json(feed('gold')):url.endsWith('currency')?Response.json(feed('usd')):url.endsWith('agriculture')?agriculture.promise:cane.promise;};
  try{
   const loading=useMarketFeed('owner-a');assert.equal(loading.isPending,true);assert.equal(loading.isQuotePending('usd'),true);
   const options=state.options;
-  assert.deepEqual(options.map(option=>option.queryKey),['currency','agriculture','cane'].map(group=>['billing','owner-a','dashboard-market',{group}]));
-  assert.deepEqual(options.map(option=>option.staleTime),[60000,600000,600000]);assert.deepEqual(options.map(option=>option.refetchInterval),[60000,600000,600000]);
+  assert.deepEqual(options.map(option=>option.queryKey),['currency','agriculture','cane','exchange'].map(group=>['billing','owner-a','dashboard-market',{group}]));
+  assert.deepEqual(options.map(option=>option.staleTime),[60000,600000,600000,60000]);assert.deepEqual(options.map(option=>option.refetchInterval),[60000,600000,600000,60000]);
   assert.equal(options.every(option=>option.refetchOnReconnect&&option.refetchOnWindowFocus),true);
   const jobs=options.map(option=>option.queryFn({signal:new AbortController().signal}));
-  const currency=await jobs[0];assert.equal(currency.quotes[0].value,'5.1234');assert.equal(requested.length,3);
-  state.results=[result(currency),result(undefined,true),result(undefined,true)];const partial=useMarketFeed('owner-a');
+  const currency=await jobs[0];assert.equal(currency.quotes[0].value,'5.1234');assert.equal(requested.length,4);
+  state.results=[result(currency),result(undefined,true),result(undefined,true),result(await jobs[3])];const partial=useMarketFeed('owner-a');
   assert.equal(partial.isPending,false);assert.equal(partial.isFetching,true);assert.equal(partial.isError,false);assert.equal(partial.data.quotes[0].id,'usd');
-  assert.equal(partial.isQuotePending('usd'),false);assert.equal(partial.isQuotePending('soy'),true);assert.equal(partial.isQuotePending('cane'),true);
+  assert.equal(partial.isQuotePending('usd'),false);assert.equal(partial.isQuotePending('soy'),true);assert.equal(partial.isQuotePending('cane'),true);assert.equal(partial.isQuotePending('gold'),false);assert.equal(partial.data.quotes.find(q=>q.id==='gold').value,'5.1234');
   agriculture.resolve(Response.json(feed('soy')));cane.resolve(Response.json(feed('cane')));await Promise.all(jobs);
  }finally{globalThis.window=previousWindow;state.results=null;}
 });
@@ -45,7 +45,7 @@ test('saved publications seed as stale immediately, refetch from zero updatedAt,
  try{
   saveMarketSnapshot(storage,'owner-a','currency',feed('usd'));useMarketFeed('owner-a');const options=state.options;
   assert.equal(options[0].initialDataUpdatedAt,0);const cached=options[0].initialData();assert.equal(cached.quotes[0].status,'stale');assert.equal(cached.quotes[0].observedAt,checkedAt);assert.equal(cached.checkedAt,checkedAt);
-  assert.equal(options[1].initialData(),undefined);state.results=[result(cached),result(undefined,true),result(undefined,true)];
+  assert.equal(options[1].initialData(),undefined);state.results=[result(cached),result(undefined,true),result(undefined,true),result(undefined,true)];
   const model=useMarketFeed('owner-a');assert.equal(model.data.quotes[0].value,'5.1234');assert.equal(model.isPending,false);assert.equal(model.isQuotePending('usd'),false);
   state.results=null;useMarketFeed('owner-b');assert.equal(state.options[0].initialData(),undefined);assert.equal(state.options[0].queryKey[1],'owner-b');
  }finally{globalThis.window=previousWindow;state.results=null;}
@@ -53,7 +53,7 @@ test('saved publications seed as stale immediately, refetch from zero updatedAt,
 test('a group network failure keeps its cached publication stale without hiding successful groups',()=>{
  const previousWindow=globalThis.window;globalThis.window={localStorage:memoryStorage()};state.cache.clear();
  try{
-  state.results=[result(feed('usd'),false,true),result(feed('soy')),result(undefined,false,true)];const model=useMarketFeed('owner');
+  state.results=[result(feed('usd'),false,true),result(feed('soy')),result(undefined,false,true),result(feed('gold'))];const model=useMarketFeed('owner');
   assert.equal(model.isPending,false);assert.equal(model.isError,true);assert.equal(model.data.quotes.find(quote=>quote.id==='usd').status,'stale');assert.equal(model.data.quotes.find(quote=>quote.id==='soy').status,'available');assert.equal(model.isQuotePending('cane'),false);
   assert.equal(state.results[0].data.quotes[0].status,'available','Presentation never mutates TanStack cached publications');
  }finally{globalThis.window=previousWindow;state.results=null;}

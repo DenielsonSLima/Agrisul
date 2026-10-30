@@ -5,7 +5,7 @@ import {billingKeys} from '@/shared/query/keys';
 import type {MarketFeed,MarketId} from './catalog';
 import {marketFeedGroups,mergeMarketFeed,parseMarketFeed,readMarketSnapshot,saveMarketSnapshot,staleMarketFeed} from './marketSnapshot.mjs';
 
-const groups=['currency','agriculture','cane'] as const;
+const groups=['currency','agriculture','cane','exchange'] as const;
 function snapshotStorage(){try{return typeof window==='undefined'?undefined:window.localStorage;}catch{return undefined;}}
 export function useMarketFeed(userId:string){
   const client=useQueryClient();

@@ -1,5 +1,36 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {exchangeInstruments,parseExchangeQuote} from './providers.mjs';
+
+const exchangeBody=(id,extra={})=>({chart:{error:null,result:[{meta:{symbol:exchangeInstruments[id].symbol,currency:exchangeInstruments[id].currency,instrumentType:exchangeInstruments[id].type,regularMarketPrice:1234.56,regularMarketTime:1793218964,regularMarketChangePercent:-0.375,...extra}}]}});
+test('exchange references validate exact instruments and preserve source timestamps and percentages',()=>{
+ for(const id of ['ibovespa','sp500','gold']){
+  const quote=parseExchangeQuote(exchangeBody(id),id);
+  assert.equal(quote.value,'1234.56');assert.equal(quote.changePercent,'-0.375');assert.equal(quote.observedAt,new Date(1793218964*1000).toISOString());
+  assert.equal(quote.date,'2026-10-28');assert.equal(quote.source,'Yahoo Finance');assert.match(quote.note,/sujeita a atraso/);
+  assert.equal(parseExchangeQuote(exchangeBody(id,{regularMarketChangePercent:undefined}),id).changePercent,undefined);
+  assert.equal(parseExchangeQuote(exchangeBody(id,{regularMarketChangePercent:0}),id).changePercent,'0');
+  for(const extra of [{symbol:'OTHER'},{currency:'EUR'},{instrumentType:'ETF'},{regularMarketPrice:0},{regularMarketPrice:NaN},{regularMarketTime:null}])assert.throws(()=>parseExchangeQuote(exchangeBody(id,extra),id));
+ }
+ assert.match(parseExchangeQuote(exchangeBody('gold'),'gold').note,/Ouro futuro · COMEX · US\$ por onça troy/);
+ assert.throws(()=>parseExchangeQuote(exchangeBody('ibovespa'),'sp500'));
+ assert.throws(()=>parseExchangeQuote({chart:{error:{code:'Not Found'}}},'gold'));
+});
+test('exchange collection isolates its requests and keeps successful indices when gold fails',async()=>{
+ const original=globalThis.fetch,requested=[];
+ globalThis.fetch=async url=>{
+  requested.push(String(url));const symbol=decodeURIComponent(new URL(url).pathname.split('/').at(-1));
+  const id=Object.keys(exchangeInstruments).find(id=>exchangeInstruments[id].symbol===symbol);
+  return id==='gold'?new Response('Unavailable',{status:503}):Response.json(exchangeBody(id));
+ };
+ try{
+  const {getMarketFeed}=await import('./providers.mjs?exchange-isolation');
+  const feed=await getMarketFeed('exchange');assert.equal(feed.refreshSeconds,60);assert.equal(requested.length,4);
+  assert.deepEqual(feed.quotes.map(q=>q.id),['ibovespa','sp500','gold']);assert.ok(feed.quotes.slice(0,2).every(q=>q.status==='available'));
+  assert.equal(feed.quotes[2].value,null);assert.equal(feed.quotes[2].status,'unavailable');
+  assert.ok(requested.every(url=>/^https:\/\/query[12]\.finance\.yahoo\.com\//.test(url)));
+ }finally{globalThis.fetch=original;}
+});
 import {consumeAgriculturalRow,emptyAgriculturalQuotes,parseCurrency,parseCane,getMarketFeed,mergeMarketQuotes,unavailable,parseAwesomeCurrency,fetchCurrencyQuotes,createMarketProvider} from './providers.mjs';
 
 const caneHtml='<h2 class="text-center">Safra 2026/2027 - 24/09/2026</h2><h5>Projeção do preço da cana básica</h5><table><tr><th>Campo</th><th>Esteira</th></tr><tr><td>PREÇO BÁSICO</td><td><b>98,03</b></td><td>109,49</td></tr></table>';
@@ -66,7 +97,7 @@ test('one unavailable provider does not discard the other real publications',asy
     assert.equal(feed.quotes.find(quote=>quote.id==='cane').value,'98.03');
     assert.equal(feed.quotes.find(quote=>quote.id==='eur').status,'unavailable');
     assert.equal(feed.quotes.find(quote=>quote.id==='soy').value,null);
-    assert.equal(feed.quotes.length,11);
+    assert.equal(feed.quotes.length,14);
   }finally{globalThis.fetch=original;}
 });
 test('provider success then failure keeps original values and dates, and recovery clears stale status',()=>{
@@ -212,7 +243,7 @@ test('HTTP route authenticates before group validation and forwards only whiteli
   const anonymous=await GET(new Request('https://example.test/api/dashboard-market?group=unknown'));
   assert.equal(anonymous.status,401,'unauthenticated requests never reach group validation');
   for(const group of ['unknown','','constructor','__proto__'])assert.equal((await GET(request(group))).status,400);
-  for(const group of ['currency','agriculture','cane',undefined]){
+  for(const group of ['currency','agriculture','cane','exchange',undefined]){
     const response=await GET(request(group));assert.equal(response.status,200);
     assert.equal((await response.json()).group,group??'all');assert.equal(response.headers.get('cache-control'),'private, no-store');
   }

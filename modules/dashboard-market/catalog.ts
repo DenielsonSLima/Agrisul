@@ -1,6 +1,9 @@
 export const marketCatalog = [
   {id:'usd',name:'Dólar',symbol:'USD/BRL',unit:'R$/US$',description:'Dólar em reais · fonte e horário nos detalhes'},
   {id:'eur',name:'Euro',symbol:'EUR/BRL',unit:'R$/€',description:'Euro em reais · fonte e horário nos detalhes'},
+  {id:'ibovespa',name:'Ibovespa',symbol:'IBOV',unit:'pts',description:'Índice Ibovespa · B3 · pontos'},
+  {id:'sp500',name:'Bolsa americana',symbol:'S&P 500',unit:'pts',description:'S&P 500 · bolsa dos EUA · pontos'},
+  {id:'gold',name:'Ouro',symbol:'GC=F',unit:'US$/oz t',description:'Ouro futuro · COMEX · dólar por onça troy'},
   {id:'soy',name:'Soja',symbol:'SOJA',unit:'R$/sc 60 kg',description:'Soja industrial · Oeste/SC'},
   {id:'cane',name:'Cana-de-açúcar',symbol:'CANA',unit:'R$/t',description:'Cana básica no campo · Consecana-PR'},
   {id:'corn',name:'Milho',symbol:'MILHO',unit:'R$/sc 60 kg',description:'Milho-amarelo · Oeste/SC'},
@@ -12,7 +15,7 @@ export const marketCatalog = [
   {id:'chicken',name:'Frango vivo',symbol:'FRANGO',unit:'R$/kg',description:'Frango de corte · Oeste/SC'},
 ] as const;
 export type MarketId=typeof marketCatalog[number]['id'];
-export const defaultMarketIds:MarketId[]=marketCatalog.slice(0,9).map(item=>item.id);
+export const defaultMarketIds:MarketId[]=marketCatalog.filter(item=>item.id!=='pork'&&item.id!=='chicken').map(item=>item.id);
 export type MarketQuote={id:MarketId;value:string|null;date:string|null;observedAt?:string;changePercent?:string;changeBasis?:'source'|'previous-publication';previousValue?:string;previousDate?:string;previousSourceUrl?:string;source:string;sourceUrl:string;note:string;status:'available'|'stale'|'unavailable'};
 export type MarketHistory={id:MarketId;days:{day:string;value:string;date:string;capturedAt:string;source:string}[]};
 export type MarketFeed={quotes:MarketQuote[];checkedAt:string;refreshSeconds:number};
