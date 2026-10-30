@@ -36,7 +36,7 @@ export async function createCaneWeighingDb(){
  await installSchedulingFixture(db);
  const directory=new URL('../../migrations/',import.meta.url);
  for(const name of (await readdir(directory)).filter(name=>name.endsWith('.sql')).sort()){
-  try{await db.exec(withoutSchedulingExtensions(await readFile(new URL(name,directory),'utf8')));}
+  try{await db.exec(withoutSchedulingExtensions((await readFile(new URL(name,directory),'utf8')).replaceAll('\r\n','\n')));}
   catch(error){await db.close();throw new Error(`Migration ${name}: ${error.message}`,{cause:error});}
  }
  const ids=caneFixtureIds;

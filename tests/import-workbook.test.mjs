@@ -19,6 +19,19 @@ const ioSource = source('documentIO').replaceAll("'./defaults'",JSON.stringify(d
   .replace("import('exceljs/dist/exceljs.min.js')",`import(${JSON.stringify(pathToFileURL(require.resolve('exceljs/dist/exceljs.min.js')).href)})`);
 const {createImportWorkbook,inspectWorkbookTemplate} = await import(dataUrl(ioSource));
 
+test('analysis column Z exports truly blank cells and clears analysis numbers from the template',async()=>{
+ const template=new ExcelJS.Workbook();const sheet=template.addWorksheet('Plan1');
+ sheet.getCell('Z1').value='NUMERO_ANALISE';sheet.getCell('AA1').value='PESOBRUTO';
+ sheet.getCell('Z2').value=8836;sheet.getCell('Z3').value=8837;
+ const templateBase64=Buffer.from(await template.xlsx.writeBuffer()).toString('base64');
+ const bytes=await createImportWorkbook({document:{profileSnapshot:{templateBase64}},sheetName:'Plan1',startRow:2,
+  columns:[{key:'NUMERO_ANALISE',column:'Z',type:'text'},{key:'PESOBRUTO',column:'AA',type:'decimal'}],
+  rows:[{entryId:'one',values:{Z:'',AA:'37.52'}},{entryId:'two',values:{Z:'',AA:'21.01'}}]});
+ const workbook=new ExcelJS.Workbook();await workbook.xlsx.load(bytes.buffer);const actual=workbook.getWorksheet('Plan1');
+ for(const row of [2,3]){assert.equal(actual.getCell(`Z${row}`).value,null);assert.equal(actual.getCell(`Z${row}`).type,ExcelJS.ValueType.Null);}
+ assert.equal(actual.getCell('AA2').value,37.52);assert.equal(actual.getCell('AA3').value,21.01);
+});
+
 test('exports native dates/numbers, preserves zeros and formula-looking text, clears old template records',async()=>{
   const template = new ExcelJS.Workbook();
   const sheet = template.addWorksheet('Plan1');

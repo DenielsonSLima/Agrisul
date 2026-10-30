@@ -35,6 +35,7 @@ export function documentDecimal(value:string):string {
 }
 
 function extractValue(field:ImportField, source:Record<string,string>, sourceLine:string):string {
+  if (field.key === 'NUMERO_ANALISE') return '';
   if (field.source !== 'pdf') return field.defaultValue || '';
   if (field.sourceKey === 'entradaSequencialConjunto') return '';
   let result = source[field.sourceKey || field.key] || '';

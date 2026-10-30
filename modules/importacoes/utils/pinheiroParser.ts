@@ -80,6 +80,7 @@ function analysisValues(tail:string):Record<string,string> {
   return result;
 }
 function fieldValue(field:ImportField,source:Record<string,string>,line:string):string {
+  if(field.key==='NUMERO_ANALISE')return '';
   if(field.source!=='pdf')return field.defaultValue||'';
   const key=field.sourceKey||field.key;
   if(serverSources.has(key))return '';

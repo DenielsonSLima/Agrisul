@@ -8,6 +8,7 @@ type Draft={value:string;initial:string;revision:string;error:string};
 type Props={entryId:string;field:ImportField;value:string;revision:string;rowNumber:number;blocked:boolean;onSave:(value:string,revision:string)=>Promise<boolean>;onNavigate:(move:ImportCellMove)=>void};
 
 export function ImportEditableCell({entryId,field,value,revision,rowNumber,blocked,onSave,onNavigate}:Props){
+ blocked=blocked||field.key==='NUMERO_ANALISE';
  const [draft,setDraft]=useState<Draft|null>(null);const [saving,setSaving]=useState(false);
  const input=useRef<HTMLInputElement>(null);const button=useRef<HTMLButtonElement>(null);const locked=useRef(false);const suppressBlur=useRef(false);const selectOnFocus=useRef(true);const mounted=useRef(true);
  const editing=draft!==null;
@@ -41,7 +42,7 @@ export function ImportEditableCell({entryId,field,value,revision,rowNumber,block
    aria-label={`Editar ${label}`} aria-invalid={!!draft.error} aria-describedby={draft.error?`cell-error-${entryId}-${field.key}`:undefined} title={draft.error||'Enter salva e desce · Tab avança · Esc cancela'}
    value={draft.value} readOnly={blocked||saving} maxLength={1000} onChange={event=>setDraft(current=>current?{...current,value:event.target.value,error:''}:current)} onKeyDown={keyDown} onBlur={()=>{if(!suppressBlur.current)void commit();}}/>
   {saving&&<span className="imports-inline-cell-status" role="status">Salvando…</span>}{draft.error&&<span id={`cell-error-${entryId}-${field.key}`} className="imports-inline-cell-error" role="alert">{draft.error}</span>}
- </div>:<button ref={button} type="button" data-import-cell data-entry-id={entryId} data-field-key={field.key} className="imports-cell-select" aria-label={`${label}: ${value||'vazio'}`} title="Clique para digitar · Enter salva e desce" disabled={blocked} onClick={()=>start()} onKeyDown={event=>{
+ </div>:<button ref={button} type="button" data-import-cell data-entry-id={entryId} data-field-key={field.key} className="imports-cell-select" aria-label={`${label}: ${value||'vazio'}`} title={field.key==='NUMERO_ANALISE'?'Esta coluna permanece em branco.':'Clique para digitar · Enter salva e desce'} disabled={blocked} onClick={()=>start()} onKeyDown={event=>{
   if(event.key==='F2'){event.preventDefault();start();}
   else if(event.key.length===1&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&event.key!==' '){event.preventDefault();start(event.key);}
  }}>{value?importValue(field,value):<span className={field.required?'imports-required':''}>—</span>}</button>;

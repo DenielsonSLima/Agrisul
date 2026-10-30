@@ -30,6 +30,8 @@ test('extracts individual compartments, carries farm context across pages, prese
   assert.equal(entries[0].date,'2026-10-22');
   assert.equal(entries[0].values.PESOBRUTO,'61.310');
   assert.equal(entries[0].values.TARA,'23.520');
+  assert.equal(entries[0].source.numeroAnalise,'7229');
+  assert.ok(entries.every(entry=>entry.values.NUMERO_ANALISE===''));
   assert.equal(entries[0].values.HORACHEGADA,'06:18');
   // Transaction entry IDs are not generated from template preparation rows.
   assert.equal(entries[0].values.COD_ENTRADA,'');
@@ -61,6 +63,15 @@ test('configuration selects original fields, explicit mappings, regex captures a
   const unknown = parseTaquariPages([{number:1,lines:[line1.replace('1582-1-54','9999-1-54')]}],profile);
   assert.equal(unknown.entries[0].values.COD_FAZENDA,'');
   assert.equal(unknown.entries[0].source.fazendaOrigem,'9999');
+});
+
+test('analysis column stays blank even with a stale PDF mapping, pattern or default',()=>{
+ const profile=createTaquariProfile();const field=profile.fields.find(field=>field.key==='NUMERO_ANALISE');
+ assert.equal(field.column,'Z');assert.equal(field.source,'manual');assert.equal(field.sourceKey,'');assert.equal(field.defaultValue,'');assert.equal(field.required,false);
+ Object.assign(field,{source:'pdf',sourceKey:'numeroAnalise',pattern:'(7229)',defaultValue:'9999'});
+ const {entries}=parseTaquariPages([{number:1,lines:[line1,line2]}],profile);
+ assert.deepEqual(entries.map(entry=>entry.source.numeroAnalise),['7229','7230']);
+ assert.ok(entries.every(entry=>entry.values.NUMERO_ANALISE===''));
 });
 
 test('refuses incomplete or repeated extraction instead of silently dropping rows', () => {

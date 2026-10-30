@@ -1,5 +1,7 @@
 # Importações de colheita
 
+A coluna Z (`NUMERO_ANALISE`) permanece vazia na tabela e no Excel, inclusive nos documentos anteriores. A RPC ignora valores recebidos para esse campo em importações e edições; perfis não podem voltar a vinculá-lo ao PDF nem definir valor padrão ou obrigatoriedade. O número original continua apenas em `source.numeroAnalise` para conferência e identificação da origem.
+
 ## Pinheiro / USJP
 
 O modelo `pinheiro-usjp-v1` é independente do Taquari e usa o Excel `import01usjp.xlsx`: 46 colunas, com 18 colunas numéricas, quatro textuais preenchidas, três de data e 21 vazias sem evidência de tipo. As vazias começam como texto manual. `COD_TIPOCOLHEITA` e `COD_TIPOCARGA` são texto, conforme as células `@`; frente 26, terceiro 1 e fundo 311272 → fazenda 5032 pertencem somente ao perfil Pinheiro.

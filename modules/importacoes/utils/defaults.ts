@@ -34,7 +34,7 @@ const fixedExamples: Record<string, string> = {
 const sourceKeys: Record<string, string> = {
   COD_FAZENDA:'fazendaOrigem', ZONA:'zona', COD_TALHAO:'talhao', DATACHEGADA:'dataChegada', HORACHEGADA:'horaChegada',
   DATASAIDA:'dataSaida', HORASAIDA:'horaSaida', DATAMOVIMENTO:'dataMovimento',
-  NUMERO_ANALISE:'numeroAnalise', PESOBRUTO:'pesoBruto', TARA:'tara', AREA:'fazendaZonaTalhao',
+  PESOBRUTO:'pesoBruto', TARA:'tara', AREA:'fazendaZonaTalhao',
   COD_TIPOCOLHEITA:'fazendaOrigem', COD_TIPOCARGA:'quantidadeVeiculosConjunto',
   COD_EQUIPAMENTO_TRANSPORTE:'equipamentoPrincipal', COD_EQUIPAMENTO_COMPARTIMENTO:'equipamentoPrincipal',
   NR_ORDEM_COLHEITA:'ordemCorte',COD_ENTRADA:'entradaSequencialConjunto',

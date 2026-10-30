@@ -70,7 +70,7 @@ test('refuses malformed candidates, duplicate BAs, invalid dates/hours and confl
 
 test('explicit configuration can expose source analytics while derived source patterns remain server-owned',()=>{
  const configured=createPinheiroProfile();Object.assign(configured.fields.find(field=>field.key==='PBU'),{source:'pdf',sourceKey:'pbu',type:'decimal'});Object.assign(configured.fields.find(field=>field.key==='NUMERO_ANALISE'),{source:'pdf',sourceKey:'numeroAnalise',type:'text'});Object.assign(configured.fields.find(field=>field.key==='TARA'),{pattern:'(31,650)',defaultValue:'123'});
- const result=parsePinheiroPages(pages([row()]),configured).entries[0];assert.equal(result.values.PBU,'150.22');assert.equal(result.values.NUMERO_ANALISE,'944382');assert.equal(result.values.TARA,'');
+ const result=parsePinheiroPages(pages([row()]),configured).entries[0];assert.equal(result.values.PBU,'150.22');assert.equal(result.values.NUMERO_ANALISE,'');assert.equal(result.source.numeroAnalise,'944382');assert.equal(result.values.TARA,'');
 });
 
 test('sequential entries remain server-owned for every source row regardless of configured start, regex or fallback',()=>{
