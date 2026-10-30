@@ -14,3 +14,7 @@ additional_redirect_urls = ["https://agrisul.vercel.app/auth/confirm", "http://l
 [functions.dashboard-market-refresh]
 # Server-only job: the handler validates its scoped secret from Vault.
 verify_jwt = false
+
+[functions.dashboard-weather]
+# Validates the user's access token through Auth before consulting any cache/source.
+verify_jwt = false

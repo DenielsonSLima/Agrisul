@@ -11,3 +11,20 @@
 @media(prefers-reduced-motion:reduce){.weather-condition-icon *{animation:none!important}}
 .weather-icon-sun{transform-origin:center}.weather-condition-icon.is-unknown{opacity:.4}
 .dashboard-weather-cities h5>small,.dashboard-weather-cities p,.dashboard-weather-cities article span>small,.dashboard-weather-cities article span>b,.dashboard-weather>footer,.dashboard-weather-empty,.dashboard-weather-empty p,.weather-settings>p,.weather-selected-cities small,.weather-search-results button>span>small,.weather-search-results>button>small,.weather-search-results>p{color:#111}
+.weather-icon-moon{width:29px;height:29px;left:3px;top:2px;stroke:#747fa3;fill:#e7eaf7}
+.weather-condition-icon.is-partly .weather-icon-moon{width:23px;height:23px;top:-2px;left:12px}
+.weather-icon-unknown,.weather-icon-snow{width:30px;height:30px;left:2px;top:2px;stroke:#647c8b}
+.weather-condition-icon.is-unknown{opacity:1}
+.weather-condition-icon.is-possible .weather-icon-rain>i,.weather-condition-icon.is-possible .weather-icon-lightning{animation:none;opacity:.6}
+.dashboard-weather-cities article .weather-icon-possibility{position:absolute;right:-1px;top:-3px;display:grid;place-items:center;width:14px;height:14px;margin:0;border:1px solid #8c6931;border-radius:50%;background:#fff7e7;color:#79531d;font:600 11px/1 Arial;z-index:2}
+.weather-city-details{display:block;max-width:100%;border:0;padding:0;background:transparent;color:inherit;font:inherit;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.weather-city-details>small{font-size:8px;color:#52665a;font-weight:450;margin-left:4px}
+.weather-city-details:focus-visible{outline:2px solid #176447;outline-offset:3px}
+.weather-forecast-period{display:block;margin-top:3px;font-size:8px;line-height:1.3;color:#52665a}
+.dashboard-weather-cities .is-stale .weather-forecast-period{color:#86591f}
+.weather-detail{font-size:12px;line-height:1.5;color:#304a39}
+.weather-detail>strong{display:block;margin:12px 0;font-size:14px}
+.weather-detail dl{margin:0}.weather-detail dl>div{padding:8px 0;border-top:1px solid #e0e9e2}
+.weather-detail dt{font-size:10px;color:#52665a}.weather-detail dd{margin:3px 0 0}
+.weather-detail>p{margin:8px 0 0;color:#52665a;font-size:11px}
+@media(max-width:760px){.dashboard-weather{height:105px}.weather-forecast-period{font-size:7px;margin-top:2px}.weather-city-details>small{font-size:6px}}

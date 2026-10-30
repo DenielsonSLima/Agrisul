@@ -7,7 +7,8 @@ import {useAuth} from '@/shared/supabase/AuthProvider';
 import {authenticatedFetch} from '@/shared/supabase/rpc';
 import {billingKeys} from '@/shared/query/keys';
 import {notifications} from '@/shared/feedback';
-import {DEFAULT_WEATHER_CITIES,weatherCitiesFromResponse,type WeatherCity} from './weatherCatalog';
+import {DEFAULT_WEATHER_CITIES,weatherCitiesFromResponse,weatherPeriodLabel,type CityForecast,type WeatherCity} from './weatherCatalog';
+import {weatherClock} from './weatherTime.mjs';
 import {useDashboardWeather} from './useDashboardWeather';
 import {WeatherIcon} from './WeatherIcon';
 const narrowQuery='(max-width: 760px)';
@@ -16,25 +17,31 @@ const narrowServerSnapshot=()=>false;
 function subscribeNarrow(changed:()=>void){const media=window.matchMedia(narrowQuery);media.addEventListener('change',changed);return()=>media.removeEventListener('change',changed);}
 
 export function DashboardWeather({presenting,slideDurationMs}:{presenting:boolean;slideDurationMs:number}){
- const model=useDashboardWeather(),[open,setOpen]=useState(false),[page,setPage]=useState(0),[capacity,setCapacity]=useState(5),trigger=useRef<HTMLButtonElement>(null),citiesRef=useRef<HTMLDivElement>(null);
+ const model=useDashboardWeather(),[open,setOpen]=useState(false),[detail,setDetail]=useState<WeatherCity|null>(null),[page,setPage]=useState(0),[capacity,setCapacity]=useState(5),trigger=useRef<HTMLButtonElement>(null),detailTrigger=useRef<HTMLButtonElement|null>(null),citiesRef=useRef<HTMLDivElement>(null);
  const narrow=useSyncExternalStore(subscribeNarrow,narrowSnapshot,narrowServerSnapshot),pageSize=narrow?2:capacity;
  const pages=Math.max(1,Math.ceil(model.cities.length/pageSize)),current=Math.min(page,pages-1);
  const close=useCallback(()=>setOpen(false),[]);
+ const closeDetail=useCallback(()=>setDetail(null),[]);
  useEffect(()=>{
   const node=citiesRef.current;if(!node)return;
-  const observer=new ResizeObserver(entries=>{const box=entries[0]?.contentRect;if(box)setCapacity(Math.max(1,Math.min(20,Math.floor(box.height/(box.width>=175?62:50)))));});
+  const observer=new ResizeObserver(entries=>{const box=entries[0]?.contentRect;if(box)setCapacity(Math.max(1,Math.min(20,Math.floor(box.height/(box.width>=175?78:66)))));});
   observer.observe(node);return()=>observer.disconnect();
  },[]);
- useEffect(()=>{if(!presenting||open||pages<2)return;const timer=window.setTimeout(()=>setPage((current+1)%pages),slideDurationMs/pages);return()=>window.clearTimeout(timer);},[presenting,open,current,pages,slideDurationMs]);
+ useEffect(()=>{if(!presenting||open||detail||pages<2)return;const timer=window.setTimeout(()=>setPage((current+1)%pages),slideDurationMs/pages);return()=>window.clearTimeout(timer);},[presenting,open,detail,current,pages,slideDurationMs]);
  return <aside className="dashboard-weather" data-dashboard-card aria-label="Previsão do tempo nas cidades selecionadas">
-  <header><div><CloudSun size={16}/><h4>Clima</h4></div><button ref={trigger} type="button" aria-label="Configurar cidades do clima" aria-expanded={open} onClick={()=>setOpen(value=>!value)}><Settings2 size={14}/></button></header>
+  <header><div><CloudSun size={16}/><h4>Previsão</h4></div><button ref={trigger} type="button" aria-label="Configurar cidades do clima" aria-expanded={open} onClick={()=>{closeDetail();setOpen(value=>!value);}}><Settings2 size={14}/></button></header>
   <div ref={citiesRef} className="dashboard-weather-cities" data-city-capacity={pageSize}>{model.cities.slice(current*pageSize,current*pageSize+pageSize).map(city=>{
    const forecast=model.data?.cities.find(item=>item.city.id===city.id),condition=forecast?.condition??'';
-   return <article key={city.id} className={forecast?.status==='cached'?'is-stale':''} title={condition||'Consultando previsão'}><div><h5>{forecast?.city.name??city.name}<small>{forecast?.city.state??city.state}</small></h5><p>{model.isPending?'Consultando…':condition||'Previsão indisponível'}</p><span><small>Mín.</small><b>{forecast?.minimum!==null&&forecast?.minimum!==undefined?`${forecast.minimum}°`:'—'}</b><small>Máx.</small><strong>{forecast?.maximum!==null&&forecast?.maximum!==undefined?`${forecast.maximum}°`:'—'}</strong></span></div><WeatherIcon condition={condition}/>{forecast?.status==='cached'&&<em>Referência: {forecast.date?.split('-').reverse().slice(0,2).join('/')}</em>}</article>;
+   const stale=forecast?.status==='cached'||model.isError;
+   return <article key={city.id} className={stale?'is-stale':''} title={condition||'Consultando previsão'}><div><h5><button type="button" className="weather-city-details" aria-label={`Ver previsão completa de ${city.name}`} aria-haspopup="dialog" aria-expanded={detail?.id===city.id} onClick={event=>{detailTrigger.current=event.currentTarget;close();setDetail(city);}}>{forecast?.city.name??city.name}<small>{forecast?.city.state??city.state}</small></button></h5><small className="weather-forecast-period">{forecast?.date?`${stale?'Referência: ':''}${forecast.date===weatherClock().date?'Hoje':forecast.date.split('-').reverse().slice(0,2).join('/')} · ${weatherPeriodLabel(forecast.period)}`:'Previsão por turno'}</small><p>{model.isPending?'Consultando…':condition||'Previsão indisponível'}</p><span><small>Mín.</small><b>{forecast?.minimum!==null&&forecast?.minimum!==undefined?`${forecast.minimum}°`:'—'}</b><small>Máx.</small><strong>{forecast?.maximum!==null&&forecast?.maximum!==undefined?`${forecast.maximum}°`:'—'}</strong></span></div><WeatherIcon condition={condition} daylight={forecast?.daylight??false}/></article>;
   })}{!model.cities.length&&<div className="dashboard-weather-empty"><CloudSun size={26}/><p>Adicione uma cidade nas configurações.</p></div>}</div>
-  <footer><a href="https://portal.inmet.gov.br/" target="_blank" rel="noopener noreferrer">INMET · mín. / máx.</a>{pages>1&&<nav aria-label="Páginas de cidades"><span>{current+1}/{pages}</span><button type="button" aria-label="Cidades anteriores" onClick={()=>setPage((current+pages-1)%pages)}><ChevronLeft size={12}/></button><button type="button" aria-label="Próximas cidades" onClick={()=>setPage((current+1)%pages)}><ChevronRight size={12}/></button></nav>}</footer>
+  <footer><a href="https://portal.inmet.gov.br/" target="_blank" rel="noopener noreferrer">INMET · previsão</a>{pages>1&&<nav aria-label="Páginas de cidades"><span>{current+1}/{pages}</span><button type="button" aria-label="Cidades anteriores" onClick={()=>setPage((current+pages-1)%pages)}><ChevronLeft size={12}/></button><button type="button" aria-label="Próximas cidades" onClick={()=>setPage((current+1)%pages)}><ChevronRight size={12}/></button></nav>}</footer>
+  {detail&&<DashboardPopover id="dashboard-weather-detail" title={`${detail.name} · ${detail.state}`} onClose={closeDetail} onReturnFocus={()=>detailTrigger.current?.focus({preventScroll:true})}><WeatherDetail forecast={model.data?.cities.find(row=>row.city.id===detail.id)} failed={model.isError}/></DashboardPopover>}
   {open&&<DashboardPopover id="dashboard-weather-settings" title="Cidades do clima" onClose={close} onReturnFocus={()=>trigger.current?.focus({preventScroll:true})}><WeatherSettings cities={model.cities} save={model.saveCities}/></DashboardPopover>}
  </aside>;
+}
+function WeatherDetail({forecast,failed}:{forecast:CityForecast|undefined;failed:boolean}){
+ return <div className="weather-detail"><p>Previsão por turno do INMET.</p><strong>{forecast?.condition||'Previsão indisponível'}</strong><dl><div><dt>Validade</dt><dd>{forecast?.date?`${forecast.date.split('-').reverse().join('/')} · ${weatherPeriodLabel(forecast.period)}`:'Indisponível'}</dd></div><div><dt>Mínima / máxima previstas</dt><dd>{forecast?.minimum??'—'}° / {forecast?.maximum??'—'}°</dd></div><div><dt>Consulta ao INMET</dt><dd>{forecast?.updatedAt?new Date(forecast.updatedAt).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}):'Indisponível'}</dd></div></dl><p>Horários de Brasília.{forecast?.status==='cached'||failed?' Atualização indisponível; exibindo a última referência obtida.':''}</p></div>;
 }
 function WeatherSettings({cities,save}:{cities:WeatherCity[];save:(cities:WeatherCity[])=>boolean}){
  const {user}=useAuth(),[search,setSearch]=useState(''),[debounced,setDebounced]=useState('');

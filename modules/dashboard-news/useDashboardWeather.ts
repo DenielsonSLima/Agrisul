@@ -5,6 +5,7 @@ import {useAuth} from '@/shared/supabase/AuthProvider';
 import {authenticatedFetch} from '@/shared/supabase/rpc';
 import {billingKeys} from '@/shared/query/keys';
 import {isWeatherFeed,readWeatherCities,weatherPreferencesKey,type WeatherCity,type WeatherFeed} from './weatherCatalog';
+import {weatherRefreshDelay} from './weatherTime.mjs';
 
 const changeEvent='billing:dashboard-weather-settings',fallback=new Map<string,string>();
 const serverSnapshot=()=>'';
@@ -18,9 +19,9 @@ export function useDashboardWeather(){
  },[key]);
  const raw=useSyncExternalStore(subscribe,()=>rawPreferences(key),serverSnapshot),cities=useMemo(()=>readWeatherCities(raw),[raw]);
  const ids=cities.map(city=>city.id).join(',');
- const query=useQuery({queryKey:[...billingKeys.resource(user?.id??'','dashboard-weather'),{ids}],enabled:ready&&!!user&&cities.length>0,
+ const query=useQuery({queryKey:[...billingKeys.resource(user?.id??'','dashboard-weather'),{ids,projection:2}],enabled:ready&&!!user&&cities.length>0,
   queryFn:async({signal}):Promise<WeatherFeed>=>{const response=await authenticatedFetch(`/api/dashboard-weather?ids=${encodeURIComponent(ids)}`,{signal});if(!response.ok)throw Error('Não foi possível atualizar o clima.');const feed=await response.json();if(!isWeatherFeed(feed)||feed.cities.length!==cities.length)throw Error('Previsão inválida.');return feed;},
-  staleTime:1800000,gcTime:3600000,refetchInterval:1800000,refetchOnReconnect:true,refetchOnWindowFocus:true,
+  staleTime:1800000,gcTime:3600000,refetchInterval:query=>weatherRefreshDelay(Date.now(),query.state.data?.cities),refetchOnReconnect:'always',refetchOnWindowFocus:'always',
  });
  const saveCities=(next:WeatherCity[])=>{
   if(!key||next.length>20)return false;

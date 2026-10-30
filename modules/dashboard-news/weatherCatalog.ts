@@ -1,5 +1,7 @@
 export type WeatherCity={id:string;name:string;state:string};
-export type CityForecast={city:WeatherCity;date:string|null;condition:string;minimum:number|null;maximum:number|null;humidityMinimum:number|null;humidityMaximum:number|null;status:'current'|'cached'|'unavailable';updatedAt:string|null};
+export type WeatherPeriod='manha'|'tarde'|'noite'|'dia';
+export const weatherPeriodLabel=(period:WeatherPeriod|null|undefined)=>period?({manha:'Manhã',tarde:'Tarde',noite:'Noite',dia:'Dia'})[period]:'Turno indisponível';
+export type CityForecast={city:WeatherCity;date:string|null;period:WeatherPeriod|null;daylight:boolean|null;sunrise:string|null;sunset:string|null;iconCode:string|null;condition:string;minimum:number|null;maximum:number|null;humidityMinimum:number|null;humidityMaximum:number|null;status:'current'|'cached'|'unavailable';updatedAt:string|null};
 export type WeatherFeed={cities:CityForecast[];checkedAt:string;refreshSeconds:number;source:'INMET'};
 export const DEFAULT_WEATHER_CITIES:readonly WeatherCity[]=[
  {id:'2803302',name:'Japaratuba',state:'SE'},
@@ -20,7 +22,7 @@ export function weatherCitiesFromResponse(value:unknown):WeatherCity[]|null{
 export function isWeatherFeed(value:unknown):value is WeatherFeed{
  if(!value||typeof value!=='object')return false;const feed=value as Record<string,unknown>;
  if(feed.source!=='INMET'||typeof feed.checkedAt!=='string'||!Number.isFinite(Date.parse(feed.checkedAt))||typeof feed.refreshSeconds!=='number'||!Array.isArray(feed.cities)||feed.cities.length>20)return false;
- return feed.cities.every(row=>row&&typeof row==='object'&&isWeatherCity(row.city)&&typeof row.condition==='string'&&['current','cached','unavailable'].includes(row.status)&&(row.minimum===null||typeof row.minimum==='number'&&Number.isFinite(row.minimum))&&(row.maximum===null||typeof row.maximum==='number'&&Number.isFinite(row.maximum))&&(row.date===null||typeof row.date==='string')&&(row.updatedAt===null||typeof row.updatedAt==='string'));
+ return feed.cities.every(row=>row&&typeof row==='object'&&isWeatherCity(row.city)&&typeof row.condition==='string'&&['current','cached','unavailable'].includes(row.status)&&(row.minimum===null||typeof row.minimum==='number'&&Number.isFinite(row.minimum))&&(row.maximum===null||typeof row.maximum==='number'&&Number.isFinite(row.maximum))&&(row.date===null||typeof row.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(row.date))&&(row.updatedAt===null||typeof row.updatedAt==='string'&&Number.isFinite(Date.parse(row.updatedAt)))&&(row.period===null||['manha','tarde','noite','dia'].includes(row.period))&&(row.daylight===null||typeof row.daylight==='boolean')&&(row.sunrise===null||typeof row.sunrise==='string')&&(row.sunset===null||typeof row.sunset==='string')&&(row.iconCode===null||typeof row.iconCode==='string')&&(row.status==='unavailable'||row.date!==null&&row.period!==null&&row.daylight!==null&&row.updatedAt!==null));
 }
 export function readWeatherCities(raw:string|null|undefined):WeatherCity[]{
  const defaults=()=>DEFAULT_WEATHER_CITIES.map(city=>({...city}));

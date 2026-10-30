@@ -1,12 +1,16 @@
-import {Cloud,Sun,Zap} from 'lucide-react';
+import {Cloud,CloudFog,HelpCircle,Moon,Snowflake,Sun,Zap} from 'lucide-react';
+import {weatherCondition} from './weatherCondition';
 
-export function WeatherIcon({condition}:{condition:string}){
- const text=condition.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
- const kind=/trovo|tempestade/.test(text)?'storm':/chuva|pancadas|chuvisco/.test(text)?'rain':/muitas nuvens|nublado|encoberto/.test(text)?'cloud':/claro|sol/.test(text)?'sun':/poucas nuvens|parcial|algumas nuvens/.test(text)?'partly':'unknown';
- return <span className={`weather-condition-icon is-${kind}`} aria-hidden="true">
-  {(kind==='sun'||kind==='partly')&&<Sun className="weather-icon-sun" strokeWidth={1.6}/>}
-  {kind!=='sun'&&<Cloud className="weather-icon-cloud" strokeWidth={1.4}/>}
+export function WeatherIcon({condition,daylight=true}:{condition:string;daylight?:boolean}){
+ const {kind,possible}=weatherCondition(condition),Light=daylight?Sun:Moon;
+ return <span className={`weather-condition-icon is-${kind}${possible?' is-possible':''}${daylight?'':' is-night'}`} aria-hidden="true">
+  {(kind==='clear'||kind==='partly')&&<Light className={daylight?'weather-icon-sun':'weather-icon-moon'} strokeWidth={1.6}/>}
+  {(kind==='cloud'||kind==='partly'||kind==='rain'||kind==='storm')&&<Cloud className="weather-icon-cloud" strokeWidth={1.4}/>}
   {(kind==='rain'||kind==='storm')&&<span className="weather-icon-rain"><i/><i/><i/></span>}
   {kind==='storm'&&<Zap className="weather-icon-lightning" strokeWidth={1.5}/>}
+  {possible&&<span className="weather-icon-possibility">?</span>}
+  {kind==='unknown'&&<HelpCircle className="weather-icon-unknown" strokeWidth={1.5}/>}
+  {kind==='fog'&&<CloudFog className="weather-icon-cloud" strokeWidth={1.4}/>}
+  {kind==='snow'&&<Snowflake className="weather-icon-snow" strokeWidth={1.5}/>}
  </span>;
 }
