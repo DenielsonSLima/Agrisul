@@ -55,18 +55,28 @@ test('public news and weather routes require a verified user before touching the
  }
 });
 
-test('weather polling follows turn boundaries, refreshes on return and validates the new projection per account',async()=>{
- const react=url('export const useCallback=fn=>fn;export const useMemo=fn=>fn();export const useSyncExternalStore=(subscribe,snapshot,server)=>server();');
+test('weather polling follows turns and mutations await scoped server invalidation',async()=>{
  const weatherCatalog=url(await compile('modules/dashboard-news/weatherCatalog.ts'));
+ const {readWeatherCities}=await import(weatherCatalog),cities=readWeatherCities('');
+ const mocks=url(`import {state} from ${JSON.stringify(fixtures)};export {useAuth,authenticatedFetch,billingKeys} from ${JSON.stringify(fixtures)};
+  export const operations=[];export const useEffect=()=>{};export const useRef=value=>({current:value});
+  export const fetchWeatherPreferences=async()=>({configured:true,revision:'1',cities:${JSON.stringify(cities)}});
+  export const useQuery=options=>options.queryKey[2]==='weather-preferences'?{...options,data:{configured:true,revision:'1',cities:${JSON.stringify(cities)}},isPending:false}:options;
+  export const useQueryClient=()=>({cancelQueries:async options=>operations.push({kind:'cancel',...options}),invalidateQueries:async options=>operations.push({kind:'invalidate',...options})});
+  export const useMutation=options=>({isPending:false,mutateAsync:async input=>{await options.onMutate();const result=await options.mutationFn(input);await options.onSuccess(result);return result;}});
+  export const assertSessionActor=async expected=>{if(state.user?.id!==expected)throw Error('actor changed');};
+  export const rpcRequest=async(resource,action,payload,signal)=>{operations.push({kind:'rpc',resource,action,payload,signal});return {configured:true,revision:'2',cities:[]};};`);
  const weatherTime=new URL('../modules/dashboard-news/weatherTime.mjs',import.meta.url).href;
- const source=(await compile('modules/dashboard-news/useDashboardWeather.ts')).replace(/from ['"]react['"]/g,`from ${JSON.stringify(react)}`).replace(/from ['"](?:@tanstack\/react-query|@\/shared\/supabase\/AuthProvider|@\/shared\/supabase\/rpc|@\/shared\/query\/keys)['"]/g,`from ${JSON.stringify(fixtures)}`).replace(/from ['"]\.\/weatherCatalog['"]/g,`from ${JSON.stringify(weatherCatalog)}`).replace(/from ['"]\.\/weatherTime.mjs['"]/g,`from ${JSON.stringify(weatherTime)}`);
- const {useDashboardWeather}=await import(url(source)),{readWeatherCities}=await import(weatherCatalog);
+ const source=(await compile('modules/dashboard-news/useDashboardWeather.ts')).replace(/from ['"][^'"]+['"]/g,match=>match.includes('./weatherCatalog')?`from ${JSON.stringify(weatherCatalog)}`:match.includes('./weatherTime.mjs')?`from ${JSON.stringify(weatherTime)}`:`from ${JSON.stringify(mocks)}`);
+ const {useDashboardWeather}=await import(url(source)),{operations}=await import(mocks);
  state.user={id:'weather-owner'};state.ready=true;state.status=200;state.hang=null;
- const options=useDashboardWeather();assert.equal(options.queryKey[1],'weather-owner');assert.equal(options.queryKey[3].projection,2);assert.equal(options.enabled,true);
+ const options=useDashboardWeather();assert.equal(options.queryKey[1],'weather-owner');assert.equal(options.enabled,true);
  assert.equal(options.refetchOnWindowFocus,'always');assert.equal(options.refetchOnReconnect,'always');assert.equal(typeof options.refetchInterval,'function');
  const delay=options.refetchInterval({state:{data:{cities:[]}}});assert.ok(delay>0&&delay<=1800000);
- state.body={source:'INMET',checkedAt:'2026-10-30T12:00:00Z',refreshSeconds:1800,cities:readWeatherCities('').map(city=>({city,date:'2026-10-30',period:'manha',daylight:true,sunrise:null,sunset:null,iconCode:'34',condition:'Muitas nuvens',minimum:22,maximum:33,status:'current',updatedAt:'2026-10-30T12:00:00Z'}))};
+ state.body={source:'INMET',checkedAt:'2026-10-30T12:00:00Z',refreshSeconds:1800,cities:cities.map(city=>({city,date:'2026-10-30',period:'manha',daylight:true,sunrise:null,sunset:null,iconCode:'34',condition:'Muitas nuvens',minimum:22,maximum:33,status:'current',updatedAt:'2026-10-30T12:00:00Z'}))};
  const signal=new AbortController().signal;assert.equal((await options.queryFn({signal})).cities.length,5);assert.equal(state.calls.at(-1).options.signal,signal);
- delete state.body.cities[0].period;await assert.rejects(()=>options.queryFn({signal}),/Previsão inválida/);
- state.user={id:'another-weather-owner'};assert.equal(useDashboardWeather().queryKey[1],'another-weather-owner');state.user=null;assert.equal(useDashboardWeather().enabled,false);
+ delete state.body.cities[0].period;await assert.rejects(()=>options.queryFn({signal}),/inv.lida/);
+ await options.changeCities('remove',cities[0].id);assert.deepEqual(operations.map(x=>x.kind),['cancel','rpc','invalidate','invalidate']);
+ assert.deepEqual(operations[1].payload,{cityId:cities[0].id});assert.equal(operations[1].resource,'weather-preferences');assert.equal(operations[2].queryKey[1],'weather-owner');
+ state.user={id:'another-weather-owner'};await assert.rejects(()=>options.changeCities('reset'),/actor changed/);assert.equal(useDashboardWeather().queryKey[1],'another-weather-owner');state.user=null;assert.equal(useDashboardWeather().enabled,false);
 });

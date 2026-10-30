@@ -18,3 +18,7 @@ verify_jwt = false
 [functions.dashboard-weather]
 # Validates the user's access token through Auth before consulting any cache/source.
 verify_jwt = false
+
+[functions.dashboard-weather-refresh]
+# Scheduled worker checks its own scoped Vault secret.
+verify_jwt = false

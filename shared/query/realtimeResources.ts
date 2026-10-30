@@ -1,6 +1,8 @@
 import {derivedResources} from './derivedResources.ts';
 // Events invalidate authorized RPC projections; payloads never populate cache.
 const baseResources: Record<string, readonly string[]> = {
+  billing_weather_settings: ['weather-preferences'],
+  billing_weather_cities: ['weather-preferences'],
   billing_companies: ['companies', 'contracts', 'report-headers', 'service-requests', 'cane-weighings'],
   billing_contracts: ['contracts'],
   billing_contract_loads: ['contracts', 'planning', 'import-documents'],

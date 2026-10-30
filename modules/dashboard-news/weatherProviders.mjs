@@ -21,7 +21,7 @@ export function normalizeInmetForecast(payload,city,now=Date.now()){
  const sunrise=weatherSolarTime(selected.nascer),sunset=weatherSolarTime(selected.ocaso);
  return {city,date:`${y}-${m}-${d}`,period,daylight:weatherDaylight(now,sunrise,sunset),sunrise,sunset,iconCode:selected.cod_icone===undefined?null:String(selected.cod_icone).slice(0,10),condition:selected.resumo.replace(/<[^>]*>/g,'').slice(0,180),minimum,maximum,humidityMinimum:numeric(selected.umidade_min,0,100),humidityMaximum:numeric(selected.umidade_max,0,100)};
 }
-export function createWeatherProvider({fetchImpl=globalThis.fetch,now=Date.now,store=null}={}){
+export function createWeatherProvider({fetchImpl=globalThis.fetch,now=Date.now,store=null,cityDirectory=[]}={}){
  const cache=new Map(),pending=new Map();let locations=null,locationsAt=0,locationRequest;
  async function allCities(){
   if(locations&&now()-locationsAt<24*3600000)return locations;
@@ -38,7 +38,7 @@ export function createWeatherProvider({fetchImpl=globalThis.fetch,now=Date.now,s
   const tokens=normalize(query).split(' ').filter(Boolean);if(!tokens.length)return [];
   const rows=await allCities();return rows.filter(city=>tokens.every(token=>normalize(city.name+' '+city.state).includes(token))).sort((a,b)=>Number(normalize(b.name).startsWith(tokens[0]))-Number(normalize(a.name).startsWith(tokens[0]))||a.name.localeCompare(b.name,'pt-BR')).slice(0,12);
  }
- async function cityById(id){return DEFAULTS.find(city=>city.id===id)??(await allCities()).find(city=>city.id===id)??null;}
+ async function cityById(id){return cityDirectory.find(city=>city.id===id)??DEFAULTS.find(city=>city.id===id)??(await allCities()).find(city=>city.id===id)??null;}
  function forecast(city){
   if(pending.has(city.id))return pending.get(city.id);
   const task=Promise.resolve().then(async()=>{
@@ -51,15 +51,16 @@ export function createWeatherProvider({fetchImpl=globalThis.fetch,now=Date.now,s
     const payload=compactInmetPayload(await response.json(),city),data=normalizeInmetForecast(payload,city,now());if(!data)throw Error('Previsão de hoje indisponível.');const at=startedAt;cache.set(city.id,{data,at,payload});
     if(store){try{await store.save(city.id,payload,new Date(at).toISOString());}catch{/* The official live response remains usable if persistence fails. */}}
     return {...data,status:'current',updatedAt:new Date(at).toISOString()};
-   }catch{return saved&&now()-saved.at<=24*3600000?{...(current??saved.data),status:'cached',updatedAt:new Date(saved.at).toISOString()}:{city,date:null,period:null,daylight:null,sunrise:null,sunset:null,iconCode:null,condition:'Previsão indisponível',minimum:null,maximum:null,humidityMinimum:null,humidityMaximum:null,status:'unavailable',updatedAt:null};}
+   }catch{if(store?.failed){try{await store.failed(city.id);}catch{}}
+    return saved&&now()-saved.at<=24*3600000?{...(current??saved.data),status:'cached',updatedAt:new Date(saved.at).toISOString()}:{city,date:null,period:null,daylight:null,sunrise:null,sunset:null,iconCode:null,condition:'Previsão indisponível',minimum:null,maximum:null,humidityMinimum:null,humidityMaximum:null,status:'unavailable',updatedAt:null};}
   }).finally(()=>pending.delete(city.id));pending.set(city.id,task);return task;
  }
- async function feed(ids){
+ async function cities(ids){
   if(!Array.isArray(ids)||ids.length>20||new Set(ids).size!==ids.length||ids.some(id=>typeof id!=='string'||!/^\d{7}$/.test(id)))throw Error('Selecione até 20 cidades válidas.');
-  const cities=await Promise.all(ids.map(cityById));if(cities.some(city=>!city))throw Error('Cidade não encontrada no IBGE.');
-  return {cities:await Promise.all(cities.map(forecast)),checkedAt:new Date(now()).toISOString(),refreshSeconds:1800,source:'INMET'};
+  const rows=await Promise.all(ids.map(cityById));if(rows.some(city=>!city))throw Error('Cidade não encontrada no IBGE.');return rows;
  }
- return {search,feed};
+ async function feed(ids){return {cities:await Promise.all((await cities(ids)).map(forecast)),checkedAt:new Date(now()).toISOString(),refreshSeconds:1800,source:'INMET'};}
+ return {search,cities,feed};
 }
 const provider=createWeatherProvider();
 export const getWeatherFeed=ids=>provider.feed(ids);

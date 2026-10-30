@@ -28,6 +28,13 @@ test('weather requests deduplicate by municipality, preserve input order and ret
  now=at+25*3600000;const old=await provider.feed(ids);assert.equal(old.cities[0].status,'unavailable');assert.equal(old.cities[0].minimum,null);
  await assert.rejects(()=>provider.feed(['https://internal']));await assert.rejects(()=>provider.feed([ids[0],ids[0]]));
 });
+test('scheduled collection uses the canonical database directory without another IBGE request',async()=>{
+ const city={id:'3550308',name:'São Paulo',state:'SP'},calls=[];
+ const provider=createWeatherProvider({now:()=>at,cityDirectory:[city],fetchImpl:async url=>{calls.push(url);return Response.json(forecast(city.id));}});
+ const feed=await provider.feed([city.id]);assert.deepEqual(feed.cities[0].city,city);assert.equal(feed.cities[0].status,'current');
+ assert.deepEqual(calls,['https://apiprevmet3.inmet.gov.br/previsao/'+city.id]);
+});
+
 test('IBGE search normalizes accents, includes state and does not confuse Pacatuba SE with CE',async()=>{
  let calls=0;const rows=[{id:'2804904',name:'Pacatuba',state:'SE'},{id:'2309706',name:'Pacatuba',state:'CE'},{id:'2803401',name:'Japoatã',state:'SE'}];
  const provider=createWeatherProvider({now:()=>at,fetchImpl:async()=>{calls++;return Response.json(rows.map(city=>({'municipio-id':Number(city.id),'municipio-nome':city.name,'UF-sigla':city.state})));}});
