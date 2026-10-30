@@ -7,8 +7,6 @@ import {useAuth} from '@/shared/supabase/AuthProvider';
 import {decimalLabel,localDay} from '@/shared/utils/presentation';
 import {MarketTicker} from '@/modules/dashboard-market/MarketTicker';
 import {DashboardNews} from '@/modules/dashboard-news/DashboardNews';
-import {DashboardTv} from '@/modules/dashboard-tv/DashboardTv';
-import {notifications} from '@/shared/feedback';
 import {useAgroNews} from '@/modules/dashboard-news/useAgroNews';
 import {useDashboardAtr} from '@/modules/dashboard-news/useDashboardAtr';
 import {useExecutiveSummary} from '../hooks/useSummary';
@@ -44,18 +42,17 @@ function SummaryDashboard(){
  const [quickMenu,setQuickMenu]=useState<QuickFilterMenu>(null);
  const closeSettings=useCallback(()=>setSettingsOpen(false),[]),closeFilters=useCallback(()=>setFiltersOpen(false),[]);
  const weeklyRange=useWeeklyRange();
- const scene=DASHBOARD_SCENES[presentation.scene],displayedScene=DASHBOARD_SCENES[transition.scene];
+ const scene=DASHBOARD_SCENES[presentation.scene],displayedScene=DASHBOARD_SCENES[transition.scene]??scene;
  const weeklyScene=scene.id==='dashboard-weekly',showWeekly=displayedScene.id==='dashboard-weekly';
- const tvScene=scene.id==='dashboard-tv',showTv=displayedScene.id==='dashboard-tv';
  const newsScene=scene.id==='dashboard-news',showNews=displayedScene.id==='dashboard-news';
- const contentScene=tvScene||newsScene;
+ const contentScene=newsScene;
  const weeklyModel=useWeeklySummary(weeklyRange.from,weeklyRange.to,filters,weeklyScene||showWeekly);
- const generalModel=useExecutiveSummary(filters.from,filters.to,{contractId:filters.contractId,status:filters.status,partnerId:filters.partnerId,farmId:filters.farmId,plotId:filters.plotId,partnerIds:filters.partnerIds,contractIds:filters.contractIds,farmIds:filters.farmIds,plotIds:filters.plotIds,contractMethod:filters.contractMethod},(!weeklyScene&&!contentScene)||(!showWeekly&&!showNews&&!showTv)),data=generalModel.data;
+ const generalModel=useExecutiveSummary(filters.from,filters.to,{contractId:filters.contractId,status:filters.status,partnerId:filters.partnerId,farmId:filters.farmId,plotId:filters.plotId,partnerIds:filters.partnerIds,contractIds:filters.contractIds,farmIds:filters.farmIds,plotIds:filters.plotIds,contractMethod:filters.contractMethod},(!weeklyScene&&!contentScene)||(!showWeekly&&!showNews)),data=generalModel.data;
  const model=weeklyScene?weeklyModel:generalModel;
  const effectiveFilters=weeklyScene?{...filters,...weeklyRange}:filters;
  const applyFilters=(next:typeof filters)=>setFilters(weeklyScene?{...next,from:filters.from,to:filters.to}:next);
  const busy=model.isFetching,failed=!!model.errorMessage;
- const activeBusy=tvScene?false:newsScene?news.isFetching:busy,activeFailed=tvScene?false:newsScene?news.isError:failed,updatedAt=tvScene?0:newsScene?news.dataUpdatedAt:model.dataUpdatedAt;
+ const activeBusy=newsScene?news.isFetching:busy,activeFailed=newsScene?news.isError:failed,updatedAt=newsScene?news.dataUpdatedAt:model.dataUpdatedAt;
  const start=()=>{closeSettings();closeFilters();setQuickMenu(null);void presentation.startPresentation();};
  const preset=(days:number)=>{const to=localDay();setDraft(value=>({...value,from:shiftDay(to,-days+1),to}));};
  return <section ref={rootRef} className={`dashboard-page executive-dashboard ${presentation.presenting?'executive-presenting':''}`} aria-label="Dashboard de acompanhamento">
@@ -74,19 +71,19 @@ function SummaryDashboard(){
     </div>
     <button type="button" className={`executive-button executive-icon-button ${visible?'':'is-active'}`} aria-label={visible?'Ocultar valores financeiros':'Exibir valores financeiros'} title={visible?'Ocultar valores financeiros':'Exibir valores financeiros'} aria-pressed={!visible} onClick={toggle}>{visible?<Eye size={16}/>:<EyeOff size={16}/>}</button>
     <button type="button" className="executive-button" aria-label={presentation.fullscreen?'Sair da tela cheia':'Tela cheia'} onClick={()=>void presentation.toggleFullscreen()}>{presentation.fullscreen?<Minimize2 size={16}/>:<Maximize2 size={16}/>}<span>{presentation.fullscreen?'Sair':'Tela cheia'}</span></button>
-    {presentation.presenting?<><button type="button" className="executive-button executive-button-primary" onClick={presentation.togglePause}>{presentation.paused?<Play size={15}/>:<Pause size={15}/>}<span>{presentation.paused?'Continuar':'Pausar'}</span></button><button type="button" className="executive-button executive-icon-button" aria-label="Encerrar apresentação" title="Encerrar apresentação" onClick={presentation.stopPresentation}><Square size={14}/></button></>:<button type="button" disabled={tvScene?false:newsScene?news.isPending:!model.data||model.loading||failed} className="executive-button executive-button-primary" onClick={start}><MonitorPlay size={16}/><span>Apresentar</span></button>}
+    {presentation.presenting?<><button type="button" className="executive-button executive-button-primary" onClick={presentation.togglePause}>{presentation.paused?<Play size={15}/>:<Pause size={15}/>}<span>{presentation.paused?'Continuar':'Pausar'}</span></button><button type="button" className="executive-button executive-icon-button" aria-label="Encerrar apresentação" title="Encerrar apresentação" onClick={presentation.stopPresentation}><Square size={14}/></button></>:<button type="button" disabled={newsScene?news.isPending:!model.data||model.loading||failed} className="executive-button executive-button-primary" onClick={start}><MonitorPlay size={16}/><span>Apresentar</span></button>}
    </div>
   </header>
-  <div className="executive-context">{tvScene?<span><MonitorPlay size={13}/>Vídeos recentes dos canais selecionados</span>:newsScene?<span><CalendarDays size={13}/>Cana, açúcar, etanol e agronegócio</span>:<DashboardQuickFilters key={`${weeklyScene}:${effectiveFilters.from}:${effectiveFilters.to}`} weekly={weeklyScene} filters={effectiveFilters} options={model.data?.filterOptions} onChange={applyFilters} open={quickMenu} onMenuChange={setQuickMenu} onOpen={()=>{closeSettings();closeFilters();}}/>}{!contentScene&&filters.status&&<span className="executive-filter-chip">{filters.status}</span>}
+  <div className="executive-context">{newsScene?<span><CalendarDays size={13}/>Cana, açúcar, etanol e agronegócio</span>:<DashboardQuickFilters key={`${weeklyScene}:${effectiveFilters.from}:${effectiveFilters.to}`} weekly={weeklyScene} filters={effectiveFilters} options={model.data?.filterOptions} onChange={applyFilters} open={quickMenu} onMenuChange={setQuickMenu} onOpen={()=>{closeSettings();closeFilters();}}/>}{!contentScene&&filters.status&&<span className="executive-filter-chip">{filters.status}</span>}
    <span className={`executive-sync ${!presentation.online||activeFailed?'is-warning':''}`} role="status">{!presentation.online?<WifiOff size={12}/>:activeBusy?<RefreshCw size={12} className="animate-spin"/>:<i/>}{!presentation.online?'Sem conexão · últimos dados':activeFailed?'Atualização indisponível':activeBusy?'Sincronizando':'Atualização automática'}<small>{updatedAt?new Date(updatedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'}):''}</small></span>
   </div>
   <DashboardSceneNavigation presentation={presentation}/>
   {presentation.error&&<p className="executive-inline-error" role="alert">{presentation.error}</p>}
   <div className="executive-stage" aria-busy={activeBusy||transition.leaving}>
-   {showTv||showNews||(showWeekly?!!weeklyModel.data&&!weeklyModel.loading:!!data&&!generalModel.loading)?<div id={displayedScene.id} className={`executive-tab-panel${transition.leaving?' is-leaving':''}`} inert={transition.leaving} role="tabpanel" aria-labelledby={`tab-${displayedScene.id}`} tabIndex={0}>
-    <Fragment key={DASHBOARD_SCENES[transition.scene].id+JSON.stringify(filters)}>
+   {showNews||(showWeekly?!!weeklyModel.data&&!weeklyModel.loading:!!data&&!generalModel.loading)?<div id={displayedScene.id} className={`executive-tab-panel${transition.leaving?' is-leaving':''}`} inert={transition.leaving} role="tabpanel" aria-labelledby={`tab-${displayedScene.id}`} tabIndex={0}>
+    <Fragment key={displayedScene.id+JSON.stringify(filters)}>
      {showWeekly&&<WeeklyContext {...weeklyRange}/>}
-     {showTv?<DashboardTv settings={presentation.tvSettings} presenting={presentation.presenting} paused={presentation.paused||settingsOpen||transition.leaving} onModeChange={mode=>{if(presentation.setTvMode(mode))notifications.saved(mode==='autoplay'?'Reprodução automática ativada.':'Reprodução automática desativada.');else notifications.error('O ajuste foi aplicado somente nesta sessão; não foi possível salvar a preferência.');}} onPlaybackActiveChange={presentation.setPlaybackActive} onPlaybackEnded={presentation.onPlaybackEnded}/>:showWeekly?weeklyModel.data&&<DashboardWeekly data={weeklyModel.data} presenting={presentation.presenting&&!presentation.paused} slideDurationMs={presentation.minutesByScene['dashboard-weekly']*60000}/>:showNews?<DashboardNews key={newsScope} scope={newsScope} news={news} atr={atr} presenting={presentation.presenting&&!presentation.paused} slideDurationMs={presentation.minutesByScene['dashboard-news']*60000}/>:data&&<>
+     {showWeekly?weeklyModel.data&&<DashboardWeekly data={weeklyModel.data} presenting={presentation.presenting&&!presentation.paused} slideDurationMs={presentation.minutesByScene['dashboard-weekly']*60000}/>:showNews?<DashboardNews key={newsScope} scope={newsScope} news={news} atr={atr} presenting={presentation.presenting&&!presentation.paused} slideDurationMs={presentation.minutesByScene['dashboard-news']*60000}/>:data&&<>
      <DashboardMetrics data={data} scene={displayedScene.id}/>
      {displayedScene.id==='dashboard-general'&&<DashboardAnalysis labels={['Evolução','Composição']} first={<FinancialEvolution compareVolume grouping={financialGrouping} periodData={financialGrouping==='week'?data.financialGroupings?.week:financialGrouping==='fortnight'?data.financialGroupings?.fortnight:undefined} data={data.months} dailyData={data.financialTimeline} presenting={presentation.presenting&&!presentation.paused} slideDurationMs={presentation.minutesByScene['dashboard-general']*60000}/>} second={<FinancialComposition totals={data.totals}/>}/>}
      {displayedScene.id==='dashboard-production'&&<DashboardAnalysis labels={['Produção e ATR','Fazendas']} first={<OperationalEvolution grouping={financialGrouping} data={data.monthlyOperations} dailyData={data.operationalTimeline} periodData={financialGrouping==='week'?data.operationalGroupings?.week:financialGrouping==='fortnight'?data.operationalGroupings?.fortnight:undefined} presenting={presentation.presenting&&!presentation.paused} slideDurationMs={presentation.minutesByScene['dashboard-production']*60000}/>} second={<DashboardBars showValues showAtr rows={data.farmPerformance} title="Produção por fazenda" eyebrow="ORIGEM DA PRODUÇÃO" subtitle="Volume carregado e ATR médio ponderado de cada fazenda."/>}/>}
@@ -98,7 +95,7 @@ function SummaryDashboard(){
     </Fragment>
    </div>:<div className="executive-query-state"><BillingQueryState {...model}/></div>}
   </div>
-  <footer className="executive-footer"><span>{tvScene?<><MonitorPlay size={12}/>TV Agro · vídeos dos canais oficiais</>:newsScene?<><Newspaper size={12}/>Fontes do agro · datas de publicação nas manchetes</>:model.data?.totals.billingPending?<><i className="executive-footer-warning"/>{model.data.totals.pendingLoadCount} carga(s) com ATR ou cotação pendentes</>:<><Activity size={12}/>Dados dos contratos da empresa ativa</>}</span><span>{presentation.fullscreen&&<span className="executive-session-note">Sessão mantida durante exibição · </span>}{presentation.presenting?(presentation.paused||settingsOpen?'Rotação pausada':presentation.playbackActive?'Reproduzindo vídeo · rotação aguardando':`Próxima aba em ${presentation.minutes} min`):'Selecione uma aba para explorar'}</span></footer>
+  <footer className="executive-footer"><span>{newsScene?<><Newspaper size={12}/>Fontes do agro · datas de publicação nas manchetes</>:model.data?.totals.billingPending?<><i className="executive-footer-warning"/>{model.data.totals.pendingLoadCount} carga(s) com ATR ou cotação pendentes</>:<><Activity size={12}/>Dados dos contratos da empresa ativa</>}</span><span>{presentation.fullscreen&&<span className="executive-session-note">Sessão mantida durante exibição · </span>}{presentation.presenting?(presentation.paused||settingsOpen?'Rotação pausada':`Próxima aba em ${presentation.minutes} min`):'Selecione uma aba para explorar'}</span></footer>
  </section>;
 }
 

@@ -32,28 +32,38 @@ export function useDashboardPresentation(rootRef:RefObject<HTMLElement|null>){
  },[settingsKey]);
  const rawSettings=useSyncExternalStore(subscribeSettings,()=>readSettingsSnapshot(settingsKey),settingsServerSnapshot);
  const preferences=useMemo(()=>readDashboardPreferences(rawSettings),[rawSettings]);
- const {minutesByScene,enabledSceneIds,tvSettings}=preferences;
+ const {minutesByScene,enabledSceneIds}=preferences;
  const [settingsFailure,setSettingsFailure]=useState<{key:string|null;message:string}>({key:null,message:''});
  const [fullscreen,setFullscreen]=useState(false),[presentingKey,setPresentingKey]=useState<string|null>(null);
  const [paused,setPaused]=useState(false),[selection,setSelection]=useState({key:settingsKey,index:0});
- const [settingsOpen,setSettingsOpen]=useState(false),[playback,setPlayback]=useState({key:settingsKey,active:false});
+ const [settingsOpen,setSettingsOpen]=useState(false);
  const [sessionKey,setSessionKey]=useState(settingsKey);
  const selectedScene=selection.key===settingsKey&&enabledSceneIds.includes(DASHBOARD_SCENES[selection.index]?.id)?selection.index:DASHBOARD_SCENES.findIndex(item=>enabledSceneIds.includes(item.id));
- const rotationIndices=presentationSceneIndices(enabledSceneIds,tvSettings.mode),rotationSignature=rotationIndices.join(',');
+ const rotationIndices=presentationSceneIndices(enabledSceneIds),rotationSignature=rotationIndices.join(',');
  const rotationCount=rotationIndices.length;
  const presenting=!!settingsKey&&presentingKey===settingsKey&&rotationCount>0;
  const scene=presenting&&!rotationIndices.includes(selectedScene)?rotationIndices[0]:selectedScene;
- const playbackActive=DASHBOARD_SCENES[scene].id==='dashboard-tv'&&playback.key===settingsKey&&playback.active;
  const minutes=minutesByScene[DASHBOARD_SCENES[scene].id];
  const settingsError=settingsFailure.key===settingsKey?settingsFailure.message:'';
  const [error,setError]=useState(''),[online,setOnline]=useState(true);
  // Keep account and visibility corrections in the render that observed the change.
- // No committed frame or playback callback can keep the previous account running.
+ // No committed frame can keep the previous account running.
  if(sessionKey!==settingsKey){
-  setSessionKey(settingsKey);setPresentingKey(null);setPaused(false);setSettingsOpen(false);setPlayback({key:settingsKey,active:false});setError('');
+  setSessionKey(settingsKey);setPresentingKey(null);setPaused(false);setSettingsOpen(false);setError('');
  }
  if(selection.key!==settingsKey||selection.index!==scene)setSelection({key:settingsKey,index:scene});
  if(presentingKey!==null&&presentingKey===settingsKey&&rotationCount===0)setPresentingKey(null);
+ useEffect(()=>{
+  if(!settingsKey||!rawSettings)return;
+  try{
+   const version=(JSON.parse(rawSettings) as {version?:unknown})?.version;
+   if(version!==1&&version!==2)return;
+   const raw=serializeDashboardPreferences(preferences);
+   try{window.localStorage.setItem(settingsKey,raw);fallbackSettings.delete(settingsKey);}
+   catch{fallbackSettings.set(settingsKey,raw);}
+   window.dispatchEvent(new CustomEvent(settingsEvent,{detail:{key:settingsKey}}));
+  }catch{/* Malformed preferences use defaults until the next explicit save. */}
+ },[settingsKey,rawSettings,preferences]);
  useEffect(()=>{
   if(fullscreen&&rootRef.current)return registerLiveDisplay(rootRef.current);
  },[fullscreen,registerLiveDisplay,rootRef]);
@@ -65,10 +75,10 @@ export function useDashboardPresentation(rootRef:RefObject<HTMLElement|null>){
   return()=>{document.removeEventListener('fullscreenchange',syncFullscreen);window.removeEventListener('online',syncOnline);window.removeEventListener('offline',syncOnline);};
  },[rootRef]);
  useEffect(()=>{
-  if(!presenting||paused||settingsOpen||playbackActive||rotationCount<2)return;
+  if(!presenting||paused||settingsOpen||rotationCount<2)return;
   const timer=setTimeout(()=>setSelection({key:settingsKey,index:nextPresentationScene(scene,indicesFromSignature(rotationSignature))}),Math.round(minutes*60000));
   return()=>clearTimeout(timer);
- },[presenting,paused,settingsOpen,playbackActive,minutes,scene,settingsKey,rotationSignature,rotationCount]);
+ },[presenting,paused,settingsOpen,minutes,scene,settingsKey,rotationSignature,rotationCount]);
  async function enterFullscreen(){
   setError('');
   if(document.fullscreenElement===rootRef.current)return true;
@@ -82,7 +92,7 @@ export function useDashboardPresentation(rootRef:RefObject<HTMLElement|null>){
   else await enterFullscreen();
  }
  async function startPresentation(){
-  if(!rotationIndices.length){setError('Ative uma aba para a apresentação ou altere a opção de pular a TV Agro.');return;}
+  if(!rotationIndices.length){setError('Ative pelo menos uma aba para a apresentação.');return;}
   if(await enterFullscreen()){
    if(!rotationIndices.includes(scene))setSelection({key:settingsKey,index:rotationIndices[0]});
    setPaused(false);setPresentingKey(settingsKey);
@@ -90,12 +100,12 @@ export function useDashboardPresentation(rootRef:RefObject<HTMLElement|null>){
  }
  function selectScene(index:number){
   if(isDashboardSceneIndex(index)&&enabledSceneIds.includes(DASHBOARD_SCENES[index].id)){
-   setPlayback({key:settingsKey,active:false});setSelection({key:settingsKey,index});
+   setSelection({key:settingsKey,index});
   }
  }
  function savePreferences(next:DashboardPresentationPreferences){
   const validated=validateDashboardPreferences(next);
-  if(!validated){setSettingsFailure({key:settingsKey,message:'Escolha tempos válidos, mantenha pelo menos uma aba e um canal ativos.'});return false;}
+  if(!validated){setSettingsFailure({key:settingsKey,message:'Escolha tempos válidos e mantenha pelo menos uma aba ativa.'});return false;}
   if(!settingsKey){setSettingsFailure({key:null,message:'Entre para salvar as preferências da apresentação.'});return false;}
   const raw=serializeDashboardPreferences(validated);let persisted=true;
   try{window.localStorage.setItem(settingsKey,raw);fallbackSettings.delete(settingsKey);setSettingsFailure({key:settingsKey,message:''});}
@@ -109,12 +119,6 @@ export function useDashboardPresentation(rootRef:RefObject<HTMLElement|null>){
  }
  const setMinutes=(value:number)=>saveSettings(updateAllSceneMinutes(value));
  const setSceneMinutes=(index:number,value:number)=>saveSettings(updateSceneMinutes(readDashboardPreferences(readSettingsSnapshot(settingsKey)).minutesByScene,index,value));
- const setPlaybackActive=useCallback((active:boolean)=>setPlayback({key:settingsKey,active}),[settingsKey]);
- const onPlaybackEnded=useCallback(()=>{
-  setPlayback({key:settingsKey,active:false});
-  if(presenting&&!paused&&!settingsOpen&&rotationCount>1)setSelection({key:settingsKey,index:nextPresentationScene(scene,indicesFromSignature(rotationSignature))});
- },[settingsKey,presenting,paused,settingsOpen,scene,rotationSignature,rotationCount]);
- const setTvMode=(mode:'autoplay'|'preview')=>savePreferences({...preferences,tvSettings:{...tvSettings,mode}});
- return {fullscreen,presenting,paused,minutes,minutesByScene,enabledSceneIds,tvSettings,scene,error,online,settingsError,playbackActive,toggleFullscreen,startPresentation,selectScene,setMinutes,setSceneMinutes,savePreferences,setTvMode,setSettingsOpen,setPlaybackActive,onPlaybackEnded,
+ return {fullscreen,presenting,paused,minutes,minutesByScene,enabledSceneIds,scene,error,online,settingsError,toggleFullscreen,startPresentation,selectScene,setMinutes,setSceneMinutes,savePreferences,setSettingsOpen,
   togglePause:()=>setPaused(value=>!value),stopPresentation:()=>{setPresentingKey(null);setPaused(false);}};
 }

@@ -2,17 +2,16 @@
 import {FINANCIAL_GROUPINGS,readFinancialGrouping,type FinancialGrouping} from '../financialGrouping';
 import {useEffect,useRef,useState,useSyncExternalStore,type ReactNode} from 'react';
 import {createPortal} from 'react-dom';
-import {Building2,CalendarDays,ChartNoAxesCombined,ChevronLeft,ChevronRight,Layers3,LayoutDashboard,FileChartColumn,Newspaper,Save,Settings2,Tv,Wallet,X} from 'lucide-react';
+import {Building2,CalendarDays,ChartNoAxesCombined,ChevronLeft,ChevronRight,Layers3,LayoutDashboard,FileChartColumn,Newspaper,Save,Settings2,Wallet,X} from 'lucide-react';
 import {notifications} from '@/shared/feedback';
 import {DASHBOARD_SCENES,PRESENTATION_INTERVALS,useDashboardPresentation} from '../hooks/useDashboardPresentation';
 import {formatPresentationInterval,isPresentationMinutes,type DashboardSceneId} from '../presentationSettings';
 import {DASHBOARD_CALENDAR_PERIODS,DASHBOARD_ROLLING_PERIODS,defaultPeriodDescription,readDefaultPeriod,type DashboardDefaultPeriod} from '../defaultPeriod';
 import {readDashboardNewsScope,type DashboardNewsScope} from '../dashboardValues';
-import {TV_CHANNELS} from '@/modules/dashboard-tv/catalog';
 import '../dashboardSettings.css';
 
 export type Presentation=ReturnType<typeof useDashboardPresentation>;
-const sceneIcons={'dashboard-general':LayoutDashboard,'dashboard-weekly':CalendarDays,'dashboard-production':ChartNoAxesCombined,'dashboard-financial':Wallet,'dashboard-suppliers':Building2,'dashboard-contracts':FileChartColumn,'dashboard-types':Layers3,'dashboard-news':Newspaper,'dashboard-tv':Tv};
+const sceneIcons={'dashboard-general':LayoutDashboard,'dashboard-weekly':CalendarDays,'dashboard-production':ChartNoAxesCombined,'dashboard-financial':Wallet,'dashboard-suppliers':Building2,'dashboard-contracts':FileChartColumn,'dashboard-types':Layers3,'dashboard-news':Newspaper};
 const clockTime=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
 const clockDate=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',year:'numeric'});
 const clockCalendar=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'short',year:'numeric'});
@@ -42,7 +41,7 @@ export function DashboardSceneNavigation({presentation}:{presentation:Presentati
 }
 
 type SettingsProps={presentation:Presentation;open:boolean;onToggle:()=>void;onClose:()=>void;financialGrouping:FinancialGrouping;onFinancialGroupingChange:(value:FinancialGrouping)=>boolean;defaultPeriod:DashboardDefaultPeriod;onDefaultPeriodChange:(value:DashboardDefaultPeriod)=>boolean;newsScope:DashboardNewsScope;onNewsScopeChange:(value:DashboardNewsScope)=>boolean};
-const SETTINGS_TABS=[{id:'general',label:'Geral',Icon:LayoutDashboard},{id:'tabs',label:'Abas do dashboard',Icon:Layers3},{id:'presentation',label:'Apresentação',Icon:CalendarDays},{id:'news',label:'Notícias',Icon:Newspaper},{id:'tv',label:'TV Agro',Icon:Tv}] as const;
+const SETTINGS_TABS=[{id:'general',label:'Geral',Icon:LayoutDashboard},{id:'tabs',label:'Abas do dashboard',Icon:Layers3},{id:'presentation',label:'Apresentação',Icon:CalendarDays},{id:'news',label:'Notícias',Icon:Newspaper}] as const;
 type SettingsTab=typeof SETTINGS_TABS[number]['id'];
 
 export function DashboardSettings(props:SettingsProps){
@@ -58,7 +57,6 @@ function DashboardSettingsModal({presentation,onClose,onReturnFocus,financialGro
  const [period,setPeriod]=useState(defaultPeriod),[grouping,setGrouping]=useState(financialGrouping),[scope,setScope]=useState(newsScope);
  const [minutes,setMinutes]=useState(()=>({...presentation.minutesByScene}));
  const [enabled,setEnabled]=useState<DashboardSceneId[]>(()=>[...presentation.enabledSceneIds]);
- const [tv,setTv]=useState(()=>({...presentation.tvSettings,channelIds:[...presentation.tvSettings.channelIds]}));
  const [error,setError]=useState(''),[saving,setSaving]=useState(false);
  const commonMinutes=DASHBOARD_SCENES.every(scene=>minutes[scene.id]===minutes[DASHBOARD_SCENES[0].id])?minutes[DASHBOARD_SCENES[0].id]:'';
  useEffect(()=>{
@@ -74,10 +72,9 @@ function DashboardSettingsModal({presentation,onClose,onReturnFocus,financialGro
  const save=()=>{
   if(saving)return;
   if(!enabled.length){setTab('tabs');setError('Mantenha pelo menos uma aba ativa no dashboard.');notifications.error('Ative pelo menos uma aba antes de salvar.');return;}
-  if(enabled.includes('dashboard-tv')&&!tv.channelIds.length){setTab('tv');setError('Selecione pelo menos um canal para a TV Agro.');notifications.error('Selecione pelo menos um canal antes de salvar.');return;}
   setSaving(true);setError('');
   try{
-   const results=[presentation.savePreferences({minutesByScene:minutes,enabledSceneIds:enabled,tvSettings:tv}),onDefaultPeriodChange(period),onFinancialGroupingChange(grouping),onNewsScopeChange(scope)];
+   const results=[presentation.savePreferences({minutesByScene:minutes,enabledSceneIds:enabled}),onDefaultPeriodChange(period),onFinancialGroupingChange(grouping),onNewsScopeChange(scope)];
    if(results.every(Boolean)){notifications.saved('Configurações do Dashboard salvas neste navegador.');onClose();}
    else{setError('As configurações foram aplicadas nesta sessão, mas o navegador não permitiu salvar todas as preferências.');notifications.error('Não foi possível salvar todas as configurações neste navegador.');}
   }catch{setError('Não foi possível salvar as configurações. Tente novamente.');notifications.error('Não foi possível salvar as configurações do Dashboard.');}
@@ -103,7 +100,6 @@ function DashboardSettingsModal({presentation,onClose,onReturnFocus,financialGro
     {tab==='tabs'&&<><h3>Abas do dashboard</h3><p className="dashboard-settings-intro">Escolha quais abas aparecem na navegação e participam da apresentação automática. Mantenha pelo menos uma ativa.</p><div className="dashboard-settings-options">{DASHBOARD_SCENES.map(scene=>{const Icon=sceneIcons[scene.id];return <label key={scene.id} className="dashboard-settings-toggle"><span className="dashboard-settings-option-icon"><Icon size={20}/></span><span><strong>{scene.label}</strong><small>{enabled.includes(scene.id)?'Visível no dashboard':'Oculta no dashboard'}</small></span><input type="checkbox" role="switch" aria-label={`Ativar aba ${scene.label}`} checked={enabled.includes(scene.id)} onChange={event=>setSceneEnabled(scene.id,event.target.checked)}/></label>;})}</div></>}
     {tab==='presentation'&&<><h3>Apresentação</h3><p className="dashboard-settings-intro">Controle o tempo de permanência de cada aba durante a apresentação do dashboard.</p><label className="dashboard-settings-field">Aplicar o mesmo tempo a todas as abas<select aria-label="Intervalo de troca dos painéis" value={commonMinutes} onChange={event=>{const value=Number(event.target.value);if(isPresentationMinutes(value))setMinutes(Object.fromEntries(DASHBOARD_SCENES.map(scene=>[scene.id,value])) as typeof minutes);}}><option value="" disabled>Personalizado por aba</option>{PRESENTATION_INTERVALS.map(value=><option key={value} value={value}>{formatPresentationInterval(value)}</option>)}</select></label><fieldset className="dashboard-settings-durations"><legend>Tempo por aba</legend>{DASHBOARD_SCENES.map(scene=><label key={scene.id} htmlFor={`duration-${scene.id}`}><span>{scene.label}{!enabled.includes(scene.id)&&<small>Aba desativada</small>}</span><select id={`duration-${scene.id}`} aria-label={`Tempo da aba ${scene.label}`} value={minutes[scene.id]} onChange={event=>{const value=Number(event.target.value);if(isPresentationMinutes(value))setMinutes(previous=>({...previous,[scene.id]:value}));}}>{PRESENTATION_INTERVALS.map(value=><option key={value} value={value}>{formatPresentationInterval(value)}</option>)}</select></label>)}</fieldset></>}
     {tab==='news'&&<><h3>Notícias</h3><p className="dashboard-settings-intro">Escolha os assuntos exibidos nos painéis de notícias.</p><label className="dashboard-settings-field">Notícias do Dashboard<select aria-label="Notícias do Dashboard" aria-describedby="dashboard-news-scope-caption" value={scope} onChange={event=>setScope(readDashboardNewsScope(event.target.value))}><option value="all">Visão geral</option><option value="cane">Só cana</option></select></label><p id="dashboard-news-scope-caption" className="dashboard-settings-help">Visão geral inclui cana, soja, milho e agronegócio. Só cana exibe notícias de cana, açúcar e etanol em todos os painéis de notícias.</p></>}
-    {tab==='tv'&&<><h3>TV Agro</h3><p className="dashboard-settings-intro">Acompanhe os vídeos dos canais selecionados e escolha o comportamento durante a apresentação.</p><fieldset className="dashboard-settings-modes"><legend>Modo de reprodução</legend>{([{id:'autoplay',label:'Reprodução automática',description:'Solicita a reprodução do vídeo ao abrir a aba. O navegador pode exigir um clique para liberar o som.'},{id:'preview',label:'Prévia',description:'Mostra os vídeos em destaque sem iniciar a reprodução. Clique no vídeo para assistir.'},{id:'skip',label:'Só passar',description:'Segue para a próxima aba sem abrir a TV Agro na apresentação. Os vídeos continuam acessíveis manualmente.'}] as const).map(mode=><label key={mode.id} className="dashboard-settings-mode"><input type="radio" name="dashboard-tv-mode" value={mode.id} checked={tv.mode===mode.id} onChange={()=>setTv(previous=>({...previous,mode:mode.id}))}/><span><strong>{mode.label}</strong><small>{mode.description}</small></span></label>)}</fieldset><h4>Canais da TV Agro</h4><p className="dashboard-settings-help">Selecione os canais que deseja acompanhar.</p><div className="dashboard-settings-options">{TV_CHANNELS.map(channel=><label key={channel.id} className="dashboard-settings-toggle"><span className="dashboard-settings-option-icon"><Tv size={20}/></span><span><strong>{channel.name}</strong><small>{tv.channelIds.includes(channel.id)?'Incluído na programação':'Fora da programação'}</small></span><input type="checkbox" role="switch" aria-label={`Ativar canal ${channel.name}`} checked={tv.channelIds.includes(channel.id)} onChange={event=>{const checked=event.target.checked;setTv(previous=>({...previous,channelIds:checked?[...previous.channelIds,channel.id]:previous.channelIds.filter(id=>id!==channel.id)}));setError('');}}/></label>)}</div></>}
     {error&&<p className="dashboard-settings-error" role="alert">{error}</p>}
    </div>
   </div>

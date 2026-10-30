@@ -5,24 +5,23 @@ import ts from 'typescript';
 
 const dataUrl=source=>'data:text/javascript;base64,'+Buffer.from(source).toString('base64');
 const transpile=async path=>ts.transpileModule(await readFile(new URL(path,import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
-const catalogUrl=dataUrl(await transpile('../modules/dashboard-tv/catalog.ts'));
-const settingsUrl=dataUrl((await transpile('../modules/resumo/presentationSettings.ts')).replace(/from ['"]\.\.\/dashboard-tv\/catalog['"]/g,`from ${JSON.stringify(catalogUrl)}`));
+const settingsUrl=dataUrl(await transpile('../modules/resumo/presentationSettings.ts'));
 const {DASHBOARD_SCENES,DASHBOARD_SCENE_IDS,PRESENTATION_INTERVALS,formatPresentationInterval,defaultPresentationMinutes,isPresentationMinutes,isDashboardSceneIndex,presentationSettingsKey,readPresentationSettings,serializePresentationSettings,updateSceneMinutes,updateAllSceneMinutes,defaultDashboardPreferences,readDashboardPreferences,serializeDashboardPreferences,validateDashboardPreferences,presentationSceneIndices,nextPresentationScene}=await import(settingsUrl);
 
 test('every scene defaults to two minutes and only supported intervals and scene indices are accepted',()=>{
- assert.deepEqual(PRESENTATION_INTERVALS,[10/60,20/60,30/60,1,2,5,10]);assert.equal(DASHBOARD_SCENES.length,9);assert.equal(DASHBOARD_SCENES[3].label,'Faturamento');assert.equal(DASHBOARD_SCENES[4].label,'Clientes');assert.equal(DASHBOARD_SCENES[4].id,'dashboard-suppliers');assert.equal(DASHBOARD_SCENES[7].label,'Notícias');assert.equal(DASHBOARD_SCENES.at(-1).label,'TV Agro');
+ assert.deepEqual(PRESENTATION_INTERVALS,[10/60,20/60,30/60,1,2,5,10]);assert.equal(DASHBOARD_SCENES.length,8);assert.equal(DASHBOARD_SCENES[3].label,'Faturamento');assert.equal(DASHBOARD_SCENES[4].label,'Clientes');assert.equal(DASHBOARD_SCENES[4].id,'dashboard-suppliers');assert.equal(DASHBOARD_SCENES.at(-1).label,'Notícias');
  assert.deepEqual(PRESENTATION_INTERVALS.map(formatPresentationInterval),['10 segundos','20 segundos','30 segundos','1 minuto','2 minutos','5 minutos','10 minutos']);
  assert.deepEqual(Object.keys(defaultPresentationMinutes()),DASHBOARD_SCENE_IDS);assert.equal(Object.values(defaultPresentationMinutes()).every(value=>value===2),true);
  for(const value of PRESENTATION_INTERVALS)assert.equal(isPresentationMinutes(value),true);
  for(const value of [0,3,-1,Infinity,NaN,'2',null])assert.equal(isPresentationMinutes(value),false);
- for(const value of [-1,0.5,9,Infinity,NaN,'0',null])assert.equal(isDashboardSceneIndex(value),false);
- for(const value of [0,1,2,3,4,5,6,7,8])assert.equal(isDashboardSceneIndex(value),true);
+ for(const value of [-1,0.5,8,9,Infinity,NaN,'0',null])assert.equal(isDashboardSceneIndex(value),false);
+ for(const value of [0,1,2,3,4,5,6,7])assert.equal(isDashboardSceneIndex(value),true);
 });
 test('preferences serialize by canonical scene ID and partial valid settings fill remaining defaults',()=>{
  const values=updateSceneMinutes(defaultPresentationMinutes(),2,5);values['dashboard-types']=10;
  const raw=serializePresentationSettings(values);assert.deepEqual(readPresentationSettings(raw),values);assert.equal(JSON.parse(raw).version,1);
  const partial=readPresentationSettings(JSON.stringify({version:1,minutesByScene:{'dashboard-general':1}}));
- assert.equal(partial['dashboard-general'],1);assert.equal(partial['dashboard-production'],2);assert.equal(partial['dashboard-news'],2);assert.equal(partial['dashboard-financial'],2);assert.equal(partial['dashboard-tv'],2);assert.equal(Object.keys(partial).length,9);
+ assert.equal(partial['dashboard-general'],1);assert.equal(partial['dashboard-production'],2);assert.equal(partial['dashboard-news'],2);assert.equal(partial['dashboard-financial'],2);assert.equal(Object.keys(partial).length,8);
  const oldFive={...values};delete oldFive['dashboard-news'];const migrated=readPresentationSettings(JSON.stringify({version:1,minutesByScene:oldFive}));assert.equal(migrated['dashboard-production'],5);assert.equal(migrated['dashboard-types'],10);assert.equal(migrated['dashboard-news'],2);
  const oldSix={...values};delete oldSix['dashboard-financial'];oldSix['dashboard-news']=5;const withFinancial=readPresentationSettings(JSON.stringify({version:1,minutesByScene:oldSix}));assert.equal(withFinancial['dashboard-financial'],2);assert.equal(withFinancial['dashboard-news'],5);assert.equal(withFinancial['dashboard-production'],5);
  const withUnknown={...values,unknown:999};assert.equal('unknown' in JSON.parse(serializePresentationSettings(withUnknown)).minutesByScene,false);
@@ -43,7 +42,7 @@ test('malformed JSON, unknown versions, keys and unsupported values never enter 
 test('editing one scene preserves all others and global compatibility updates all scenes without mutating prior state',()=>{
  const previous=defaultPresentationMinutes();const next=updateSceneMinutes(previous,5,10);
  assert.equal(next['dashboard-contracts'],10);assert.equal(next['dashboard-general'],2);assert.equal(previous['dashboard-contracts'],2);
- for(const index of [-1,9,NaN])assert.equal(updateSceneMinutes(previous,index,1),null);
+ for(const index of [-1,8,9,NaN])assert.equal(updateSceneMinutes(previous,index,1),null);
  assert.equal(updateSceneMinutes(previous,1,3),null);assert.equal(updateAllSceneMinutes(3),null);
  assert.equal(Object.values(updateAllSceneMinutes(5)).every(value=>value===5),true);
 });
@@ -53,22 +52,31 @@ test('storage keys isolate accounts and require an authenticated user',()=>{
  assert.match(presentationSettingsKey('owner:currency'),/owner%3Acurrency$/);
 });
 
-test('version two keeps enabled scenes and TV settings while migrating old durations',()=>{
+test('current preferences keep enabled scenes while migrating old durations',()=>{
  const old=readDashboardPreferences(JSON.stringify({version:1,minutesByScene:{'dashboard-news':5}}));
- assert.equal(old.minutesByScene['dashboard-news'],5);assert.equal(old.minutesByScene['dashboard-tv'],2);
- assert.equal(old.enabledSceneIds.length,9);assert.equal(old.tvSettings.mode,'preview');assert.equal(old.tvSettings.channelIds.length,5);
- const next={...old,enabledSceneIds:['dashboard-news','dashboard-tv'],tvSettings:{mode:'autoplay',channelIds:[old.tvSettings.channelIds[2]]}};
+ assert.equal(old.minutesByScene['dashboard-news'],5);assert.equal(old.enabledSceneIds.length,8);
+ const next={...old,enabledSceneIds:['dashboard-weekly','dashboard-news']};
  assert.deepEqual(readDashboardPreferences(serializeDashboardPreferences(next)),next);
- for(const enabledSceneIds of [[],['missing'],['dashboard-tv','dashboard-tv']])assert.equal(validateDashboardPreferences({...next,enabledSceneIds}),null);
- for(const tvSettings of [{mode:'other',channelIds:next.tvSettings.channelIds},{mode:'preview',channelIds:[]},{mode:'skip',channelIds:['missing']}])assert.equal(validateDashboardPreferences({...next,tvSettings}),null);
- assert.deepEqual(validateDashboardPreferences({...next,enabledSceneIds:['dashboard-news'],tvSettings:{mode:'preview',channelIds:[]}})?.tvSettings.channelIds,[]);
+ assert.equal(JSON.parse(serializeDashboardPreferences(next)).version,3);
+ for(const enabledSceneIds of [[],['missing'],['dashboard-news','dashboard-news']])assert.equal(validateDashboardPreferences({...next,enabledSceneIds}),null);
 });
 
-test('rotation respects enabled tabs and skip TV mode, including a single or absent rotation scene',()=>{
- const enabled=['dashboard-weekly','dashboard-news','dashboard-tv'];
- assert.deepEqual(presentationSceneIndices(enabled,'preview'),[1,7,8]);assert.deepEqual(presentationSceneIndices(enabled,'skip'),[1,7]);
+test('removing a retired scene preserves durations and visibility and never leaves an empty dashboard',()=>{
+ const legacy={version:2,minutesByScene:{...defaultPresentationMinutes(),'dashboard-tv':10,'dashboard-contracts':5},enabledSceneIds:['dashboard-contracts','dashboard-tv'],tvSettings:{mode:'autoplay',channelIds:['canal-rural']}};
+ const restored=readDashboardPreferences(JSON.stringify(legacy));
+ assert.deepEqual(restored.enabledSceneIds,['dashboard-contracts']);assert.equal(restored.minutesByScene['dashboard-contracts'],5);
+ assert.equal('dashboard-tv' in restored.minutesByScene,false);assert.equal('tvSettings' in restored,false);
+ assert.doesNotMatch(serializeDashboardPreferences(restored),/dashboard-tv|tvSettings|canal-rural/);
+ const onlyRetired=readDashboardPreferences(JSON.stringify({...legacy,enabledSceneIds:['dashboard-tv']}));
+ assert.deepEqual(onlyRetired.enabledSceneIds,['dashboard-general']);assert.equal(onlyRetired.minutesByScene['dashboard-contracts'],5);
+ const oldTimes=readPresentationSettings(JSON.stringify({version:1,minutesByScene:legacy.minutesByScene}));assert.equal(oldTimes['dashboard-contracts'],5);assert.equal('dashboard-tv' in oldTimes,false);
+});
+
+test('rotation respects enabled tabs, including a single or absent rotation scene',()=>{
+ const enabled=['dashboard-weekly','dashboard-news'];
+ assert.deepEqual(presentationSceneIndices(enabled),[1,7]);
  assert.equal(nextPresentationScene(7,[1,7]),1);assert.equal(nextPresentationScene(0,[1,7]),1);
- assert.equal(nextPresentationScene(8,[8]),8);assert.equal(nextPresentationScene(8,[]),8);
+ assert.equal(nextPresentationScene(7,[7]),7);assert.equal(nextPresentationScene(7,[]),7);
 });
 
 // Execute the actual hook with deterministic React lifecycle and browser adapters.
@@ -100,6 +108,18 @@ function setup(){
  const render=()=>{state.cursor=0;state.pending=[];const result=evaluatePresentation(rootRef);for(const effect of state.pending)effect();return result;};
  return {storage,render,restore:()=>{for(const effect of state.effects)effect?.cleanup?.();Object.assign(globalThis,previousGlobals);}};
 }
+test('opening existing preferences removes retired data from storage only for the active account',()=>{
+ const fixture=setup();
+ try{
+  const legacy=JSON.stringify({version:2,minutesByScene:{...defaultPresentationMinutes(),'dashboard-tv':10,'dashboard-weekly':5},enabledSceneIds:['dashboard-weekly','dashboard-tv'],tvSettings:{mode:'preview',channelIds:[]}});
+  const active=presentationSettingsKey('owner-a'),other=presentationSettingsKey('owner-other');
+  fixture.storage.setItem(active,legacy);fixture.storage.setItem(other,legacy);
+  const model=fixture.render();assert.equal(model.scene,1);assert.equal(model.minutes,5);
+  const saved=fixture.storage.getItem(active);assert.equal(JSON.parse(saved).version,3);assert.doesNotMatch(saved,/dashboard-tv|tvSettings/);
+  assert.equal(fixture.storage.getItem(other),legacy);assert.deepEqual(model.enabledSceneIds,['dashboard-weekly']);
+ }finally{fixture.restore();}
+});
+
 test('per-scene timer advances once using each duration; editing a different scene never resets the active timer',async()=>{
  const fixture=setup();
  try{
@@ -133,30 +153,28 @@ test('blocked storage applies settings immediately in this tab while keeping acc
  }finally{fixture.restore();}
 });
 
-test('saving tab visibility clamps selection and rotation waits for video and settings modal',async()=>{
+test('saving tab visibility clamps selection and rotation waits for the settings modal',async()=>{
  const fixture=setup();
  try{
   let model=fixture.render();
-  const preferences={...defaultDashboardPreferences(),enabledSceneIds:['dashboard-general','dashboard-tv'],tvSettings:{...model.tvSettings,mode:'autoplay'}};
+  const preferences={...defaultDashboardPreferences(),enabledSceneIds:['dashboard-general','dashboard-news']};
   assert.equal(model.savePreferences(preferences),true);model=fixture.render();
   model.selectScene(1);model=fixture.render();assert.equal(model.scene,0);
   await model.startPresentation();model=fixture.render();assert.equal(state.timers.size,1);
-  const next=[...state.timers.values()][0];next.callback();model=fixture.render();assert.equal(model.scene,8);
-  model.setPlaybackActive(true);model=fixture.render();assert.equal(state.timers.size,0);
-  model.onPlaybackEnded();model=fixture.render();assert.equal(model.scene,0);assert.equal(state.timers.size,1);
+  const next=[...state.timers.values()][0];next.callback();model=fixture.render();assert.equal(model.scene,7);
   model.setSettingsOpen(true);model=fixture.render();assert.equal(state.timers.size,0);
   model.setSettingsOpen(false);model=fixture.render();assert.equal(state.timers.size,1);
-  model.selectScene(8);model=fixture.render();
+  model.selectScene(7);model=fixture.render();
   assert.equal(model.savePreferences({...preferences,enabledSceneIds:['dashboard-general']}),true);model=fixture.render();assert.equal(model.scene,0);assert.equal(state.timers.size,0);
  }finally{fixture.restore();}
 });
 
-test('TV skip mode cannot start an empty presentation and account changes stop active playback rotation',async()=>{
+test('a single scene stays visible without a timer and account changes stop presentation',async()=>{
  const fixture=setup();
  try{
   let model=fixture.render();
-  model.savePreferences({...defaultDashboardPreferences(),enabledSceneIds:['dashboard-tv'],tvSettings:{...model.tvSettings,mode:'skip'}});model=fixture.render();
-  await model.startPresentation();model=fixture.render();assert.equal(model.presenting,false);assert.match(model.error,/Ative uma aba/);assert.equal(state.timers.size,0);
+  model.savePreferences({...defaultDashboardPreferences(),enabledSceneIds:['dashboard-news']});model=fixture.render();
+  await model.startPresentation();model=fixture.render();assert.equal(model.presenting,true);assert.equal(model.scene,7);assert.equal(state.timers.size,0);
   model.savePreferences(defaultDashboardPreferences());model=fixture.render();await model.startPresentation();model=fixture.render();assert.equal(model.presenting,true);
   state.user={id:'owner-other'};model=fixture.render();assert.equal(model.presenting,false);assert.equal(model.scene,0);assert.equal(state.timers.size,0);
   state.user={id:'owner-a'};model=fixture.render();assert.equal(model.presenting,false);
