@@ -14,13 +14,30 @@ async function fixture(){
   CREATE FUNCTION public.billing_rpc(p_resource text,p_action text,p_payload jsonb DEFAULT '{}') RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$BEGIN IF auth.uid() IS NULL THEN RAISE EXCEPTION 'login' USING ERRCODE='28000';END IF;PERFORM billing_private.ensure_actor_workspace();RETURN '{}'::jsonb;END$$;
   CREATE PUBLICATION supabase_realtime;`);
  await installSchedulingFixture(db);
- for(const file of ['20261030130255_dashboard_weather_cache.sql','20261030132411_dashboard_weather_preferences_scheduler.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
+ for(const file of ['20261030130255_dashboard_weather_cache.sql','20261030132411_dashboard_weather_preferences_scheduler.sql','20261030180837_dashboard_weather_cached_read.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
  const actor=async(role='authenticated',sub=a)=>{await db.exec('RESET ROLE');await db.query("SELECT set_config('request.jwt.claims',$1,false)",[JSON.stringify({role,...(sub?{sub}:{})})]);await db.exec(`SET ROLE ${role}`);};
  const rpc=async(action,payload={})=>(await db.query("SELECT public.billing_rpc('weather-preferences',$1,$2::jsonb) result",[action,JSON.stringify(payload)])).rows[0].result;
  const worker=async(action,payload={})=>(await db.query('SELECT public.dashboard_weather_cache($1,$2::jsonb) result',[action,JSON.stringify(payload)])).rows[0].result;
  return {db,actor,rpc,worker};
 }
 const deny=(job,code)=>assert.rejects(job,error=>error.code===code);
+
+test('dashboard reads stored forecasts without external services and only for its own selected cities',async()=>{
+ const {db,actor,rpc,worker}=await fixture();
+ const read=async(payload={cityIds:['2803302']},action='get')=>(await db.query("SELECT public.billing_rpc('dashboard-weather',$1,$2::jsonb) result",[action,JSON.stringify(payload)])).rows[0].result;
+ try{
+  await actor();await rpc('initialize',{cityIds:['2803401','2803302']});
+  const empty=await read();assert.equal(empty.cities[0].payload,null);assert.equal(empty.cities[0].city.name,'Japaratuba');
+  await actor('service_role',null);const payload={'2803302':{'30/10/2026':{manha:{resumo:'Muitas nuvens',temp_min:22}}}};
+  await worker('save',{cityId:'2803302',payload,fetchedAt:new Date().toISOString()});
+  await actor();const cached=await read({cityIds:['2803302','2803401']});assert.deepEqual(cached.cities.map(row=>row.city.id),['2803401','2803302']);assert.deepEqual(cached.cities[1].payload,payload);assert.ok(cached.cities[1].fetchedAt);assert.ok(cached.checkedAt);
+  for(const invalid of [{cityIds:['2803302'],ownerId:b},{cityIds:['2803302','2803302']},{cityIds:['bad']},{cityIds:[null]},{cityIds:'2803302'},{}])await deny(()=>read(invalid),'22023');
+  await deny(()=>read({cityIds:['2803302']},'save'),'22023');await deny(()=>read({cityIds:['2704302']}),'42501');
+  await deny(()=>db.query('SELECT * FROM billing_private.weather_forecasts'),'42501');
+  await actor('authenticated',b);await rpc('initialize',{cityIds:[]});await deny(()=>read(),'42501');assert.deepEqual((await read({cityIds:[]})).cities,[]);
+  await actor('anon',null);await deny(()=>read(),'28000');
+ }finally{await db.close();}
+});
 test('weather selections persist per account, retain explicit empty lists and deny cross-owner payloads/direct writes',async()=>{
  const {db,actor,rpc,worker}=await fixture();
  try{

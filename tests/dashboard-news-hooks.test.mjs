@@ -58,7 +58,8 @@ test('public news and weather routes require a verified user before touching the
 test('weather polling follows turns and mutations await scoped server invalidation',async()=>{
  const weatherCatalog=url(await compile('modules/dashboard-news/weatherCatalog.ts'));
  const {readWeatherCities}=await import(weatherCatalog),cities=readWeatherCities('');
- const mocks=url(`import {state} from ${JSON.stringify(fixtures)};export {useAuth,authenticatedFetch,billingKeys} from ${JSON.stringify(fixtures)};
+ const mocks=url(`import {state} from ${JSON.stringify(fixtures)};import {isWeatherFeed} from ${JSON.stringify(weatherCatalog)};export {useAuth,authenticatedFetch,billingKeys} from ${JSON.stringify(fixtures)};
+  export const fetchCachedWeather=async(ids,signal)=>{state.calls.push({ids,options:{signal}});if(!isWeatherFeed(state.body))throw Error('Previsão inválida.');return state.body;};
   export const operations=[];export const useEffect=()=>{};export const useRef=value=>({current:value});
   export const fetchWeatherPreferences=async()=>({configured:true,revision:'1',cities:${JSON.stringify(cities)}});
   export const useQuery=options=>options.queryKey[2]==='weather-preferences'?{...options,data:{configured:true,revision:'1',cities:${JSON.stringify(cities)}},isPending:false}:options;

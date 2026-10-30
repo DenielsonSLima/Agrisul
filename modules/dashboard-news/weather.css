@@ -28,3 +28,4 @@
 .weather-detail dt{font-size:10px;color:#52665a}.weather-detail dd{margin:3px 0 0}
 .weather-detail>p{margin:8px 0 0;color:#52665a;font-size:11px}
 @media(max-width:760px){.dashboard-weather{height:105px}.weather-forecast-period{font-size:7px;margin-top:2px}.weather-city-details>small{font-size:6px}}
+.weather-load-error{flex:none;font-size:10px;line-height:1.4}.weather-load-error p{margin:0 0 4px}.weather-load-error button{font:inherit;text-decoration:underline}.weather-load-error button:disabled{opacity:.6}

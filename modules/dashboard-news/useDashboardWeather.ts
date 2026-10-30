@@ -2,10 +2,10 @@
 import {useEffect,useRef} from 'react';
 import {useMutation,useQuery,useQueryClient} from '@tanstack/react-query';
 import {useAuth} from '@/shared/supabase/AuthProvider';
-import {authenticatedFetch,rpcRequest} from '@/shared/supabase/rpc';
+import {rpcRequest} from '@/shared/supabase/rpc';
 import {assertSessionActor} from '@/shared/supabase/sessionActor';
 import {billingKeys} from '@/shared/query/keys';
-import {isWeatherFeed,type WeatherFeed} from './weatherCatalog';
+import {fetchCachedWeather} from './weatherFeed';
 import {weatherRefreshDelay} from './weatherTime.mjs';
 import {fetchWeatherPreferences,type WeatherPreferences} from './weatherPreferences';
 
@@ -15,9 +15,9 @@ export function useDashboardWeather(){
  useEffect(()=>{const active=requests.current;return()=>{for(const request of active)request.abort();active.clear();};},[userId]);
  const preferences=useQuery({queryKey:preferenceKey,enabled:ready&&!!userId,queryFn:({signal})=>fetchWeatherPreferences(userId,signal)});
  const cities=preferences.data?.cities??[],ids=cities.map(city=>city.id).join(',');
- const query=useQuery({queryKey:[...billingKeys.resource(userId,'dashboard-weather'),{ids,projection:2}],enabled:ready&&!!userId&&!!preferences.data?.configured&&cities.length>0,
-  queryFn:async({signal}):Promise<WeatherFeed>=>{const response=await authenticatedFetch(`/api/dashboard-weather?ids=${encodeURIComponent(ids)}`,{signal});if(!response.ok)throw Error('Não foi possível atualizar o clima.');const feed=await response.json();if(!isWeatherFeed(feed)||feed.cities.length!==cities.length)throw Error('Previsão inválida.');return feed;},
-  staleTime:1800000,gcTime:3600000,refetchInterval:query=>weatherRefreshDelay(Date.now(),query.state.data?.cities),refetchOnReconnect:'always',refetchOnWindowFocus:'always',
+ const query=useQuery({queryKey:[...billingKeys.resource(userId,'dashboard-weather'),{ids,projection:3}],enabled:ready&&!!userId&&!!preferences.data?.configured&&cities.length>0,
+  queryFn:({signal})=>fetchCachedWeather(cities.map(city=>city.id),signal),
+  staleTime:60000,gcTime:3600000,refetchInterval:query=>Math.min(query.state.data?.cities.some(city=>city.status!=='current')?60000:300000,weatherRefreshDelay(Date.now(),query.state.data?.cities)),refetchOnReconnect:'always',refetchOnWindowFocus:'always',retry:1,
  });
  const mutation=useMutation({
   mutationFn:async({action,cityId}:{action:'add'|'remove'|'reset';cityId?:string})=>{
