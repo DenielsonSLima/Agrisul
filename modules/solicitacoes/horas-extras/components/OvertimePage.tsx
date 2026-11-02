@@ -39,7 +39,7 @@ function OvertimeWorkspace({companyId,companyName}:{companyId:string;companyName
  const status=searchParams.get('aba')==='finalizados'?'finished':'open';
  const filters:OvertimeFilters={companyId,status,search,...(dateFrom&&dateTo?{dateFrom,dateTo}:{})};
  const list=useOvertimeList(filters),options=useOvertimeOptions(companyId),detail=useOvertimeReport(companyId,id),mutations=useOvertimeMutations();
- const header=useReportHeader(companyId,'landscape');
+ const header=useReportHeader(companyId,'portrait');
  const [formError,setFormError]=useState(''),[createError,setCreateError]=useState(''),[exportError,setExportError]=useState(''),[exporting,setExporting]=useState(false);
  const [draftStatus,setDraftStatus]=useState<'saved'|'saving'|'error'>('saved');
  const [pdfSnapshot,setPdfSnapshot]=useState<OvertimeReport|null>(null);
@@ -111,7 +111,7 @@ function OvertimeWorkspace({companyId,companyName}:{companyId:string;companyName
    </Tabs>
   </>}
   {!id&&creating&&canManage&&<OvertimeCreateModal companyId={companyId} busy={mutations.creating} error={createError} onClose={()=>navigate(href())} onSave={create}/>}
-  {pdfSnapshot&&pdfSnapshot.id===id&&<PdfExportDialog snapshot={pdfSnapshot} companyId={companyId} createPdf={createPdf} orientation="landscape" title="Relatório de horas extras" description={dateLabel(pdfSnapshot.dateFrom)+' a '+dateLabel(pdfSnapshot.dateTo)} previewClassName="overtime-pdf-preview" onClose={()=>setPdfSnapshot(null)}/>}
+  {pdfSnapshot&&pdfSnapshot.id===id&&<PdfExportDialog snapshot={pdfSnapshot} companyId={companyId} createPdf={createPdf} orientation="portrait" title="Relatório de horas extras" description={dateLabel(pdfSnapshot.dateFrom)+' a '+dateLabel(pdfSnapshot.dateTo)} previewClassName="overtime-pdf-preview" onClose={()=>setPdfSnapshot(null)}/>}
  </section>;
 }
 function Loading(){return <div className="client-loading" role="status"><Loader2 className="animate-spin" size={20}/>Carregando relatórios…</div>;}

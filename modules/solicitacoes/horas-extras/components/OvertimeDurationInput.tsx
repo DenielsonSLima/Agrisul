@@ -7,6 +7,7 @@ export function OvertimeDurationInput({value,onChange,label,onComplete,inputRef}
  if(value!==model.source)setModel({source:value,edit:durationFromText(value)??{digits:'',hourWidth:2}});
  const input=useRef<HTMLInputElement|null>(null),cursor=useRef<number|null>(null),timer=useRef<ReturnType<typeof setTimeout>|null>(null);
  const explicitSeparator=useRef(false);
+ const selectOnClick=useRef(false);
  const cancelAdvance=()=>{if(timer.current!==null){clearTimeout(timer.current);timer.current=null;}};
  useEffect(()=>()=>{if(timer.current!==null)clearTimeout(timer.current);},[]);
  useLayoutEffect(()=>{const node=input.current;if(node&&cursor.current!==null&&node===document.activeElement){node.setSelectionRange(cursor.current,cursor.current);cursor.current=null;}},[model]);
@@ -21,9 +22,11 @@ export function OvertimeDurationInput({value,onChange,label,onComplete,inputRef}
  const display=durationDisplay(model.edit);
  useEffect(()=>{if(value!==display&&durationFromText(value)!==null)onChange(display);},[value,display,onChange]);
  return <input ref={node=>{input.current=node;inputRef?.(node);}} type="text" inputMode="numeric" autoComplete="off" spellCheck={false} aria-label={label} placeholder="00:00:00" value={display}
-  onFocus={event=>{cancelAdvance();explicitSeparator.current=false;event.currentTarget.select();}}
-  onBlur={cancelAdvance}
+  onFocus={event=>{cancelAdvance();explicitSeparator.current=false;selectOnClick.current=true;event.currentTarget.select();}}
+  onClick={event=>{if(selectOnClick.current){event.currentTarget.select();selectOnClick.current=false;}}}
+  onBlur={()=>{cancelAdvance();selectOnClick.current=false;}}
   onKeyDown={event=>{
+   selectOnClick.current=false;
    if(event.ctrlKey||event.metaKey||event.altKey)return;
    const node=event.currentTarget,selectedAll=node.selectionStart===0&&node.selectionEnd===display.length;
    let start=durationRawPosition(model.edit,node.selectionStart??0),end=durationRawPosition(model.edit,node.selectionEnd??0);
@@ -46,6 +49,7 @@ export function OvertimeDurationInput({value,onChange,label,onComplete,inputRef}
    }else if(['ArrowLeft','ArrowRight','Home','End','Tab'].includes(event.key))cancelAdvance();
   }}
   onChange={event=>{
+   selectOnClick.current=false;
    // Virtual keyboards can dispatch input without a usable keydown event.
    const next=event.target.value;
    let start=0;while(start<display.length&&start<next.length&&display[start]===next[start])start++;
