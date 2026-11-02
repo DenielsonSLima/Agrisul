@@ -65,5 +65,5 @@ export async function createOvertimePdf(report:OvertimeReport,brand:ReportPdfBra
  doc.text('DIRETOR DA UNIDADE',margin+content*.78,signatureY+5,{align:'center'});
  const pages=doc.getNumberOfPages();
  for(let page=1;page<=pages;page++){doc.setPage(page);doc.setFont('helvetica','normal');doc.setFontSize(6);doc.setTextColor('#7b887f');doc.text('Relatório de horas extras · '+page+' / '+pages,width-margin,height-6,{align:'right'});}
- return {doc,fileName:'relatorio-horas-extras-'+report.dateFrom+'-a-'+report.dateTo+'.pdf'};
+ return {doc,fileName:'Relatório de horas extras - '+dateLabel(report.dateFrom).replaceAll('/','-')+' a '+dateLabel(report.dateTo).replaceAll('/','-')+'.pdf'};
 }

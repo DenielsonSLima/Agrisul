@@ -9,6 +9,7 @@ import {useOvertimeTotals} from '../hooks/useOvertime';
 import type {OvertimeEmployee,OvertimeInput,OvertimeReport,OvertimeRowInput} from '../types';
 import {OvertimeDurationInput} from './OvertimeDurationInput';
 import {OvertimeEmployeeSelect} from './OvertimeEmployeeSelect';
+import {OvertimeAddEmployeesModal} from './OvertimeAddEmployeesModal';
 import {useOvertimeAutoSave,type OvertimeSaveStatus} from '../hooks/useOvertimeAutoSave';
 
 type DraftRow=OvertimeRowInput & {key:string};
@@ -16,6 +17,7 @@ export function OvertimeForm({report,employees,companyId,busy,error,onSave,canRe
  const confirm=useConfirmation();
  const inputs100=useRef(new Map<string,HTMLInputElement>());
  const employeeMutations=useEmployeeMutations(),[registeringFor,setRegisteringFor]=useState<string|null>(null);
+ const [addingEmployees,setAddingEmployees]=useState(false);
  const mounted=useRef(false);
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Sao_Paulo'}).format(new Date());
@@ -46,12 +48,19 @@ export function OvertimeForm({report,employees,companyId,busy,error,onSave,canRe
     const employee=availableEmployees.find(item=>item.id===row.employeeId);
     return <tr key={row.key}><td><OvertimeEmployeeSelect label={`Funcionário da linha ${index+1}`} employees={availableEmployees} value={row.employeeId} onChange={employeeId=>patchRow(row.key,{employeeId})} onCreate={canRegisterEmployees?()=>setRegisteringFor(row.key):undefined}/></td><td>{employee?.registrationNumber||'—'}</td><td>{employee?.jobTitle||<span className="overtime-missing-role">{employee?'Cadastre o cargo':'—'}</span>}</td><td><OvertimeDurationInput label={`Horas extras 50% da linha ${index+1}`} value={row.hours50} onChange={value=>patchRow(row.key,{hours50:value})} onComplete={()=>inputs100.current.get(row.key)?.focus()}/></td><td><OvertimeDurationInput label={`Horas extras 100% da linha ${index+1}`} value={row.hours100} onChange={value=>patchRow(row.key,{hours100:value})} inputRef={node=>{if(node)inputs100.current.set(row.key,node);else inputs100.current.delete(row.key);}}/></td><td><button hidden={readOnly} type="button" className="icon-btn overtime-delete" aria-label={`Remover linha ${index+1}`} onClick={()=>void remove(row)}><Trash2 size={16}/></button></td></tr>;
    })}</tbody></table></div>
-   <button hidden={readOnly} type="button" className="btn overtime-add-row" onClick={()=>setRows(current=>[...current,{key:crypto.randomUUID(),employeeId:'',hours50:'',hours100:''}])} disabled={rows.length>=500}><Plus size={16}/>Adicionar funcionário</button>
+   <button hidden={readOnly} type="button" className="btn overtime-add-row" onClick={()=>setAddingEmployees(true)} disabled={rows.filter(row=>row.employeeId).length>=500}><Plus size={16}/>Adicionar funcionários</button>
   </fieldset>
   <section className="overtime-draft-summary" aria-label="Resumo das horas extras" aria-busy={totals.updating}><h3>Resumo do relatório</h3><div><span>Total de horas 50%</span><output aria-label="Total de horas 50%">{readOnly?report?.total50:totals.updating?'Calculando…':totals.data?.total50??'—'}</output></div><div><span>Total de horas 100%</span><output aria-label="Total de horas 100%">{readOnly?report?.total100:totals.updating?'Calculando…':totals.data?.total100??'—'}</output></div>{!readOnly&&!totals.updating&&totals.error&&<p className="form-error" role="alert">{totals.error}</p>}</section>
   {error&&<p className="form-error" role="alert">{error}</p>}
   <div className="overtime-auto-save-status" role="status">{readOnly?'Consulta do relatório.':autosave.status==='saving'?<><Loader2 className="animate-spin" size={14}/>Salvando automaticamente…</>:autosave.status==='error'?'Não foi possível salvar. Confira a mensagem acima.':'Alterações salvas automaticamente.'}</div>
- </form>{registeringFor!==null&&<EmployeeForm requireJobTitle onClose={()=>setRegisteringFor(null)} onSave={async input=>{
+ </form>{addingEmployees&&!readOnly&&<OvertimeAddEmployeesModal employees={employees.filter(employee=>!rows.some(row=>row.employeeId===employee.id))} maxSelections={500-rows.filter(row=>row.employeeId).length} onClose={()=>setAddingEmployees(false)} onAdd={ids=>{
+  setRows(current=>{
+   const remaining=ids.filter(id=>!current.some(row=>row.employeeId===id));
+   const filled=current.map(row=>!row.employeeId&&remaining.length?{...row,employeeId:remaining.shift()!}:row);
+   return [...filled,...remaining.slice(0,500-filled.length).map(employeeId=>({key:crypto.randomUUID(),employeeId,hours50:'',hours100:''}))];
+  });setAddingEmployees(false);
+ }}/>}
+ {registeringFor!==null&&<EmployeeForm requireJobTitle onClose={()=>setRegisteringFor(null)} onSave={async input=>{
   const employee=await employeeMutations.save(input);if(!mounted.current)return employee;
   if(registeringFor==='new')setRows(current=>[...current,{key:crypto.randomUUID(),employeeId:employee.id,hours50:'',hours100:''}]);
   else patchRow(registeringFor,{employeeId:employee.id});

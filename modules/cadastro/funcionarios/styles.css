@@ -19,3 +19,29 @@
 .employee-job-options [data-slot=combobox-item]{font-size:13px;padding:10px 12px}
 @media(max-width:600px){.employee-job-filter{flex:auto;width:100%;min-width:0}}
 @media(max-width:600px){.employees-toolbar{align-items:stretch;flex-direction:column}.employees-toolbar>span{align-self:flex-end}.employees-table th,.employees-table td{padding:12px}.employee-actions .btn{font-size:11px}}
+@media(max-width:1000px){
+ .employees-workspace .companies-heading{align-items:stretch;flex-direction:column;gap:16px}
+ .employees-workspace .companies-heading>.btn{width:100%;min-height:46px}
+ .employees-toolbar{align-items:stretch;flex-direction:column;gap:12px}
+ .employees-toolbar .local-search input,.employee-job-combobox input,.employee-form input{font-size:16px!important;min-height:46px}
+ .employee-job-combobox{height:46px}
+ .employee-job-filter{flex:auto;width:100%;min-width:0}
+ .employees-toolbar>span{align-self:flex-end}
+ .employees-table-wrap{overflow:visible;border:0;background:transparent}
+ .employees-table,.employees-table tbody{display:block;width:100%;min-width:0}
+ .employees-table thead{display:none}
+ .employees-table tbody{display:grid;gap:12px}
+ .employees-table tr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;padding:16px;border:1px solid #dfe8e2;border-radius:12px;background:#fff}
+ .employees-table td{padding:0;border:0;min-width:0;font-size:14px;line-height:1.5}
+ .employees-table td:first-child{grid-column:1/-1;font-size:16px;font-weight:600}
+ .employees-table td[data-label]::before{content:attr(data-label);display:block;margin-bottom:4px;font-size:12px;color:#7a8f82}
+ .employees-table .employee-actions-cell{grid-column:1/-1;border-top:1px solid #edf1ee;padding-top:12px}
+ .employee-actions{gap:10px}
+ .employee-actions .btn{flex:1;min-height:44px;font-size:14px!important}
+ .employee-actions .icon-btn{width:44px;height:44px}
+ .employee-job-options{min-width:0;max-width:calc(100vw - 32px)}
+ .employee-job-options [data-slot=combobox-item]{min-height:46px;font-size:16px}
+ .employee-modal{width:calc(100vw - 24px)!important;max-height:calc(100dvh - 24px);padding:20px!important}
+ .employee-modal .form-actions{display:flex;gap:10px}
+ .employee-modal .form-actions .btn{flex:1;min-height:46px;white-space:normal}
+}

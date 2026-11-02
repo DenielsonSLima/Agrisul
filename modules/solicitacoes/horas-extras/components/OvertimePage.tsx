@@ -107,7 +107,7 @@ function OvertimeWorkspace({companyId,companyName}:{companyId:string;companyName
    </Tabs>
   </>}
   {!id&&creating&&canManage&&<OvertimeCreateModal companyId={companyId} busy={mutations.creating} error={createError} onClose={()=>navigate(href())} onSave={create}/>}
-  {pdfSnapshot&&pdfSnapshot.id===id&&<PdfExportDialog snapshot={pdfSnapshot} companyId={companyId} createPdf={createPdf} orientation="portrait" title="Relatório de horas extras" description={dateLabel(pdfSnapshot.dateFrom)+' a '+dateLabel(pdfSnapshot.dateTo)} previewClassName="overtime-pdf-preview" onClose={()=>setPdfSnapshot(null)}/>}
+  {pdfSnapshot&&pdfSnapshot.id===id&&<PdfExportDialog snapshot={pdfSnapshot} companyId={companyId} createPdf={createPdf} allowShare orientation="portrait" title="Relatório de horas extras" description={dateLabel(pdfSnapshot.dateFrom)+' a '+dateLabel(pdfSnapshot.dateTo)} previewClassName="overtime-pdf-preview" onClose={()=>setPdfSnapshot(null)}/>}
  </section>;
 }
 function Loading(){return <div className="client-loading" role="status"><Loader2 className="animate-spin" size={20}/>Carregando relatórios…</div>;}
