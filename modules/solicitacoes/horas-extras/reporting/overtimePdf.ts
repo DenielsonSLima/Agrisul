@@ -43,7 +43,7 @@ export async function createOvertimePdf(report:OvertimeReport,brand:ReportPdfBra
   return y+11;
  };
  let y=header(),rowsOnPage=0;
- const row=(values:string[],rowHeight:number)=>{for(let i=0;i<values.length;i++)cell(values[i],edges[i],y,widths[i],rowHeight,{size:9});y+=rowHeight;rowsOnPage++;};
+ const row=(values:string[],rowHeight:number)=>{for(let i=0;i<values.length;i++)cell(values[i],edges[i],y,widths[i],rowHeight,{size:9,align:i===1?'left':'center'});y+=rowHeight;rowsOnPage++;};
  const rows=[...report.rows].sort((a,b)=>a.employeeName.localeCompare(b.employeeName,'pt-BR',{sensitivity:'base'}));
  for(const item of rows){
   const values=[item.registrationNumber,item.employeeName.toLocaleUpperCase('pt-BR'),item.jobTitle.toLocaleUpperCase('pt-BR'),item.hours50.trim()||'00:00:00',item.hours100.trim()||'00:00:00'];
