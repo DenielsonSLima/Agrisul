@@ -8,7 +8,9 @@ import {ModuleLink,useModuleNavigation} from '@/shared/navigation/ModuleNavigati
 import {useAuth} from '@/shared/supabase/AuthProvider';
 import {assertSessionActor} from '@/shared/supabase/sessionActor';
 import {useWorkspaceCompany} from '@/shared/state/WorkspaceCompanyProvider';
-import {useReportHeader} from '@/modules/configuracoes/cabecalho-relatorios/hooks/useReportHeader';
+import {fetchOvertimeBrand} from '../services/overtimeBrandApi';
+import {useWorkspaceAccess} from '@/shared/access/useWorkspaceAccess';
+import {canOpenWorkspaceHref} from '@/shared/access/routeAccess';
 import {dateLabel} from '@/shared/utils/presentation';
 import {PdfExportDialog} from '@/shared/reporting/PdfExportDialog';
 import type {ReportPdfBrand} from '@/shared/reporting/types';
@@ -26,22 +28,23 @@ async function createPdf(snapshot:OvertimeReport,brand:ReportPdfBrand){
 
 export function OvertimePage(){
  const {user}=useAuth(),workspace=useWorkspaceCompany();
+ const access=useWorkspaceAccess();
  if(workspace.loading)return <Loading/>;
  if(workspace.error)return <ErrorState error={workspace.error} onRetry={()=>void workspace.reload()}/>;
- if(!workspace.activeCompanyId)return <div className="company-empty"><h3>Cadastre uma empresa para criar os relatórios</h3><ModuleLink className="btn" href="/configuracoes?secao=empresas">Abrir empresas</ModuleLink></div>;
+ if(!workspace.activeCompanyId)return <div className="company-empty"><h3>Nenhuma empresa disponível para os relatórios</h3>{canOpenWorkspaceHref(access.data,'/configuracoes?secao=empresas')?<ModuleLink className="btn" href="/configuracoes?secao=empresas">Abrir empresas</ModuleLink>:<p>Solicite à administração o cadastro de uma empresa.</p>}</div>;
  return <OvertimeWorkspace key={(user?.id??'')+':'+workspace.activeCompanyId} companyId={workspace.activeCompanyId} companyName={workspace.activeCompany?.name??''}/>;
 }
 function OvertimeWorkspace({companyId,companyName}:{companyId:string;companyName:string}){
- const {user}=useAuth(),{searchParams,navigate}=useModuleNavigation(),confirm=useConfirmation();
+ const {user}=useAuth(),{searchParams,navigate}=useModuleNavigation(),confirm=useConfirmation(),access=useWorkspaceAccess();
  const id=searchParams.get('relatorio')??'',creating=searchParams.get('novo')==='1'&&!id;
  const dateFrom=searchParams.get('de')??'',dateTo=searchParams.get('ate')??'',search=searchParams.get('busca')??'';
  const status=searchParams.get('aba')==='finalizados'?'finished':'open';
  const filters:OvertimeFilters={companyId,status,search,...(dateFrom&&dateTo?{dateFrom,dateTo}:{})};
  const list=useOvertimeList(filters),options=useOvertimeOptions(companyId),detail=useOvertimeReport(companyId,id),mutations=useOvertimeMutations();
- const header=useReportHeader(companyId,'portrait');
  const [formError,setFormError]=useState(''),[createError,setCreateError]=useState(''),[exportError,setExportError]=useState(''),[exporting,setExporting]=useState(false);
  const [draftStatus,setDraftStatus]=useState<'saved'|'saving'|'error'>('saved');
  const [pdfSnapshot,setPdfSnapshot]=useState<OvertimeReport|null>(null);
+ const [pdfBrand,setPdfBrand]=useState<ReportPdfBrand|null>(null);
  const mounted=useRef(false),exportController=useRef<AbortController|null>(null);
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;exportController.current?.abort();};},[]);
  const href=(target?:string,edit=false,tab=status,query=search,from=dateFrom,to=dateTo)=>{
@@ -76,10 +79,9 @@ function OvertimeWorkspace({companyId,companyName}:{companyId:string;companyName
   if(exporting||!user||!id||draftStatus==='saving'||draftStatus==='error')return;
   const actorId=user.id,controller=new AbortController();exportController.current=controller;setExporting(true);setExportError('');
   try{
-   if(header.loading||header.error)throw Error(header.error||'Aguarde o carregamento da identidade do relatório.');
    await assertSessionActor(actorId);
-   const [snapshot]=await Promise.all([fetchOvertimeReport(companyId,id,controller.signal),header.refreshWatermark()]);
-   await assertSessionActor(actorId);if(!mounted.current||controller.signal.aborted)return;setPdfSnapshot(snapshot);
+   const [snapshot,brand]=await Promise.all([fetchOvertimeReport(companyId,id,controller.signal),fetchOvertimeBrand(companyId,controller.signal)]);
+   await assertSessionActor(actorId);if(!mounted.current||controller.signal.aborted)return;setPdfBrand(brand);setPdfSnapshot(snapshot);
   }catch(error){if(mounted.current){const message=error instanceof Error?error.message:'Não foi possível gerar o PDF.';setExportError(message);notifications.error(message);}}
   finally{if(mounted.current)setExporting(false);}
  };
@@ -89,10 +91,10 @@ function OvertimeWorkspace({companyId,companyName}:{companyId:string;companyName
   {id&&<ModuleLink className="request-back overtime-back" href={href()}><ArrowLeft size={16}/>Voltar para relatórios</ModuleLink>}
   <div className="companies-heading"><div><span className="eyebrow">SOLICITAÇÕES</span><h2>{id?'Funcionários e horas extras':'Relatório de hora extra'}</h2><p>{companyName}</p>{id&&report&&<span className={'overtime-status '+(isOpen?'open':'finished')}>{isOpen?'Em aberto':'Finalizado'}</span>}</div><div className="overtime-heading-actions">
    {!id&&canManage&&<button className="btn company-primary" type="button" disabled={mutations.creating} onClick={openNew}><Plus size={17}/>Novo relatório</button>}
-   {id&&report&&<><button className="btn" type="button" onClick={()=>void exportPdf()} disabled={exporting||header.loading||!!detail.error||!report.employeeCount||(editing&&draftStatus!=='saved')}>{exporting?<Loader2 className="animate-spin" size={16}/>:<Download size={16}/>} {exporting?'Gerando…':'Exportar PDF'}</button>{canManage&&<>{isOpen?<><button className="btn company-primary" type="button" disabled={busy||!report.canFinish||(editing&&draftStatus!=='saved')} onClick={()=>void finish()}><CheckCircle2 size={16}/>Finalizar</button></>:<button className="btn company-primary" type="button" disabled={busy} onClick={async()=>{if(!await confirm({title:'Abrir relatório novamente?',description:'O relatório voltará para Em aberto e poderá receber alterações nos funcionários e nas horas.',confirmLabel:'Abrir novamente'}))return;try{await mutations.reopen({companyId,id:report.id,expectedUpdatedAt:report.updatedAt});if(mounted.current){notifications.updated('O relatório está em aberto novamente.');setDraftStatus('saved');navigate(href(id,true,'open'));}}catch(error){if(mounted.current)notifications.error(error instanceof Error?error.message:'Não foi possível abrir o relatório.');}}}><FolderOpen size={16}/>Abrir novamente</button>}<button className="btn overtime-delete" type="button" disabled={busy} onClick={()=>void remove(report)}><Trash2 size={16}/>Excluir</button></>}</>}
+   {id&&report&&<><button className="btn" type="button" onClick={()=>void exportPdf()} disabled={exporting||!!detail.error||!report.employeeCount||(editing&&draftStatus!=='saved')}>{exporting?<Loader2 className="animate-spin" size={16}/>:<Download size={16}/>} {exporting?'Gerando…':'Exportar PDF'}</button>{canManage&&<>{isOpen?<><button className="btn company-primary" type="button" disabled={busy||!report.canFinish||(editing&&draftStatus!=='saved')} onClick={()=>void finish()}><CheckCircle2 size={16}/>Finalizar</button></>:<button className="btn company-primary" type="button" disabled={busy} onClick={async()=>{if(!await confirm({title:'Abrir relatório novamente?',description:'O relatório voltará para Em aberto e poderá receber alterações nos funcionários e nas horas.',confirmLabel:'Abrir novamente'}))return;try{await mutations.reopen({companyId,id:report.id,expectedUpdatedAt:report.updatedAt});if(mounted.current){notifications.updated('O relatório está em aberto novamente.');setDraftStatus('saved');navigate(href(id,true,'open'));}}catch(error){if(mounted.current)notifications.error(error instanceof Error?error.message:'Não foi possível abrir o relatório.');}}}><FolderOpen size={16}/>Abrir novamente</button>}<button className="btn overtime-delete" type="button" disabled={busy} onClick={()=>void remove(report)}><Trash2 size={16}/>Excluir</button></>}</>}
   </div></div>
   {options.error&&<ErrorState error={options.error} onRetry={()=>void options.reload()}/>}
-  {id&&!options.loading&&!options.error&&!options.data?.employees.length&&<div className="overtime-notice"><Users size={20}/><p>Cadastre os funcionários com nome e cargo para preencher as horas.</p><ModuleLink className="text-link" href="/cadastro?secao=funcionarios">Abrir funcionários</ModuleLink></div>}
+  {id&&!options.loading&&!options.error&&!options.data?.employees.length&&<div className="overtime-notice"><Users size={20}/><p>Cadastre os funcionários com nome e cargo para preencher as horas.</p>{canOpenWorkspaceHref(access.data,'/cadastro?secao=funcionarios')&&<ModuleLink className="text-link" href="/cadastro?secao=funcionarios">Abrir funcionários</ModuleLink>}</div>}
   {exportError&&<p className="form-error" role="alert">{exportError}</p>}
   {id?detail.loading||options.loading?<Loading/>:detail.error?<ErrorState error={detail.error} onRetry={()=>void detail.reload()}/>:report&&<>
    <OvertimeForm key={id} report={report} companyId={companyId} employees={options.data?.employees??[]} canRegisterEmployees={options.data?.canRegisterEmployees??false} busy={mutations.finishing||mutations.reopening} readOnly={!editing} onStatusChange={setDraftStatus} error={formError} onClose={()=>navigate(href(id))} onSave={save}/>
@@ -107,7 +109,7 @@ function OvertimeWorkspace({companyId,companyName}:{companyId:string;companyName
    </Tabs>
   </>}
   {!id&&creating&&canManage&&<OvertimeCreateModal companyId={companyId} busy={mutations.creating} error={createError} onClose={()=>navigate(href())} onSave={create}/>}
-  {pdfSnapshot&&pdfSnapshot.id===id&&<PdfExportDialog snapshot={pdfSnapshot} companyId={companyId} createPdf={createPdf} allowShare orientation="portrait" title="Relatório de horas extras" description={dateLabel(pdfSnapshot.dateFrom)+' a '+dateLabel(pdfSnapshot.dateTo)} previewClassName="overtime-pdf-preview" onClose={()=>setPdfSnapshot(null)}/>}
+  {pdfSnapshot&&pdfBrand&&pdfSnapshot.id===id&&<PdfExportDialog snapshot={pdfSnapshot} brand={pdfBrand} companyId={companyId} createPdf={createPdf} allowShare orientation="portrait" title="Relatório de horas extras" description={dateLabel(pdfSnapshot.dateFrom)+' a '+dateLabel(pdfSnapshot.dateTo)} previewClassName="overtime-pdf-preview" onClose={()=>{setPdfSnapshot(null);setPdfBrand(null);}}/>}
  </section>;
 }
 function Loading(){return <div className="client-loading" role="status"><Loader2 className="animate-spin" size={20}/>Carregando relatórios…</div>;}

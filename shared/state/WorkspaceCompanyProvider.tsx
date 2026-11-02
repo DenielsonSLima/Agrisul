@@ -2,12 +2,11 @@
 
 import {createContext,useContext,useEffect,useMemo,useState,type ReactNode} from 'react';
 import {useAuth} from '@/shared/supabase/AuthProvider';
-import {useCompanies} from '@/modules/configuracoes/empresas/hooks/useCompanies';
-import type {Company} from '@/modules/configuracoes/empresas/types';
+import {useWorkspaceAccess,type WorkspaceCompany} from '@/shared/access/useWorkspaceAccess';
 
 type WorkspaceCompanyState={
- companies:Company[];
- activeCompany:Company|null;
+ companies:WorkspaceCompany[];
+ activeCompany:WorkspaceCompany|null;
  activeCompanyId:string;
  loading:boolean;
  error:string;
@@ -20,26 +19,27 @@ const storageKey=(userId:string)=>`billing:${userId}:active-company`;
 
 export function WorkspaceCompanyProvider({children}:{children:ReactNode}){
  const {user}=useAuth();
- const companyQuery=useCompanies();
+ const companyQuery=useWorkspaceAccess();
+ const companies=useMemo(()=>companyQuery.data?.companies??[],[companyQuery.data]);
  const [selectedId,setSelectedId]=useState(()=>user&&typeof window!=='undefined'
   ?window.localStorage.getItem(storageKey(user.id))??''
   :'');
 
- const activeCompany=useMemo(()=>companyQuery.companies.find(company=>company.id===selectedId)
-  ??companyQuery.companies.find(company=>company.isPrimary)
-  ??companyQuery.companies[0]
-  ??null,[companyQuery.companies,selectedId]);
+ const activeCompany=useMemo(()=>companies.find(company=>company.id===selectedId)
+  ??companies.find(company=>company.isPrimary)
+  ??companies[0]
+  ??null,[companies,selectedId]);
 
  useEffect(()=>{
   if(user&&activeCompany)window.localStorage.setItem(storageKey(user.id),activeCompany.id);
  },[user,activeCompany]);
 
  const selectCompany=(companyId:string)=>{
-  if(companyQuery.companies.some(company=>company.id===companyId))setSelectedId(companyId);
+  if(companies.some(company=>company.id===companyId))setSelectedId(companyId);
  };
 
  return <WorkspaceCompanyContext.Provider value={{
-  companies:companyQuery.companies,
+  companies,
   activeCompany,
   activeCompanyId:activeCompany?.id??'',
   loading:companyQuery.loading,
