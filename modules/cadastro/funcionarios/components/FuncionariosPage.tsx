@@ -3,12 +3,14 @@
 import {useEffect,useRef,useState} from 'react';
 import {Loader2,Pencil,Plus,RefreshCw,Search,Trash2,Users} from 'lucide-react';
 import {LocalSearch} from '@/shared/components/Common';
+import {normalize} from '@/shared/utils/format';
 import {notifications,useConfirmation} from '@/shared/feedback';
 import {ModuleLink} from '@/shared/navigation/ModuleNavigation';
 import {useAuth} from '@/shared/supabase/AuthProvider';
 import {useEmployeeMutations,useEmployees} from '../hooks/useEmployees';
 import type {Employee} from '../types';
 import {EmployeeForm} from './EmployeeForm';
+import {employeeJobTitles,EmployeeJobTitleSelect} from './EmployeeJobTitleSelect';
 import '../styles.css';
 
 export function FuncionariosPage(){
@@ -21,10 +23,11 @@ function EmployeeWorkspace(){
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   const query=useEmployees(),mutations=useEmployeeMutations(),confirm=useConfirmation();
   const [search,setSearch]=useState('');
+  const [jobTitle,setJobTitle]=useState('');
   const [editing,setEditing]=useState<Employee|null|undefined>(undefined);
   const [deleting,setDeleting]=useState<string|null>(null);
   const term=search.trim().toLocaleLowerCase('pt-BR');
-  const employees=query.employees.filter(employee=>!term||`${employee.fullName} ${employee.registrationNumber} ${employee.jobTitle}`.toLocaleLowerCase('pt-BR').includes(term));
+  const employees=query.employees.filter(employee=>(!jobTitle||normalize(employee.jobTitle.trim().replace(/\s+/g,' '))===normalize(jobTitle))&&(!term||`${employee.fullName} ${employee.registrationNumber} ${employee.jobTitle}`.toLocaleLowerCase('pt-BR').includes(term)));
   const busy=mutations.saving||mutations.deleting;
 
   const remove=async(employee:Employee)=>{
@@ -44,8 +47,8 @@ function EmployeeWorkspace(){
       :query.error?<div className="company-empty" role="alert"><h3>Não foi possível carregar os funcionários</h3><p>{query.error}</p><button className="btn" type="button" onClick={()=>void query.reload()}><RefreshCw size={16}/>Tentar novamente</button></div>
       :!query.employees.length?<div className="company-empty"><span className="company-empty-icon"><Users size={25}/></span><h3>Nenhum funcionário cadastrado</h3><p>Os funcionários cadastrados aparecerão aqui com suas matrículas.</p>{add}</div>
       :<>
-        <div className="employees-toolbar"><LocalSearch value={search} onChange={setSearch} placeholder="Buscar por nome, matrícula ou cargo"/><span>{employees.length} de {query.employees.length}</span></div>
-        {!employees.length?<div className="company-empty"><Search size={24}/><h3>Nenhum funcionário encontrado</h3><button className="btn" type="button" onClick={()=>setSearch('')}>Limpar busca</button></div>
+        <div className="employees-toolbar"><LocalSearch value={search} onChange={setSearch} placeholder="Buscar por nome, matrícula ou cargo"/><div className="employee-job-filter"><EmployeeJobTitleSelect titles={employeeJobTitles(query.employees)} value={jobTitle} onChange={setJobTitle} label="Filtrar funcionários por cargo"/></div><span>{employees.length} de {query.employees.length}</span></div>
+        {!employees.length?<div className="company-empty"><Search size={24}/><h3>Nenhum funcionário encontrado</h3><button className="btn" type="button" onClick={()=>{setSearch('');setJobTitle('');}}>Limpar filtros</button></div>
           :<div className="employees-table-wrap"><table className="employees-table"><thead><tr><th scope="col">Nome completo</th><th scope="col">Matrícula</th><th scope="col">Cargo</th>{query.canManage&&<th scope="col" className="employee-actions-heading">Ações</th>}</tr></thead>
             <tbody>{employees.map(employee=><tr key={employee.id}><td>{employee.fullName}</td><td>{employee.registrationNumber||'Sem matrícula'}</td><td>{employee.jobTitle||'—'}</td>{query.canManage&&<td><div className="employee-actions"><button className="btn small" type="button" onClick={()=>setEditing(employee)} disabled={busy} aria-label={`Editar ${employee.fullName}`}><Pencil size={14}/>Editar</button><button className="icon-btn employee-delete" type="button" aria-label={`Excluir ${employee.fullName}`} onClick={()=>void remove(employee)} disabled={busy}>{deleting===employee.id?<Loader2 size={15} className="animate-spin"/>:<Trash2 size={15}/>}</button></div></td>}</tr>)}</tbody>
           </table></div>}
