@@ -6,8 +6,11 @@ import {Dialog,DialogContent,DialogDescription,DialogHeader,DialogTitle} from '@
 import {Field} from '@/shared/components/Common';
 import {notifications} from '@/shared/feedback';
 import type {Employee,EmployeeInput} from '../types';
+import {useEmployees} from '../hooks/useEmployees';
+import {employeeJobTitles,EmployeeJobTitleSelect} from './EmployeeJobTitleSelect';
 
 export function EmployeeForm({employee,onClose,onSave,requireJobTitle=false}:{employee?:Employee;onClose:()=>void;onSave:(input:EmployeeInput)=>Promise<Employee>;requireJobTitle?:boolean}){
+  const employees=useEmployees();
   const mounted=useRef(false);
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   const [fullName,setFullName]=useState(employee?.fullName??'');
@@ -43,7 +46,7 @@ export function EmployeeForm({employee,onClose,onSave,requireJobTitle=false}:{em
           <Field label="Matrícula (quando disponível)"><input maxLength={60} type="text" autoComplete="off"
             value={registrationNumber} onChange={event=>{setRegistrationNumber(event.target.value);setError('');}}
             placeholder="Ex.: 00123 — deixe em branco se ainda não possui"/></Field>
-          <Field label={requireJobTitle?'Cargo *':'Cargo'}><input required={requireJobTitle} maxLength={100} value={jobTitle} onChange={event=>{setJobTitle(event.target.value);setError('');}} placeholder="Ex.: Motorista, Operador ou Fiscal"/></Field>
+          <Field label={requireJobTitle?'Cargo *':'Cargo'}><EmployeeJobTitleSelect titles={employeeJobTitles(employees.employees)} value={jobTitle} onChange={value=>{setJobTitle(value);setError('');}} label="Cargo do funcionário" allowCreate required={requireJobTitle} disabled={saving}/></Field>
         </fieldset>
         {error&&<p className="form-error" role="alert">{error}</p>}
         <div className="form-actions">

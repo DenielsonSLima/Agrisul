@@ -7,11 +7,11 @@ import type {OvertimeCreateInput,OvertimeDeleteInput,OvertimeFilters,OvertimeInp
 export const useOvertimeOptions=(companyId:string)=>useCadastroQuery('overtime',{view:'options',companyId},signal=>fetchOvertimeOptions(companyId,signal),!!companyId);
 export const useOvertimeList=(filters:OvertimeFilters)=>useCadastroQuery('overtime',{view:'list',...filters},signal=>fetchOvertimeList(filters,signal),!!filters.companyId);
 export const useOvertimeReport=(companyId:string,id:string)=>useCadastroQuery('overtime',{view:'detail',companyId,id},signal=>fetchOvertimeReport(companyId,id,signal),!!companyId&&!!id);
-export function useOvertimeTotals(companyId:string,rows:{hours50:string;hours100:string}[]){
+export function useOvertimeTotals(companyId:string,rows:{hours50:string;hours100:string}[],enabled=true){
  const serialized=JSON.stringify(rows),[settled,setSettled]=useState(serialized);
  useEffect(()=>{const timer=setTimeout(()=>setSettled(serialized),200);return()=>clearTimeout(timer);},[serialized]);
  const quantities=JSON.parse(settled) as {hours50:string;hours100:string}[];
- const query=useCadastroQuery('overtime',{view:'preview',companyId,rows:quantities},signal=>fetchOvertimeTotals(companyId,quantities,signal),!!companyId);
+ const query=useCadastroQuery('overtime',{view:'preview',companyId,rows:quantities},signal=>fetchOvertimeTotals(companyId,quantities,signal),!!companyId&&enabled);
  return {...query,updating:serialized!==settled||query.loading};
 }
 export function useOvertimeMutations(){
