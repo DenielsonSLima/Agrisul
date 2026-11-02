@@ -20,6 +20,19 @@ try{
  const text=result.doc.internal.pages.slice(1).flat().join('\n');
  for(const marker of ['26/09/2026','25/10/2026','09/2026','AGRICOLA','50%','100%','590:22:00','384:00:00','COORD. DO SETOR','DIRETOR DA UNIDADE'])assert.ok(text.includes(marker),marker);
  assert.ok(result.fileName.endsWith('2026-09-26-a-2026-10-25.pdf'));
+ const unordered={...report,employeeCount:4,rows:[
+  {...report.rows[0],employeeName:'ZULEICA',hours50:'',hours100:'   '},
+  {...report.rows[1],employeeName:'ÉRICA',hours50:'00:00:00',hours100:'01:02:03'},
+  {...report.rows[2],employeeName:'DAMIÃO',hours50:'02:03:04',hours100:''},
+  {...report.rows[3],employeeName:'ANA',hours50:'',hours100:'00:00:00'},
+ ]};
+ const unorderedBefore=JSON.stringify(unordered),ordered=await createOvertimePdf(unordered,brand);
+ const orderedText=ordered.doc.internal.pages.slice(1).flat().join('\n');
+ const names=['ANA','DAMIÃO','ÉRICA','ZULEICA'];
+ for(let index=1;index<names.length;index++)assert.ok(orderedText.indexOf('('+names[index-1]+') Tj')<orderedText.indexOf('('+names[index]+') Tj'),'Employees use Portuguese alphabetical order, including accented names');
+ assert.equal(JSON.stringify(unordered),unorderedBefore,'Alphabetizing the PDF preserves the saved row order');
+ assert.equal(orderedText.split('(00:00:00) Tj').length-1,6,'Empty and zero hours print as zero only on employee rows, leaving filler rows blank');
+ for(const duration of ['01:02:03','02:03:04','590:22:00','384:00:00'])assert.ok(orderedText.includes('('+duration+') Tj'),'Entered hours and server totals remain unchanged');
  const large={...report,rows:Array.from({length:60},(_,index)=>({...report.rows[0],employeeId:'large-'+index,employeeName:'UNIQUE_EMPLOYEE_'+index}))};
  const {doc}=await createOvertimePdf(large,brand),pages=doc.internal.pages.slice(1).map(page=>page.join('\n'));
  assert.ok(doc.getNumberOfPages()>1);
@@ -27,5 +40,5 @@ try{
  for(const page of pages){assert.ok(page.includes('26/09/2026'));assert.ok(page.includes('50%')&&page.includes('100%'));}
  assert.equal(pages.filter(page=>page.includes('590:22:00')).length,1,'Final totals occur only on the last page');
  assert.ok(pages.at(-1).includes('DIRETOR DA UNIDADE'));
- console.log('Passed: reference period, separate server totals, role column, signature labels, landscape A4, pagination and repeated headings.');
+ console.log('Passed: alphabetical order with accents, empty and zero hours, immutable inputs, server totals, landscape A4 and pagination.');
 }finally{await rm(directory,{recursive:true,force:true});}
