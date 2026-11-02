@@ -20,7 +20,7 @@ try{
  assert.ok(Math.abs(result.doc.internal.pageSize.getHeight()-297)<.1,'PDF uses A4 portrait height');
  const text=result.doc.internal.pages.slice(1).flat().join('\n');
  for(const marker of ['26/09/2026','25/10/2026','09/2026','AGRICOLA','50%','100%','590:22:00','384:00:00','COORD. DO SETOR','DIRETOR DA UNIDADE'])assert.ok(text.includes(marker),marker);
- assert.ok(result.fileName.endsWith('2026-09-26-a-2026-10-25.pdf'));
+ assert.equal(result.fileName,'Relatório de horas extras - 26-09-2026 a 25-10-2026.pdf');
  const unordered={...report,employeeCount:4,rows:[
   {...report.rows[0],employeeName:'ZULEICA',hours50:'',hours100:'   '},
   {...report.rows[1],employeeName:'ÉRICA',hours50:'00:00:00',hours100:'01:02:03'},

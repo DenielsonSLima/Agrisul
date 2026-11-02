@@ -18,5 +18,51 @@
 @media(max-width:1200px){.overtime-report-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:1000px){.overtime-report-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.overtime-filters{grid-template-columns:1fr 1fr}.overtime-filters>.field:first-child{grid-column:1/-1}}
 @media(max-width:600px){.overtime-report-grid{grid-template-columns:1fr}.overtime-filters{padding:14px}.overtime-filters>.btn{min-height:44px;width:100%;justify-content:center}}
-@media(max-width:700px){.overtime-employee-picker{min-width:0}.overtime-employee-combobox{min-height:44px}.overtime-draft-summary{grid-template-columns:1fr 1fr;padding:16px;gap:16px}.overtime-draft-summary h3{grid-column:1/-1}.overtime-draft-summary output{font-size:20px}}
-@media(max-width:700px){.overtime-edit-table,.overtime-edit-table tbody,.overtime-edit-table tr,.overtime-edit-table td{display:block;min-width:0;width:100%}.overtime-edit-table thead{display:none}.overtime-editor .overtime-table-wrap{border:0;background:transparent;overflow:visible}.overtime-edit-table tbody{display:grid;gap:14px}.overtime-edit-table tr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:13px;padding:16px;border:1px solid #dfe8e2;border-radius:12px;background:#fff}.overtime-edit-table td{padding:0;border:0}.overtime-edit-table td:first-child{grid-column:1/-1}.overtime-edit-table td::before{display:block;font-size:11px;color:#7a8f82;margin-bottom:6px}.overtime-edit-table td:first-child::before{content:'Funcionário'}.overtime-edit-table td:nth-child(2)::before{content:'Matrícula'}.overtime-edit-table td:nth-child(3)::before{content:'Cargo'}.overtime-edit-table td:nth-child(4)::before{content:'Horas extras 50%'}.overtime-edit-table td:nth-child(5)::before{content:'Horas extras 100%'}.overtime-edit-table td:last-child{grid-column:1/-1;display:flex;justify-content:flex-end}.overtime-edit-table select,.overtime-edit-table td:nth-child(4) input,.overtime-edit-table td:nth-child(5) input{min-width:0;width:100%;min-height:44px}.overtime-create-fields>div{gap:12px}.overtime-editor .form-actions{display:flex}.overtime-editor .form-actions .btn{flex:1;justify-content:center}}
+@media(max-width:1000px){.overtime-employee-picker{min-width:0}.overtime-employee-combobox{min-height:44px}.overtime-draft-summary{grid-template-columns:1fr 1fr;padding:16px;gap:16px}.overtime-draft-summary h3{grid-column:1/-1}.overtime-draft-summary output{font-size:20px}}
+@media(max-width:1000px){.overtime-edit-table,.overtime-edit-table tbody,.overtime-edit-table tr,.overtime-edit-table td{display:block;min-width:0;width:100%}.overtime-edit-table thead{display:none}.overtime-editor .overtime-table-wrap{border:0;background:transparent;overflow:visible}.overtime-edit-table tbody{display:grid;gap:14px}.overtime-edit-table tr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:13px;padding:16px;border:1px solid #dfe8e2;border-radius:12px;background:#fff}.overtime-edit-table td{padding:0;border:0}.overtime-edit-table td:first-child{grid-column:1/-1}.overtime-edit-table td::before{display:block;font-size:11px;color:#7a8f82;margin-bottom:6px}.overtime-edit-table td:first-child::before{content:'Funcionário'}.overtime-edit-table td:nth-child(2)::before{content:'Matrícula'}.overtime-edit-table td:nth-child(3)::before{content:'Cargo'}.overtime-edit-table td:nth-child(4)::before{content:'Horas extras 50%'}.overtime-edit-table td:nth-child(5)::before{content:'Horas extras 100%'}.overtime-edit-table td:last-child{grid-column:1/-1;display:flex;justify-content:flex-end}.overtime-edit-table select,.overtime-edit-table td:nth-child(4) input,.overtime-edit-table td:nth-child(5) input{min-width:0;width:100%;min-height:44px}.overtime-create-fields>div{gap:12px}.overtime-editor .form-actions{display:flex}.overtime-editor .form-actions .btn{flex:1;justify-content:center}}
+@media(max-width:1000px){
+ .overtime-workspace .companies-heading{align-items:stretch;flex-direction:column;gap:16px}
+ .overtime-heading-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+ .overtime-heading-actions>.btn{width:100%;min-height:46px}
+ .overtime-heading-actions>.btn:first-child{grid-column:1/-1}
+ .overtime-workspace .field input,.overtime-workspace .field textarea,.overtime-edit-table input{font-size:16px!important;min-height:46px}
+ .overtime-employee-combobox input{font-size:16px!important;min-height:46px}
+ .overtime-employee-options [role=option]{min-height:48px}
+ .overtime-employee-options [role=option] strong{font-size:15px}
+ .overtime-employee-options [role=option] small{font-size:12px}
+ .overtime-edit-table td{overflow-wrap:anywhere;font-size:14px}
+ .overtime-edit-table td::before{font-size:12px}
+ .overtime-edit-table .icon-btn{min-width:44px;min-height:44px}
+ .overtime-editor-note{gap:12px}
+ .overtime-editor-note>.btn,.overtime-add-row{width:100%;min-height:46px;justify-content:center}
+ .overtime-workspace .overtime-search input{font-size:16px!important;min-height:46px}
+ .overtime-create-modal{width:calc(100vw - 24px)!important;padding:20px!important;max-height:calc(100dvh - 24px)}
+ .overtime-create-modal .field input,.overtime-create-modal textarea{font-size:16px!important;min-height:46px}
+ .overtime-create-modal .form-actions .btn{min-height:46px}
+}
+@media(max-width:440px){.overtime-metadata,.overtime-create-fields>div{grid-template-columns:1fr}.overtime-filters{gap:12px}}
+.overtime-add-employees-modal{display:flex!important;flex-direction:column;gap:14px!important;width:min(600px,calc(100vw - 32px))!important;max-width:600px!important;max-height:calc(100dvh - 48px);overflow:hidden}
+.overtime-add-employees-modal [data-slot=dialog-header]{padding-right:30px;text-align:left;flex-shrink:0}
+.overtime-add-employees-modal [data-slot=dialog-title]{outline:none}
+.overtime-bulk-search{display:flex;align-items:center;gap:10px;border:1px solid #dce6df;border-radius:9px;padding:0 12px;background:white;flex-shrink:0}
+.overtime-bulk-search svg{color:#7a8f82;flex-shrink:0}
+.overtime-bulk-search input{width:100%;min-width:0;min-height:46px;border:0!important;box-shadow:none!important;padding:10px 0;font-size:16px;outline:none;background:transparent}
+.overtime-bulk-count{font-size:13px;color:#617769;flex-shrink:0}
+.overtime-bulk-list{display:grid;align-content:start;gap:8px;overflow-y:auto;min-height:100px;flex:1;padding:2px}
+.overtime-bulk-option{display:flex;gap:12px;align-items:center;padding:14px;border:1px solid #dfe8e2;border-radius:10px;cursor:pointer;background:white;min-height:74px}
+.overtime-bulk-option[data-selected=true]{background:#eef7f0;border-color:#2f8056}
+.overtime-bulk-option:focus-within{outline:2px solid #2f8056;outline-offset:1px}
+.overtime-bulk-option input{width:22px!important;height:22px!important;min-height:0!important;flex-shrink:0;accent-color:#2f8056}
+.overtime-bulk-option>span{min-width:0;overflow-wrap:anywhere}
+.overtime-bulk-option strong{display:block;font-size:14px;font-weight:600;color:#35523f;line-height:1.5}
+.overtime-bulk-option small{display:block;font-size:12px;color:#71877a;margin-top:4px}
+.overtime-bulk-option:has(input:disabled){opacity:.6;cursor:default}
+.overtime-bulk-empty{display:grid;justify-items:center;gap:12px;padding:35px 10px;text-align:center;color:#71877a;font-size:14px}
+.overtime-bulk-actions{display:flex;gap:10px;justify-content:flex-end;flex-shrink:0;padding-top:12px;border-top:1px solid #e4ece7}
+.overtime-bulk-actions .btn{min-height:46px}
+@media(max-width:700px){
+ .overtime-add-employees-modal{top:0!important;left:0!important;transform:none!important;translate:none!important;width:100vw!important;max-width:none!important;height:100dvh;max-height:100dvh;border:0!important;border-radius:0!important;padding:max(20px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom))!important}
+ .overtime-add-employees-modal [data-slot=dialog-close]{width:44px;height:44px;display:grid;place-items:center;top:8px;right:8px}
+ .overtime-bulk-option strong{font-size:15px}
+ .overtime-bulk-actions .btn{flex:1;min-height:48px;justify-content:center}
+}

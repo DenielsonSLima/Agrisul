@@ -1,11 +1,12 @@
 'use client';
 import {useEffect, useRef, useState} from 'react';
 import type {jsPDF} from 'jspdf';
-import {Download, Loader2, Printer} from 'lucide-react';
+import {Download, Loader2, Printer, Share2} from 'lucide-react';
 import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription} from '@/components/ui/dialog';
 import {useReportHeader} from '@/modules/configuracoes/cabecalho-relatorios/hooks/useReportHeader';
 import {notifications} from '@/shared/feedback';
 import type {ReportOrientation, ReportPdfBrand} from './types';
+import {sharePdfFile} from './sharePdfFile';
 import './pdfExport.css';
 
 type PdfDocumentResult = {doc: jsPDF; fileName: string};
@@ -14,11 +15,11 @@ type PdfResult = PdfDocumentResult | PdfBinaryResult;
 type PdfCreateOptions = {autoPrint?: boolean; signal?: AbortSignal};
 type ExportProps<T> = {
   snapshot: T; companyId: string; title: string; description: string; previewClassName?: string; orientation?: ReportOrientation;
-  fitPreviewToWidth?: boolean; showPreviewToolbar?: boolean;
+  fitPreviewToWidth?: boolean; showPreviewToolbar?: boolean; allowShare?: boolean;
   createPdf: (snapshot: T, brand: ReportPdfBrand, options?: PdfCreateOptions) => Promise<PdfResult>; onClose: () => void;
 };
 
-type PreparedResult = {fileName: string; pageCount: number; url: string; printBlob?: Blob};
+type PreparedResult = {fileName: string; file: File; pageCount: number; url: string; printBlob?: Blob};
 
 function pdfBlob(result: PdfResult) {
   return 'blob' in result ? result.blob : result.doc.output('blob');
@@ -36,10 +37,12 @@ export function PdfExportDialog<T>(props: ExportProps<T>) {
   </DialogContent></Dialog>;
 }
 
-function PreparedPdf<T>({snapshot, createPdf, brand, title, previewClassName = '', orientation = 'landscape', fitPreviewToWidth = false, showPreviewToolbar = false}: ExportProps<T> & {brand: ReportPdfBrand}) {
+function PreparedPdf<T>({snapshot, createPdf, brand, title, previewClassName = '', orientation = 'landscape', fitPreviewToWidth = false, showPreviewToolbar = false, allowShare = false}: ExportProps<T> & {brand: ReportPdfBrand}) {
   const [snapshotBrand] = useState(brand), [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<PreparedResult | null>(null), [error, setError] = useState('');
   const [printing, setPrinting] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const shareInProgress = useRef(false);
   const printUrls = useRef<string[]>([]);
   const mounted = useRef(true), pendingPrint = useRef<Window | null>(null), printInProgress = useRef(false);
   useEffect(() => {
@@ -47,9 +50,11 @@ function PreparedPdf<T>({snapshot, createPdf, brand, title, previewClassName = '
     const controller = new AbortController();
     createPdf(snapshot, snapshotBrand, {signal: controller.signal}).then(pdf => {
       if (active) {
-        url = URL.createObjectURL(pdfBlob(pdf));
+        const blob = pdfBlob(pdf);
+        url = URL.createObjectURL(blob);
         setResult({
           fileName: pdf.fileName,
+          file: new File([blob],pdf.fileName,{type:'application/pdf'}),
           pageCount: pageCount(pdf),
           url,
           printBlob: 'printBlob' in pdf ? pdf.printBlob : undefined,
@@ -67,14 +72,28 @@ function PreparedPdf<T>({snapshot, createPdf, brand, title, previewClassName = '
     const urls = printUrls.current;
     return () => {mounted.current = false; pendingPrint.current?.close(); urls.forEach(url => URL.revokeObjectURL(url));};
   }, []);
-  function download() {
+  function download(message = 'O relatório foi baixado em PDF.') {
     if (!result) return;
     try {
       const anchor = document.createElement('a');
       anchor.href = result.url; anchor.download = result.fileName; anchor.click();
-      notifications.saved('O relatório foi baixado em PDF.');
+      notifications.saved(message);
     }
     catch (reason) {notifications.error((reason as Error).message);}
+  }
+  async function share() {
+    if (!result || shareInProgress.current) return;
+    shareInProgress.current = true; setSharing(true);
+    try {
+      const outcome = await sharePdfFile(result.file);
+      if (outcome === 'unsupported' && mounted.current) {
+        download('Este navegador não compartilha arquivos. Anexe o PDF baixado no WhatsApp.');
+      }
+    } catch (reason) {
+      if (mounted.current) notifications.error((reason as Error).message || 'Não foi possível compartilhar o PDF. Use Baixar PDF para anexá-lo.');
+    } finally {
+      shareInProgress.current = false; if (mounted.current) setSharing(false);
+    }
   }
   function print() {
     if (!result || printing || printInProgress.current) return;
@@ -99,6 +118,6 @@ function PreparedPdf<T>({snapshot, createPdf, brand, title, previewClassName = '
   const previewView = fitPreviewToWidth || orientation === 'landscape' ? 'FitH' : 'Fit';
   const previewToolbar = showPreviewToolbar ? '' : '&toolbar=0';
   return <>{error ? <div className="company-empty" role="alert"><p>{error}</p><button className="btn" onClick={() => {setError(''); setAttempt(value => value + 1);}}>Tentar novamente</button></div> : result ? <iframe className={`pdf-export-preview ${previewClassName}`} title={`Prévia completa: ${title}`} src={`${result.url}#view=${previewView}${previewToolbar}`}/> : <div className="company-empty" role="status"><Loader2 className="animate-spin"/>Gerando páginas…</div>}
-    <div className="pdf-export-actions"><span>A4 · {orientation === 'portrait' ? 'Retrato' : 'Paisagem'}{result ? ` · ${result.pageCount} página(s)` : ''}</span><div><button className="btn" disabled={!result || printing} onClick={print}>{printing ? <Loader2 size={16} className="animate-spin"/> : <Printer size={16}/>}Imprimir</button><button className="btn company-primary" disabled={!result} onClick={download}><Download size={16}/>Baixar PDF</button></div></div>
+    <div className="pdf-export-actions"><span className="pdf-export-details"><span>A4 · {orientation === 'portrait' ? 'Retrato' : 'Paisagem'}{result ? ` · ${result.pageCount} página(s)` : ''}</span>{allowShare&&result&&<span className="pdf-export-filename">{result.fileName}</span>}</span><div><button className="btn" disabled={!result || printing || sharing} onClick={print}>{printing ? <Loader2 size={16} className="animate-spin"/> : <Printer size={16}/>}Imprimir</button><button className={allowShare?'btn':'btn company-primary'} disabled={!result || sharing} onClick={()=>download()}><Download size={16}/>Baixar PDF</button>{allowShare&&<button className="btn company-primary pdf-share-button" disabled={!result||sharing||printing} onClick={()=>void share()}>{sharing?<Loader2 size={16} className="animate-spin"/>:<Share2 size={16}/>}Compartilhar</button>}</div></div>
   </>;
 }
