@@ -44,8 +44,9 @@ export async function createOvertimePdf(report:OvertimeReport,brand:ReportPdfBra
  };
  let y=header(),rowsOnPage=0;
  const row=(values:string[],rowHeight:number)=>{for(let i=0;i<values.length;i++)cell(values[i],edges[i],y,widths[i],rowHeight,{size:9});y+=rowHeight;rowsOnPage++;};
- for(const item of report.rows){
-  const values=[item.registrationNumber,item.employeeName.toLocaleUpperCase('pt-BR'),item.jobTitle.toLocaleUpperCase('pt-BR'),item.hours50==='00:00:00'?'':item.hours50,item.hours100==='00:00:00'?'':item.hours100];
+ const rows=[...report.rows].sort((a,b)=>a.employeeName.localeCompare(b.employeeName,'pt-BR',{sensitivity:'base'}));
+ for(const item of rows){
+  const values=[item.registrationNumber,item.employeeName.toLocaleUpperCase('pt-BR'),item.jobTitle.toLocaleUpperCase('pt-BR'),item.hours50.trim()||'00:00:00',item.hours100.trim()||'00:00:00'];
   doc.setFont('times','normal');doc.setFontSize(9);
   const rowHeight=Math.max(6,...values.map((value,i)=>doc.splitTextToSize(value,widths[i]-3).length*3.7+2));
   if(y+rowHeight+9>bodyBottom){doc.addPage();y=header();rowsOnPage=0;}

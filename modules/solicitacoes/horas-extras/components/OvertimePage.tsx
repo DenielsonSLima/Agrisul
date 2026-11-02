@@ -10,6 +10,8 @@ import {assertSessionActor} from '@/shared/supabase/sessionActor';
 import {useWorkspaceCompany} from '@/shared/state/WorkspaceCompanyProvider';
 import {useReportHeader} from '@/modules/configuracoes/cabecalho-relatorios/hooks/useReportHeader';
 import {dateLabel} from '@/shared/utils/presentation';
+import {PdfExportDialog} from '@/shared/reporting/PdfExportDialog';
+import type {ReportPdfBrand} from '@/shared/reporting/types';
 import {useOvertimeList,useOvertimeMutations,useOvertimeOptions,useOvertimeReport} from '../hooks/useOvertime';
 import {fetchOvertimeReport} from '../services/overtimeApi';
 import type {OvertimeCreateInput,OvertimeFilters,OvertimeInput,OvertimeReport,OvertimeSummary} from '../types';
@@ -17,6 +19,11 @@ import {OvertimeCreateModal} from './OvertimeCreateModal';
 import {OvertimeForm} from './OvertimeForm';
 import {OvertimeSheet} from './OvertimeSheet';
 import '../styles.css';
+
+async function createPdf(snapshot:OvertimeReport,brand:ReportPdfBrand){
+ const {createOvertimePdf}=await import('../reporting/overtimePdf');
+ return createOvertimePdf(snapshot,brand);
+}
 
 export function OvertimePage(){
  const {user}=useAuth(),workspace=useWorkspaceCompany();
@@ -35,6 +42,7 @@ function OvertimeWorkspace({companyId,companyName}:{companyId:string;companyName
  const header=useReportHeader(companyId,'landscape');
  const [formError,setFormError]=useState(''),[createError,setCreateError]=useState(''),[exportError,setExportError]=useState(''),[exporting,setExporting]=useState(false);
  const [draftStatus,setDraftStatus]=useState<'saved'|'saving'|'error'>('saved');
+ const [pdfSnapshot,setPdfSnapshot]=useState<OvertimeReport|null>(null);
  const mounted=useRef(false),exportController=useRef<AbortController|null>(null);
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;exportController.current?.abort();};},[]);
  const href=(target?:string,edit=false,tab=status,query=search,from=dateFrom,to=dateTo)=>{
@@ -71,9 +79,8 @@ function OvertimeWorkspace({companyId,companyName}:{companyId:string;companyName
   try{
    if(header.loading||header.error)throw Error(header.error||'Aguarde o carregamento da identidade do relatório.');
    await assertSessionActor(actorId);
-   const [snapshot,watermark,{createOvertimePdf}]=await Promise.all([fetchOvertimeReport(companyId,id,controller.signal),header.refreshWatermark(),import('../reporting/overtimePdf')]);
-   const result=await createOvertimePdf(snapshot,{header:header.settings.landscape,company:header.company,watermark,issuer:header.issuer,issuedAt:new Date()});
-   await assertSessionActor(actorId);if(!mounted.current||controller.signal.aborted)return;result.doc.save(result.fileName);
+   const [snapshot]=await Promise.all([fetchOvertimeReport(companyId,id,controller.signal),header.refreshWatermark()]);
+   await assertSessionActor(actorId);if(!mounted.current||controller.signal.aborted)return;setPdfSnapshot(snapshot);
   }catch(error){if(mounted.current){const message=error instanceof Error?error.message:'Não foi possível gerar o PDF.';setExportError(message);notifications.error(message);}}
   finally{if(mounted.current)setExporting(false);}
  };
@@ -104,6 +111,7 @@ function OvertimeWorkspace({companyId,companyName}:{companyId:string;companyName
    </Tabs>
   </>}
   {!id&&creating&&canManage&&<OvertimeCreateModal companyId={companyId} busy={mutations.creating} error={createError} onClose={()=>navigate(href())} onSave={create}/>}
+  {pdfSnapshot&&pdfSnapshot.id===id&&<PdfExportDialog snapshot={pdfSnapshot} companyId={companyId} createPdf={createPdf} orientation="landscape" title="Relatório de horas extras" description={dateLabel(pdfSnapshot.dateFrom)+' a '+dateLabel(pdfSnapshot.dateTo)} previewClassName="overtime-pdf-preview" onClose={()=>setPdfSnapshot(null)}/>}
  </section>;
 }
 function Loading(){return <div className="client-loading" role="status"><Loader2 className="animate-spin" size={20}/>Carregando relatórios…</div>;}
