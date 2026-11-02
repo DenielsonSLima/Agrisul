@@ -24,7 +24,7 @@ test('period overtime sheets preserve 50/100 quantities, employee roles and hist
    rows:[{employeeId:maria.id,hours50:'21:22:30',hours100:'08:00'},{employeeId:jose.id,hours50:'48:00',hours100:'30:00:45'}]};
   const saved=await rpc('save',input),report=saved.report;assert.equal(saved.created,true);
   assert.equal(report.total50,'69:22:30');assert.equal(report.total100,'38:00:45');assert.equal(report.employeeCount,2);
-  assert.equal(report.referenceMonth,'2026-09');assert.equal(report.rows[0].registrationNumber,'00123');
+  assert.equal(report.referenceMonth,'2026-10');assert.equal(report.rows[0].registrationNumber,'00123');
   assert.equal(report.rows[0].jobTitle,'Motorista');assert.equal(report.rows[0].hours100,'08:00:00');
   assert.equal((await rpc('list',{...scope,dateFrom:'2026-10-01',dateTo:'2026-10-30'})).reports.length,1,'Periods that overlap the filter are included');
   assert.equal((await rpc('list',{...scope,dateFrom:'2026-11-01',dateTo:'2026-11-30'})).reports.length,0);
@@ -102,7 +102,7 @@ test('overtime opens an empty period, filters by search/date/status, and finaliz
   const scope={companyId:ids.company};
   const input={...scope,dateFrom:'2026-09-26',dateTo:'2026-10-25',notes:'Equipe de colheita 50%'};
   const created=(await rpc('create',input)).report;
-  assert.equal(created.status,'open');assert.equal(created.notes,input.notes);assert.equal(created.referenceMonth,'2026-09');
+  assert.equal(created.status,'open');assert.equal(created.notes,input.notes);assert.equal(created.referenceMonth,'2026-10');
   assert.equal(created.employeeCount,0);assert.equal(created.total50,'00:00:00');assert.deepEqual(created.rows,[]);
   assert.equal(created.canFinish,false);
   await denied('finish',{...scope,id:created.id,expectedUpdatedAt:created.updatedAt},'23514');
