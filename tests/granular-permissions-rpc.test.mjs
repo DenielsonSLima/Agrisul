@@ -126,13 +126,13 @@ test('first authenticated permission request provisions a fresh owner and immedi
 
 test('each granular catalog/projection and its private files works without blanket registry access',async()=>{
  const {db,ids,setActor}=await createCaneWeighingDb();
- const use=async permissions=>{await db.exec('RESET ROLE');await db.query('UPDATE public.billing_access_profiles SET permissions=$1 WHERE id=$2',[permissions,ids.readerProfile]);await setActor(ids.reader);};
+ const setPermissions=async permissions=>{await db.exec('RESET ROLE');await db.query('UPDATE public.billing_access_profiles SET permissions=$1 WHERE id=$2',[permissions,ids.readerProfile]);await setActor(ids.reader);};
  try{
   const requester=(await call(db,'signatures','save',{name:'Solicitante',role:'requester'})).signature;
   await db.exec('RESET ROLE');
   await db.query(`INSERT INTO public.billing_document_templates(owner_id,key,name,version,layout,updated_by)
    VALUES($1,'service-request','Modelo salvo',1,billing_private.default_request_template()->'layout',$1)`,[ids.owner]);
-  await use(['materials.read','materials.write']);
+  await setPermissions(['materials.read','materials.write']);
   const material=(await call(db,'materials','save',{name:'Filtro granular',internalCode:'GRANULAR-1',unit:'UN',application:'Trator'})).material;
   assert.equal((await call(db,'materials','get',{id:material.id})).material.id,material.id);
   const reference=(await call(db,'material-variants','save',{materialId:material.id,brand:'Marca',code:'REF-1'})).reference;
@@ -144,7 +144,7 @@ test('each granular catalog/projection and its private files works without blank
   await rejectsCode(db.query('INSERT INTO storage.objects(bucket_id,name) VALUES($1,$2)',['billing-material-images',foreignImage]),'42501');
   await db.query('UPDATE storage.objects SET name=$1 WHERE name=$2',[image.replace('test.webp','updated.webp'),image]);
   assert.equal((await db.query('DELETE FROM storage.objects WHERE name=$1 RETURNING name',[image.replace('test.webp','updated.webp')])).rows.length,1);
-  await use(['quotations.read','quotations.write']);
+  await setPermissions(['quotations.read','quotations.write']);
   const quote=(await call(db,'quotations','save',{title:'Cotação granular',number:'GRANULAR-1',requestDate:'2026-11-02',requesterSignatureId:requester.id,notes:'',items:[{id:'10000000-0000-4000-8000-000000000061',materialId:material.id,quantity:'2',notes:''}],providers:[]})).quote;
   assert.equal((await call(db,'quotations','get',{id:quote.id})).quote.id,quote.id);
   assert.equal((await db.query('SELECT id FROM public.billing_quotations')).rows.length,1);
@@ -153,31 +153,31 @@ test('each granular catalog/projection and its private files works without blank
   assert.equal((await db.query('SELECT name FROM storage.objects WHERE name=$1',[quoteFile])).rows.length,1);
   await rejectsCode(db.query('INSERT INTO storage.objects(bucket_id,name) VALUES($1,$2)',['billing-material-images',image]),'42501');
   assert.equal((await db.query('DELETE FROM storage.objects WHERE name=$1 RETURNING name',[quoteFile])).rows.length,1);
-  await use(['document-templates.read']);
+  await setPermissions(['document-templates.read']);
   assert.equal((await call(db,'document-templates','list')).canManage,false);
   assert.equal((await call(db,'document-templates','get',{key:'service-request'})).template.name,'Modelo salvo');
   assert.equal((await db.query('SELECT key FROM public.billing_document_templates')).rows.length,1);
   await rejectsCode(call(db,'document-templates','save',{key:'service-request'}),'42501');
   await rejectsCode(call(db,'report-headers','get'),'42501');
-  await use(['signatures.read']);
+  await setPermissions(['signatures.read']);
   assert.equal((await call(db,'signatures','list')).items.length,1);
   assert.equal((await call(db,'signatures','options')).canManage,false);
   assert.equal((await db.query('SELECT id FROM public.billing_signatures')).rows.length,1);
   assert.equal((await db.query('SELECT key FROM public.billing_document_templates')).rows.length,0);
   await rejectsCode(call(db,'signatures','save',{name:'Negado',role:'requester'}),'42501');
-  await use(['report-headers.read','companies.read','watermarks.read']);
+  await setPermissions(['report-headers.read','companies.read','watermarks.read']);
   assert.equal((await db.query('SELECT key FROM public.billing_document_templates')).rows.length,0,'Header configuration alone grants no template data');
-  await use(['agenda.read']);
+  await setPermissions(['agenda.read']);
   assert.ok((await call(db,'agenda','list',{companyId:ids.company,month:'2026-11'})).days);
   await rejectsCode(call(db,'contracts','list'),'42501');
-  await use(['summary.read']);
+  await setPermissions(['summary.read']);
   assert.ok(await call(db,'summary','list',{companyId:ids.company,month:'2026-11'}));
   await rejectsCode(call(db,'reports','list',{companyId:ids.company,month:'2026-11',kind:'financial'}),'42501');
-  await use(['reports.read']);
+  await setPermissions(['reports.read']);
   assert.equal((await call(db,'reports','list',{companyId:ids.company,month:'2026-11',kind:'financial'})).kind,'financial');
   assert.equal((await call(db,'reports','list',{companyId:ids.company,month:'2026-11',kind:'farms'})).kind,'farms');
   await rejectsCode(call(db,'summary','list',{companyId:ids.company,month:'2026-11'}),'42501');
-  await use(['materials.read']);
+  await setPermissions(['materials.read']);
   assert.equal((await db.query('SELECT name FROM storage.objects WHERE name=$1',[image])).rows.length,0);
   await rejectsCode(db.query('INSERT INTO storage.objects(bucket_id,name) VALUES($1,$2)',['billing-material-images',image]),'42501');
   await setActor(ids.otherOwner);assert.equal((await db.query('SELECT key FROM public.billing_document_templates')).rows.length,0);
