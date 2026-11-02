@@ -12,14 +12,14 @@ try{
  await build({entryPoints:['modules/solicitacoes/horas-extras/reporting/overtimePdf.ts'],outfile,bundle:true,platform:'node',format:'esm'});
  const {createOvertimePdf}=await import(pathToFileURL(outfile));
  const brand={company:null,header:{variant:'compact',logoAlignment:'left',showCnpj:false,showContact:false},watermark:{imageUrl:null,opacity:15,size:60},issuer:{id:'tester',name:'Teste',email:''},issuedAt:new Date('2026-10-30T12:00:00Z')};
- const report={id:'test',companyId:'company',dateFrom:'2026-09-26',dateTo:'2026-10-25',referenceMonth:'2026-09',sector:'AGRICOLA',employeeCount:17,total50:'590:22:00',total100:'384:00:00',createdAt:'',updatedAt:'',rows:Array.from({length:17},(_,index)=>({employeeId:'id-'+index,employeeName:'FUNCIONARIO_SENTINEL_'+index,registrationNumber:'00'+index,jobTitle:'MOTORISTA',hours50:index===0?'21:22:00':'48:00:00',hours100:'30:00:00'}))};
+ const report={id:'test',companyId:'company',dateFrom:'2026-09-26',dateTo:'2026-10-25',referenceMonth:'2026-10',sector:'AGRICOLA',employeeCount:17,total50:'590:22:00',total100:'384:00:00',createdAt:'',updatedAt:'',rows:Array.from({length:17},(_,index)=>({employeeId:'id-'+index,employeeName:'FUNCIONARIO_SENTINEL_'+index,registrationNumber:'00'+index,jobTitle:'MOTORISTA',hours50:index===0?'21:22:00':'48:00:00',hours100:'30:00:00'}))};
  const before=JSON.stringify(report),result=await createOvertimePdf(report,brand);
  assert.equal(JSON.stringify(report),before,'PDF uses the saved server projection without modifying inputs');
  assert.equal(result.doc.getNumberOfPages(),1,'The reference model fits one portrait page');
  assert.ok(Math.abs(result.doc.internal.pageSize.getWidth()-210)<.1,'PDF uses A4 portrait width');
  assert.ok(Math.abs(result.doc.internal.pageSize.getHeight()-297)<.1,'PDF uses A4 portrait height');
  const text=result.doc.internal.pages.slice(1).flat().join('\n');
- for(const marker of ['26/09/2026','25/10/2026','09/2026','AGRICOLA','50%','100%','590:22:00','384:00:00','COORD. DO SETOR','DIRETOR DA UNIDADE'])assert.ok(text.includes(marker),marker);
+ for(const marker of ['26/09/2026','25/10/2026','MÊS 10/2026','AGRICOLA','50%','100%','590:22:00','384:00:00','COORD. DO SETOR','DIRETOR DA UNIDADE'])assert.ok(text.includes(marker),marker);
  assert.equal(result.fileName,'Relatório de horas extras - 26-09-2026 a 25-10-2026.pdf');
  const unordered={...report,employeeCount:4,rows:[
   {...report.rows[0],employeeName:'ZULEICA',hours50:'',hours100:'   '},

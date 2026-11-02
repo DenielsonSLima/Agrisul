@@ -39,7 +39,7 @@ export function OvertimeForm({report,employees,companyId,busy,error,onSave,canRe
    <div className="overtime-metadata">
     <Field label="Data inicial *"><input type="date" required value={metadata.dateFrom} onChange={event=>setMetadata({...metadata,dateFrom:event.target.value})}/></Field>
     <Field label="Data final *"><input type="date" required value={metadata.dateTo} onChange={event=>setMetadata({...metadata,dateTo:event.target.value})}/></Field>
-    <Field label="Mês de referência *"><input type="month" required value={metadata.referenceMonth} onChange={event=>setMetadata({...metadata,referenceMonth:event.target.value})}/></Field>
+    <Field label="Mês de referência (automático)"><input type="month" readOnly value={report?.referenceMonth??metadata.referenceMonth} title="Calculado pelo mês com mais dias no período."/></Field>
     <Field label="Setor"><input maxLength={120} value={metadata.sector} onChange={event=>setMetadata({...metadata,sector:event.target.value})} placeholder="Ex.: Agrícola"/></Field>
    </div>
    <Field label="Observação"><textarea className="overtime-notes-input" rows={3} maxLength={2000} value={metadata.notes} onChange={event=>setMetadata({...metadata,notes:event.target.value})}/></Field>
