@@ -57,7 +57,7 @@ export async function createOvertimePdf(report:OvertimeReport,brand:ReportPdfBra
  cell('TOTAL DE HORAS',margin,y,widths[0]+widths[1]+widths[2],8,{align:'right',size:10});
  cell(report.total50,edges[3],y,widths[3],8,{bold:true,size:10});
  cell(report.total100,edges[4],y,widths[4],8,{bold:true,size:10});y+=8;
- const signatureY=Math.max(y+18,height-margin-12),signatureWidth=content*.3;
+ const signatureY=Math.max(y+18,y+(height-margin-12-y)*.6),signatureWidth=content*.3;
  doc.setDrawColor('#222222');doc.setLineWidth(.2);
  doc.line(margin+content*.07,signatureY,margin+content*.07+signatureWidth,signatureY);
  doc.line(margin+content*.63,signatureY,margin+content*.63+signatureWidth,signatureY);
