@@ -6,6 +6,8 @@ import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} fro
 import {notifications} from '@/shared/feedback';
 import {ModuleLink, useModuleNavigation} from '@/shared/navigation/ModuleNavigation';
 import {useAuth} from '@/shared/supabase/AuthProvider';
+import {useWorkspaceAccess} from '@/shared/access/useWorkspaceAccess';
+import {canOpenWorkspaceHref} from '@/shared/access/routeAccess';
 import {moneyLabel} from '@/shared/utils/presentation';
 import {ServiceRequestForm, type ServiceRequestFormHandle} from '../forms/ServiceRequestForm';
 import {useRequestCollection, useRequestDetail, useRequestMutations, useRequestOptions} from '../hooks/useServiceRequests';
@@ -37,9 +39,22 @@ function requestHref(filters: Filters, extra: {id?: string; create?: boolean; ma
 export function SolicitacoesPage() {
   const {user} = useAuth();
   const {searchParams} = useModuleNavigation();
+  if(!searchParams.get('secao'))return <RequestDirectory/>;
   if (searchParams.get('secao') === 'horas-extras') return <OvertimePage key={user?.id ?? 'anonymous'}/>;
   if (searchParams.get('secao') === 'compras') return <ComprasPage key={user?.id ?? 'anonymous'}/>;
   return <SolicitacoesWorkspace key={user?.id ?? 'anonymous'}/>;
+}
+
+function RequestDirectory(){
+ const access=useWorkspaceAccess();
+ const sections=[
+  {href:'/solicitacoes?secao=horas-extras',title:'Relatório de hora extra',description:'Informe horas extras de 50% e 100% e emita o relatório por período.',icon:Clock3},
+  {href:'/solicitacoes?secao=servico',title:'Serviço',description:'Solicitações com equipamentos, materiais, orçamento e assinaturas.',icon:Wrench},
+  {href:'/solicitacoes?secao=compras',title:'Compras',description:'Organize as solicitações de compras da empresa.',icon:ShoppingBag},
+  {href:'/cotacao',title:'Cotação',description:'Monte cotações de materiais, organize fornecedores e acompanhe as propostas.',icon:ReceiptText},
+  {href:'/pedidos',title:'Pedidos',description:'Acompanhe os pedidos gerados pelas cotações e suas condições comerciais.',icon:ShoppingCart},
+ ].filter(section=>canOpenWorkspaceHref(access.data,section.href));
+ return <section className="requests-workspace"><div className="request-heading"><div><span className="eyebrow">CONTROLE INTERNO</span><h2>Solicitações</h2><p>Abra um dos módulos disponíveis para seu perfil.</p></div></div><div className="request-module-grid">{sections.map(section=><ModuleLink key={section.href} href={section.href} className="request-module-card"><span className="request-module-icon"><section.icon size={28}/></span><div><h3>{section.title}</h3><p>{section.description}</p><span>Abrir módulo<ArrowRight size={16}/></span></div></ModuleLink>)}</div></section>;
 }
 
 function SolicitacoesWorkspace() {

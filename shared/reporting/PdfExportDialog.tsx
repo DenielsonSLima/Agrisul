@@ -16,6 +16,7 @@ type PdfCreateOptions = {autoPrint?: boolean; signal?: AbortSignal};
 type ExportProps<T> = {
   snapshot: T; companyId: string; title: string; description: string; previewClassName?: string; orientation?: ReportOrientation;
   fitPreviewToWidth?: boolean; showPreviewToolbar?: boolean; allowShare?: boolean;
+  brand?: ReportPdfBrand;
   createPdf: (snapshot: T, brand: ReportPdfBrand, options?: PdfCreateOptions) => Promise<PdfResult>; onClose: () => void;
 };
 
@@ -30,11 +31,15 @@ function pageCount(result: PdfResult) {
 }
 
 export function PdfExportDialog<T>(props: ExportProps<T>) {
-  const orientation = props.orientation ?? 'landscape';
-  const report = useReportHeader(props.companyId, orientation);
   return <Dialog open onOpenChange={open => {if (!open) props.onClose();}}><DialogContent className="form-modal pdf-export-modal"><DialogHeader><DialogTitle>{props.title}</DialogTitle><DialogDescription>{props.description}</DialogDescription></DialogHeader>
-    {report.loading ? <div className="company-empty" role="status"><Loader2 className="animate-spin"/>Preparando cabeçalho…</div> : report.error || report.authRequired ? <div className="company-empty" role="alert"><p>{report.error || 'Entre para gerar o relatório.'}</p><button className="btn" onClick={() => void report.reload()}>Tentar novamente</button></div> : <PreparedPdf {...props} brand={{company:report.company, header:report.settings[orientation], watermark:report.watermark, issuer:report.issuer, issuedAt:report.issuedAt}}/>}
+    {props.brand?<PreparedPdf {...props} brand={props.brand}/>:<DefaultReportPdf {...props}/>}
   </DialogContent></Dialog>;
+}
+
+function DefaultReportPdf<T>(props:ExportProps<T>){
+ const orientation=props.orientation??'landscape';
+ const report=useReportHeader(props.companyId,orientation);
+ return report.loading?<div className="company-empty" role="status"><Loader2 className="animate-spin"/>Preparando cabeçalho…</div>:report.error||report.authRequired?<div className="company-empty" role="alert"><p>{report.error||'Entre para gerar o relatório.'}</p><button className="btn" onClick={()=>void report.reload()}>Tentar novamente</button></div>:<PreparedPdf {...props} brand={{company:report.company,header:report.settings[orientation],watermark:report.watermark,issuer:report.issuer,issuedAt:report.issuedAt}}/>;
 }
 
 function PreparedPdf<T>({snapshot, createPdf, brand, title, previewClassName = '', orientation = 'landscape', fitPreviewToWidth = false, showPreviewToolbar = false, allowShare = false}: ExportProps<T> & {brand: ReportPdfBrand}) {
