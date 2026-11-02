@@ -13,5 +13,5 @@ SELECT jsonb_build_object(
  'employeePolicy',(SELECT qual FROM pg_policies WHERE schemaname='public' AND tablename='billing_employees' AND policyname='billing_employees_read'),
  'overtimePolicies',(SELECT jsonb_agg(jsonb_build_object('table',tablename,'qual',qual)) FROM pg_policies WHERE schemaname='public' AND tablename IN ('billing_overtime_reports','billing_overtime_rows')),
  'storagePolicies',(SELECT jsonb_agg(jsonb_build_object('name',policyname,'qual',qual,'check',with_check)) FROM pg_policies WHERE schemaname='storage' AND (policyname LIKE 'billing_material_images_%' OR policyname LIKE 'billing_quotation_files_%' OR policyname='billing_overtime_brand_files_read')),
- 'unmappedStoragePolicies',(SELECT count(*) FROM pg_policies WHERE schemaname='storage' AND (coalesce(qual,'') ~ '''(registrations|requests)\.' OR coalesce(with_check,'') ~ '''(registrations|requests)\.'))
+ 'unmappedStoragePolicies',(SELECT count(*) FROM pg_policies WHERE schemaname='storage' AND (coalesce(qual,'') LIKE '%''registrations.%' OR coalesce(qual,'') LIKE '%''requests.%' OR coalesce(with_check,'') LIKE '%''registrations.%' OR coalesce(with_check,'') LIKE '%''requests.%'))
 ) postflight;
