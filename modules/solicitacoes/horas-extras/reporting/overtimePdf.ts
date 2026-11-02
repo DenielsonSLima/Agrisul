@@ -5,11 +5,11 @@ import type {OvertimeReport} from '../types';
 
 export async function createOvertimePdf(report:OvertimeReport,brand:ReportPdfBrand){
  const {jsPDF}=await import('@/shared/reporting/jsPdfRuntime');
- const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4',compress:true});
+ const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});
  const width=doc.internal.pageSize.getWidth(),height=doc.internal.pageSize.getHeight(),margin=REPORT_MARGIN_MM;
  const content=width-margin*2,bodyBottom=height-margin-30;
  const [logo,watermark]=await Promise.all([loadReportImage(brand.company?.logoUrl??null),loadReportImage(brand.watermark.imageUrl)]);
- const widths=[content*.09,content*.33,content*.26,content*.16,content*.16];
+ const widths=[content*.09,content*.40,content*.23,content*.14,content*.14];
  const edges=[margin];for(const value of widths)edges.push(edges[edges.length-1]+value);
  const month=report.referenceMonth.split('-').reverse().join('/');
  const frame=(x:number,y:number,w:number,h:number)=>{doc.setDrawColor('#222222');doc.setLineWidth(.2);doc.rect(x,y,w,h);};
@@ -32,12 +32,12 @@ export async function createOvertimePdf(report:OvertimeReport,brand:ReportPdfBra
   const lines=doc.splitTextToSize(title,content-brandWidth-6) as string[];
   doc.text(lines,margin+brandWidth+(content-brandWidth)/2,y+headerHeight/2-(lines.length-1)*1.8,{align:'center'});
   y+=headerHeight;
-  cell('PERÍODO '+dateLabel(report.dateFrom)+' A '+dateLabel(report.dateTo),margin,y,content*.42,8,{bold:true,size:10});
-  cell('MÊS '+month,margin+content*.42,y,content*.58,8,{bold:true,size:11});y+=8;
+  cell('PERÍODO '+dateLabel(report.dateFrom)+' A '+dateLabel(report.dateTo),margin,y,content*.60,8,{bold:true,size:10});
+  cell('MÊS '+month,margin+content*.60,y,content*.40,8,{bold:true,size:11});y+=8;
   cell('Mat.',edges[0],y,widths[0],11,{bold:true});
   cell('Funcionário',edges[1],y,widths[1],11,{bold:true});
   cell('Cargo',edges[2],y,widths[2],11,{bold:true});
-  cell('QUANTIDADE HORAS EXTRAS',edges[3],y,widths[3]+widths[4],5.5,{size:9});
+  cell('QUANTIDADE HORAS EXTRAS',edges[3],y,widths[3]+widths[4],5.5,{size:8});
   cell('50%',edges[3],y+5.5,widths[3],5.5,{bold:true,fill:'#fff600'});
   cell('100%',edges[4],y+5.5,widths[4],5.5,{bold:true,fill:'#fff600'});
   return y+11;

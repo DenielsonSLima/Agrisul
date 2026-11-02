@@ -15,8 +15,9 @@ try{
  const report={id:'test',companyId:'company',dateFrom:'2026-09-26',dateTo:'2026-10-25',referenceMonth:'2026-09',sector:'AGRICOLA',employeeCount:17,total50:'590:22:00',total100:'384:00:00',createdAt:'',updatedAt:'',rows:Array.from({length:17},(_,index)=>({employeeId:'id-'+index,employeeName:'FUNCIONARIO_SENTINEL_'+index,registrationNumber:'00'+index,jobTitle:'MOTORISTA',hours50:index===0?'21:22:00':'48:00:00',hours100:'30:00:00'}))};
  const before=JSON.stringify(report),result=await createOvertimePdf(report,brand);
  assert.equal(JSON.stringify(report),before,'PDF uses the saved server projection without modifying inputs');
- assert.equal(result.doc.getNumberOfPages(),1,'The reference model fits one landscape page');
- assert.equal(result.doc.internal.pageSize.getWidth()>result.doc.internal.pageSize.getHeight(),true);
+ assert.equal(result.doc.getNumberOfPages(),1,'The reference model fits one portrait page');
+ assert.ok(Math.abs(result.doc.internal.pageSize.getWidth()-210)<.1,'PDF uses A4 portrait width');
+ assert.ok(Math.abs(result.doc.internal.pageSize.getHeight()-297)<.1,'PDF uses A4 portrait height');
  const text=result.doc.internal.pages.slice(1).flat().join('\n');
  for(const marker of ['26/09/2026','25/10/2026','09/2026','AGRICOLA','50%','100%','590:22:00','384:00:00','COORD. DO SETOR','DIRETOR DA UNIDADE'])assert.ok(text.includes(marker),marker);
  assert.ok(result.fileName.endsWith('2026-09-26-a-2026-10-25.pdf'));
@@ -40,5 +41,5 @@ try{
  for(const page of pages){assert.ok(page.includes('26/09/2026'));assert.ok(page.includes('50%')&&page.includes('100%'));}
  assert.equal(pages.filter(page=>page.includes('590:22:00')).length,1,'Final totals occur only on the last page');
  assert.ok(pages.at(-1).includes('DIRETOR DA UNIDADE'));
- console.log('Passed: alphabetical order with accents, empty and zero hours, immutable inputs, server totals, landscape A4 and pagination.');
+ console.log('Passed: alphabetical order with accents, empty and zero hours, immutable inputs, server totals, portrait A4 and pagination.');
 }finally{await rm(directory,{recursive:true,force:true});}

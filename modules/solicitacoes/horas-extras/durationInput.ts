@@ -32,6 +32,11 @@ export function durationCursor(edit:DurationEdit,rawPosition:number){
 
 export function editDuration(edit:DurationEdit,start:number,end:number,inserted:string){
  const from=Math.max(0,Math.min(start,edit.digits.length)),to=Math.max(from,Math.min(end,edit.digits.length));
+ // A saved zero is a complete mask; start a fresh duration even if the click left no selection.
+ if(from===to&&/^\d+$/.test(inserted)&&edit.digits.length===edit.hourWidth+4&&/^0+$/.test(edit.digits)){
+  if(inserted.length>6)return null;
+  return {edit:{digits:inserted,hourWidth:2},cursor:inserted.length};
+ }
  const digits=edit.digits.slice(0,from)+inserted+edit.digits.slice(to);
  if(!/^\d*$/.test(digits)||digits.length>edit.hourWidth+4)return null;
  return {edit:{...edit,digits},cursor:from+inserted.length};

@@ -28,3 +28,18 @@ test('paste, selection replacement, clearing and large existing hours preserve d
  assert.equal(editDuration(edit,6,6,'9'),null);
  for(const invalid of ['1.5','abc','-50','50::00'])assert.equal(durationFromText(invalid),null);
 });
+test('saved zero hours accept a fresh duration with a collapsed caret after clicking or auto focus',()=>{
+ for(const position of [0,2,4,6]){
+  let edit=durationFromText('00:00:00'),cursor=position;
+  for(const [index,digit] of [...'502235'].entries()){
+   const result=editDuration(edit,cursor,cursor,digit);
+   assert.ok(result,'A saved zero mask must accept typing without selecting it first');
+   edit=result.edit;cursor=result.cursor;
+   assert.equal(durationDisplay(edit),['05:00:00','50:00:00','50:20:00','50:22:00','50:22:30','50:22:35'][index]);
+  }
+ }
+ const first=editDuration(durationFromText('00:00:00'),6,6,'0');
+ assert.equal(first.edit.digits,'0','The first typed zero must remain partial rather than completing the mask');
+ assert.equal(durationCompletionDelay(first.edit),null);
+ assert.equal(editDuration(durationFromText('01:00:00'),6,6,'5'),null,'An existing nonzero duration is never silently discarded');
+});
