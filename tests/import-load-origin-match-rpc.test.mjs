@@ -42,6 +42,7 @@ test('finished PDF origins suggest only unique registered codes within the owner
   const linked=await docs('link-load',{...scope,id:document.id,tripKey:items['2'].tripKey,expectedUpdatedAt:document.updatedAt,farmId:varzea,plotId:''});
   assert.equal(linked.load.farmId,varzea,'An explicit valid manual choice remains permitted');
   assert.equal(linked.load.volume,'20.125');
+  await db.exec('RESET ROLE');await db.query("UPDATE public.billing_access_profiles SET permissions=ARRAY['contracts.read','imports.read'] WHERE id=$1",[ids.readerProfile]);
   await setActor(ids.reader);assert.equal((await queue())['6'].matchedFarmId,letters);
   await setActor(ids.otherOwner);await assert.rejects(()=>docs('pending-loads',scope),error=>error.code==='P0002');
   await setActor(null);await assert.rejects(()=>docs('pending-loads',scope),error=>error.code==='28000');

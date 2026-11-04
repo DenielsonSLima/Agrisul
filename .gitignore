@@ -48,6 +48,7 @@ next-env.d.ts
 /.agents/
 /.codex/
 /outputs/
+/output/
 /work/
 /.openai/
 # Planilhas e boletins operacionais usados apenas como referência local.

@@ -46,6 +46,7 @@ test('finished PDF groups link once to the matching contract with exact tonne vo
   assert.equal((await rpc('summary','dashboard',{...dashboardScope,companyId:ids.siblingCompany})).harvestMethods.every(method=>method.loadCount===0),true);
   assert.equal((await rpc('summary','dashboard',{...dashboardScope,contractId:contract})).harvestMethods.find(method=>method.code==='unknown').loadCount,3);
   await deny(()=>db.query('DELETE FROM public.billing_import_load_links WHERE document_id=$1',[document.id]),'42501');
+  await db.exec('RESET ROLE');await db.query("UPDATE public.billing_access_profiles SET permissions=ARRAY['contracts.read','imports.read'] WHERE id=$1",[ids.readerProfile]);
   await setActor(ids.reader);assert.equal((await docs('pending-loads',scope)).loads.length,2);await deny(()=>docs('link-load',{...payload,tripKey:machine.tripKey}),'42501');
   await setActor(ids.otherOwner);await deny(()=>docs('pending-loads',scope),'P0002');await deny(()=>docs('link-load',payload),'P0002');
   await deny(()=>rpc('summary','dashboard',dashboardScope),'22023');

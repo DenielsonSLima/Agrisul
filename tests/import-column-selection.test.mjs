@@ -44,6 +44,7 @@ const fixtureUrl=dataUrl(`
 export const state={slots:[],cursor:0,calls:[],entryCalls:[],numberCalls:[],confirmations:[]};
 export function useState(initial){const index=state.cursor++;if(!(index in state.slots))state.slots[index]=typeof initial==='function'?initial():initial;return [state.slots[index],next=>{state.slots[index]=typeof next==='function'?next(state.slots[index]):next;}];}
 export const useRef=value=>({current:value}),useMounted=()=>({current:true});
+export const useImportPlotAreaChoice=()=>({choose:async()=>null,dialog:null});
 export const useImportMutations=()=>({saving:false,saveBulk:async payload=>{state.calls.push(payload);},saveEntry:async payload=>{state.entryCalls.push(payload);},numberGroups:async payload=>{state.numberCalls.push(payload);}});
 export const useConfirmation=()=>async options=>{state.confirmations.push(options);return true;};
 export const notifications={updated(){}},message=String,dateLabel=String;
@@ -57,7 +58,7 @@ const internalAtrSource=tableFile.match(/^const INTERNAL_ATR_FIELD:ImportField=.
 assert.ok(internalAtrSource);
 const tableStart=tableFile.indexOf('function ImportDayTable('),tableEnd=tableFile.indexOf('\nfunction EntryEditor(',tableStart);
 assert.ok(tableStart>=0&&tableEnd>tableStart);
-const tableSource=`import {useState,useRef,useMounted,useImportMutations,useConfirmation,notifications,message,dateLabel,Field,CalendarDays,Pencil,Loader2,Check,Trash2,FileText,Settings2,EntrySourceNotes,ImportColumnFilter,ImportEditableCell} from ${JSON.stringify(fixtureUrl)};
+const tableSource=`import {useState,useRef,useMounted,useImportMutations,useConfirmation,useImportPlotAreaChoice,notifications,message,dateLabel,Field,CalendarDays,Pencil,Loader2,Check,Trash2,FileText,Settings2,EntrySourceNotes,ImportColumnFilter,ImportEditableCell} from ${JSON.stringify(fixtureUrl)};
 import {resolveColumnType,visibleImportSelection,toggleVisibleImportSelection} from ${JSON.stringify(dataUrl(source))};
 import {MAIN_IMPORT_COLUMNS,mainImportFields,importFieldLabel,importCount,importGroupDecoration} from ${JSON.stringify(presentationUrl)};
 import {importValueFields,IMPORT_EQUIPMENT_HELP} from ${JSON.stringify(dataUrl(compile(readFileSync(new URL('../modules/importacoes/utils/equipmentFields.ts',import.meta.url),'utf8'))))};

@@ -4,7 +4,7 @@ import {billingKeys} from '@/shared/query/keys';
 import {rpcRequest} from '@/shared/supabase/rpc';
 import {useAuth} from '@/shared/supabase/AuthProvider';
 import {getSupabaseBrowserClient} from '@/shared/supabase/client';
-import type {ImportTable,ImportTableFilters,ImportAtrInput,ImportHarvestOrderOptions,ImportHarvestOrdersInput} from '../types';
+import type {ImportTable,ImportTableFilters,ImportAtrInput,ImportHarvestOrderOptions,ImportHarvestOrdersInput,ImportPlotAreaInput,ImportPlotAreaResult} from '../types';
 import type {ImportBulkInput,ImportColumnTypeInput,ImportCollection,ImportDocument,ImportDocumentInput,ImportEntryInput,ImportExport,ImportProfile,ImportProfileInput,ImportProfileRevisionInput,ImportProfileCloneInput,ImportProfileActiveInput,ImportRevisionInput,ImportStatus,ImportOperationalSummary,ImportNumberGroupsInput,ImportLedger,ImportLedgerParams} from '../types';
 
 export function useImportProfiles(){return useCadastroQuery('import-profiles',{},signal=>rpcRequest<{profiles:ImportProfile[];canManage:boolean}>('import-profiles','list',{},signal));}
@@ -48,9 +48,10 @@ export function useImportMutations(){
  const finished=useCadastroMutation('import-documents',(input:ImportRevisionInput)=>call<{document:ImportDocument}>('import-documents','finalize',input));
  const reopened=useCadastroMutation('import-documents',(input:ImportRevisionInput)=>call<{document:ImportDocument}>('import-documents','reopen',input));
  const bulk=useCadastroMutation('import-documents',(input:ImportBulkInput)=>call<{document:ImportDocument}>('import-documents','save-bulk',input));
+ const plotArea=useCadastroMutation('import-documents',(input:ImportPlotAreaInput)=>call<ImportPlotAreaResult>('import-documents','save-plot-area',input));
  const columnType=useCadastroMutation('import-documents',(input:ImportColumnTypeInput)=>call<{document:ImportDocument}>('import-documents','change-column-type',input));
  const numbered=useCadastroMutation('import-documents',(input:ImportNumberGroupsInput)=>call<{document:ImportDocument}>('import-documents','number-groups',input));
  const harvestOrders=useCadastroMutation('import-documents',(input:ImportHarvestOrdersInput)=>call<{document:ImportDocument;changedCount:number}>('import-documents','save-harvest-orders',input));
  return {saveProfile:profile.mutateAsync,cloneProfile:cloned.mutateAsync,setProfileActive:activated.mutateAsync,setDefaultProfile:defaulted.mutateAsync,importDocument:imported.mutateAsync,saveEntry:entry.mutateAsync,removeEntry:removed.mutateAsync,finalize:finished.mutateAsync,reopen:reopened.mutateAsync,saveBulk:bulk.mutateAsync,changeColumnType:columnType.mutateAsync,
-  numberGroups:numbered.mutateAsync,saveHarvestOrders:harvestOrders.mutateAsync,saveAtrs:atrs.mutateAsync,exportDocument:(id:string,filters?:ImportTableFilters,expectedUpdatedAt?:string)=>filters?call<ImportExport>('import-documents','export-filtered',{id,...filters,expectedUpdatedAt}):call<ImportExport>('import-documents','export',{id}),saving:[profile,cloned,activated,defaulted,imported,entry,atrs,removed,finished,reopened,bulk,columnType,numbered,harvestOrders].some(m=>m.isPending)};
+  numberGroups:numbered.mutateAsync,saveHarvestOrders:harvestOrders.mutateAsync,saveAtrs:atrs.mutateAsync,savePlotArea:plotArea.mutateAsync,exportDocument:(id:string,filters?:ImportTableFilters,expectedUpdatedAt?:string)=>filters?call<ImportExport>('import-documents','export-filtered',{id,...filters,expectedUpdatedAt}):call<ImportExport>('import-documents','export',{id}),saving:[profile,cloned,activated,defaulted,imported,entry,atrs,removed,finished,reopened,bulk,plotArea,columnType,numbered,harvestOrders].some(m=>m.isPending)};
 }

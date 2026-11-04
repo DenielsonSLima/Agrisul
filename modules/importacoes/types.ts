@@ -37,6 +37,11 @@ export interface ImportHarvestOrder {farm:string;farmName:string;plot:string;ent
 export interface ImportHarvestOrderOptions {orders:ImportHarvestOrder[];missingCount:number;updatedAt:string}
 export interface ImportHarvestOrdersInput extends ImportRevisionInput {orders:Array<{farm:string;plot:string;order:string}>}
 export interface ImportBulkInput extends ImportRevisionInput { entryIds: string[]; fieldKey?: string; fieldKeys?: string[]; value: string }
+export interface ImportPlotAreaCandidate {plotId:string;plotName:string;areaHa:string;updatedAt:string;farmId:string;farmCode:string;farmName:string}
+export interface ImportPlotAreaChoice {entryId:string;farmCode:string;plotCode:string;candidates:ImportPlotAreaCandidate[]}
+export interface ImportPlotAreaSelection {plotId:string;updatedAt:string}
+export interface ImportPlotAreaInput extends ImportRevisionInput {entryIds:string[];value:string;selections?:Record<string,ImportPlotAreaSelection>}
+export type ImportPlotAreaResult = {saved:false;choices:ImportPlotAreaChoice[]}|{saved:true;document:ImportDocument;filledCount:number;unmatchedCount:number};
 export interface ImportColumnTypeInput extends ImportRevisionInput { fieldKey?: string; fieldKeys?: string[]; type: ImportField['type'] }
 export interface ImportOperationalSummary {dayCount:number;documentCount:number;entryCount:number;groupCount:number;pendingCount:number;reviewedCount:number;dateFrom:string|null;dateTo:string|null}
 export interface ImportDocumentSummary {id:string;sourceName:string;status:ImportStatus;entryCount:number;pendingCount:number;profileId?:string;profileName?:string;updatedAt?:string;dayEntryCount?:number;dayPendingCount?:number;groupCount?:number;dayGroupCount?:number}

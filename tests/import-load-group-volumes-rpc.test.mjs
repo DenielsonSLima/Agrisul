@@ -45,6 +45,7 @@ test('pending PDF origins retain the exact complete source-set net volume and or
   assert.equal((await docs('pending-loads',scope)).loads.some(p=>p.entryNumber==='3394'),false);
   await setActor(ids.otherOwner);
   await assert.rejects(()=>docs('pending-loads',scope),error=>error.code==='P0002');
+  await db.exec('RESET ROLE');await db.query("UPDATE public.billing_access_profiles SET permissions=ARRAY['contracts.read','imports.read'] WHERE id=$1",[ids.readerProfile]);
   await setActor(ids.reader);
   assert.equal((await docs('pending-loads',scope)).loads.find(p=>p.entryNumber==='3404').groupVolume,'8');
   await assert.rejects(()=>db.query('SELECT * FROM billing_private.import_load_group_summary(NULL::public.billing_import_documents)'),error=>error.code==='42501');

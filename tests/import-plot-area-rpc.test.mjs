@@ -1,0 +1,50 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createCaneWeighingDb} from '../supabase/tests/helpers/cane-weighing-db.mjs';
+
+test('plot edits fill registered areas atomically, ask on ambiguity, preserve other rows and enforce isolation',async()=>{
+ const {db,ids,setActor}=await createCaneWeighingDb();
+ const rpc=async(resource,action,payload={})=>(await db.query('select public.billing_rpc($1,$2,$3::jsonb) result',[resource,action,JSON.stringify(payload)])).rows[0].result;
+ const docs=(action,payload)=>rpc('import-documents',action,payload);
+ const field=(key,column,type='text')=>({key,column,type,label:key,source:'manual',sourceKey:'',required:false,defaultValue:'',mappings:{},pattern:''});
+ const fields=[field('COD_FAZENDA','F'),field('COD_TALHAO','H'),field('AREA','I','decimal'),field('NR_ORDEM_COLHEITA','AC','decimal'),field('PESOBRUTO','AA','decimal')];
+ const farm=async(code,name)=>(await rpc('farms','save',{code,name,areaHa:'100',city:'Japaratuba',state:'SE'})).farm;
+ const plot=async(f,name,area)=>{await rpc('plots','save',{farmId:f.id,name,areaHa:area});return (await db.query('select id,updated_at from public.billing_farm_plots where farm_id=$1 and name=$2',[f.id,name])).rows[0];};
+ try{
+  const tapera=await farm('5032','TAPERA'),maracuja=await farm('5035','MARACUJÁ');
+  const p62=await plot(tapera,'062','14.55'),p1=await plot(maracuja,'01','12.49');
+  const profile=(await rpc('import-profiles','save',{name:'Áreas e ordens automáticas',clientId:ids.partner,parser:'taquari-equipment-v1',sheetName:'Plan1',startRow:2,fields})).profile;
+  const entries=[['5032','','9'],['5032','62','9'],['5035','62','8'],['','1','7']].map(([farm,plot,area],i)=>({date:i%2?'2026-10-30':'2026-10-29',source:{original:String(i)},sourcePage:1,sourceLine:`Original ${i}`,values:{COD_FAZENDA:farm,COD_TALHAO:plot,AREA:area,NR_ORDEM_COLHEITA:'',PESOBRUTO:'25.1'}}));
+  let document=(await docs('import',{profileId:profile.id,clientId:ids.partner,sourceName:'areas.pdf',sourceHash:'d'.repeat(64),entries})).document;
+  const row=i=>document.entries.find(e=>e.source.original===String(i));
+  const originals=structuredClone(document.entries.map(e=>e.source));
+  const other=(await docs('import',{profileId:profile.id,clientId:ids.partner,sourceName:'outro.pdf',sourceHash:'e'.repeat(64),entries})).document;
+  const save=async(value,indices=[0],selections)=>docs('save-plot-area',{id:document.id,entryIds:indices.map(i=>row(i).id),value,expectedUpdatedAt:document.updatedAt,...(selections?{selections}:{})});
+  let result=await save('62');assert.equal(result.saved,true);document=result.document;
+  assert.equal(row(0).values.AREA,'14.55');assert.equal(row(1).values.AREA,'9','Only edited plot rows receive an area');
+  result=await save('1',[3]);document=result.document;assert.equal(row(3).values.AREA,'12.49');assert.equal(row(3).values.COD_FAZENDA,'5035','Unique plot without farm also resolves the origin');
+  const duplicate=await plot(tapera,'62','13.63');
+  const before=structuredClone(document);
+  result=await save('062',[0,1]);assert.equal(result.saved,false);assert.equal(result.choices.length,2);
+  assert.equal(result.choices[0].candidates.length,2);
+  assert.deepEqual((await docs('get',{id:document.id})).document,before,'Ambiguity performs no writes or revision changes');
+  const selections=Object.fromEntries(result.choices.map(c=>[c.entryId,{plotId:duplicate.id,updatedAt:duplicate.updated_at}]));
+  await assert.rejects(()=>save('62',[0],{[row(0).id]:{plotId:p1.id,updatedAt:p1.updated_at}}),e=>e.code==='22023');
+  result=await save('62',[0,1],selections);document=result.document;
+  assert.deepEqual([row(0),row(1)].map(e=>e.values.AREA),['13.63','13.63']);
+  const revision=document.updatedAt;
+  result=await save('999');document=result.document;assert.equal(result.unmatchedCount,1);assert.equal(row(0).values.AREA,'','Unknown plot clears stale area');
+  result=await save('');document=result.document;assert.equal(row(0).values.COD_TALHAO,'');assert.equal(row(0).values.AREA,'');
+  await assert.rejects(()=>docs('save-plot-area',{id:document.id,entryIds:[row(0).id],value:'62',expectedUpdatedAt:revision}),e=>e.code==='PT409'||e.code==='40001');
+  await assert.rejects(()=>docs('save-plot-area',{id:document.id,entryIds:[other.entries[0].id],value:'62',expectedUpdatedAt:document.updatedAt}),e=>e.code==='22023');
+  assert.deepEqual(document.entries.map(e=>e.source),originals);
+  assert.deepEqual((await docs('get',{id:other.id})).document,other);
+  await setActor(ids.otherOwner);await assert.rejects(()=>save('62'),e=>e.code==='P0002');
+  await setActor(ids.reader);await assert.rejects(()=>save('62'),e=>e.code==='42501');
+  await setActor(null);await assert.rejects(()=>save('62'),e=>e.code==='28000');
+  await setActor();
+  assert.equal((await db.query("select has_function_privilege('authenticated','billing_private.save_import_plot_area(jsonb)','execute') allowed")).rows[0].allowed,false);
+  await assert.rejects(()=>db.query("update public.billing_import_entry_values set decimal_value=999 where field_key='AREA'"),e=>e.code==='42501');
+  assert.ok(p62.id);
+ }finally{await db.close();}
+});

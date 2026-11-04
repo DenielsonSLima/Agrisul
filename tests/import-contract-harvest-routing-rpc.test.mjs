@@ -38,6 +38,7 @@ test('column K routes finished PDF sets by contract harvest type and rejects cro
   assert.equal((await link('mechanized',machine)).created,false);
   await assert.rejects(()=>link('manual',machine),error=>error.code==='23514');
   assert.equal((await docs('pending-loads',scope('manual'))).loads.length,1);
+  await db.exec('RESET ROLE');await db.query("UPDATE public.billing_access_profiles SET permissions=ARRAY['contracts.read','imports.read'] WHERE id=$1",[ids.readerProfile]);
   await setActor(ids.reader);assert.equal((await docs('pending-loads',scope('mechanized'))).loads.length,1);
   await assert.rejects(()=>link('manual',hand),error=>error.code==='42501');
   await setActor(ids.otherOwner);await assert.rejects(()=>docs('pending-loads',scope('manual')),error=>error.code==='P0002');
