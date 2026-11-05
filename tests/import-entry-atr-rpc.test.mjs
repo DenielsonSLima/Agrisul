@@ -22,8 +22,8 @@ test('internal ATR survives import/review, stays out of Excel and supplies linke
   assert.equal(doc.status,'finished');assert.deepEqual(doc.entries.map(e=>({values:e.values,source:e.source,reviewed:e.reviewed,groupKey:e.groupKey})),before,'Missing farm/plot and wrong K are preserved for later review');
   const table=await docs('table',{id:doc.id});assert.equal(table.entries[0].atr,'110.000001');
   const exported=await docs('export',{id:doc.id});
-  assert.equal(exported.columns.length,6);assert.ok(exported.columns.every(c=>!['atr','$atr','ATR'].includes(c.key)));
-  assert.deepEqual(Object.keys(exported.rows[0].values).sort(),['A','B','C','D','E','F']);
+  assert.equal(exported.columns.length,7);assert.ok(exported.columns.every(c=>!['atr','$atr','ATR'].includes(c.key)));
+  assert.deepEqual(Object.keys(exported.rows[0].values).sort(),['A','B','C','D','E','F','G']);
   const filtered=await docs('export-filtered',{id:doc.id,expectedUpdatedAt:doc.updatedAt});
   assert.deepEqual(filtered.columns,exported.columns);assert.deepEqual(filtered.rows,exported.rows);
   await deny(()=>docs('save-atrs',{id:doc.id,expectedUpdatedAt:'2000-01-01',entries:[{entryId:doc.entries[0].id,atr:'150'}]}),'40001');

@@ -30,13 +30,15 @@ test('finished PDF groups link once to the matching contract with exact tonne vo
   const first=await docs('link-load',payload);assert.equal(first.created,true);assert.equal(first.load.volume,'28.5');assert.equal(first.load.atr,'');
   assert.equal((await docs('link-load',payload)).load.id,first.load.id,'Retry does not duplicate the trip');assert.equal((await docs('link-load',payload)).created,false);
   assert.equal((await docs('pending-loads',scope)).loads.length,3);
-  await deny(()=>docs('reopen',{id:document.id,expectedUpdatedAt:document.updatedAt}),'23514');
+  document=(await docs('reopen',{id:document.id,expectedUpdatedAt:document.updatedAt})).document;
+  assert.equal(document.status,'open');
+  document=(await docs('finalize',{id:document.id,expectedUpdatedAt:document.updatedAt})).document;
   const saved=await rpc('contracts','save-load',{...scope,id:first.load.id,loadedAt:first.load.loadedAt,farmId:farm,plotId:'',volume:first.load.volume,atr:'',document:'101',notes:'ATR depois'});
   assert.equal(saved.load.atr,'');
   const priced=await rpc('contracts','save-load',{...scope,id:first.load.id,loadedAt:first.load.loadedAt,farmId:farm,plotId:'',volume:first.load.volume,atr:'121.234567',document:'101',notes:''});assert.equal(priced.load.atr,'121.234567');
   const detail=await rpc('contracts','get',{id:contract,companyId:ids.company});assert.equal(detail.contract.loadedVolume,'28.5');
   assert.equal((await db.query('SELECT harvest_method FROM public.billing_contract_loads WHERE id=$1',[first.load.id])).rows[0].harvest_method,'1');
-  const mechanized=await docs('link-load',{...payload,tripKey:machine.tripKey});
+  const mechanized=await docs('link-load',{...payload,expectedUpdatedAt:document.updatedAt,tripKey:machine.tripKey});
   const historical=await rpc('contracts','save-load',{...scope,loadedAt:'2026-10-21',farmId:farm,plotId:'',volume:'3.125',atr:'',document:'Histórico',notes:''});
   const dashboardScope={companyId:ids.company,from:'2026-10-01',to:'2026-10-31'};
   const dashboard=await rpc('summary','dashboard',dashboardScope);const methods=Object.fromEntries(dashboard.harvestMethods.map(method=>[method.code,method]));

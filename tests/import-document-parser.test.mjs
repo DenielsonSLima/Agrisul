@@ -82,16 +82,17 @@ test('refuses incomplete or repeated extraction instead of silently dropping row
   assert.throws(()=>parseTaquariPages([{number:1,lines:[line1.replaceAll('22/10/2026','31/02/2026')]}],profile),/Data inválida/);
 });
 
-test('decimal conversion is lexical and the template keeps all 46 ERP columns in order', () => {
+test('decimal conversion is lexical and the template appends text destination after the original ERP columns', () => {
   assert.equal(documentDecimal('1.028,400'),'1028.400');
   assert.equal(documentDecimal('0,000'),'0.000');
   assert.equal(isoDate('22/10/2026'),'2026-10-22');
   assert.throws(()=>documentDecimal('1,2,3'),/inválido/);
   const profile = createTaquariProfile();
-  assert.equal(profile.fields.length,46);
+  assert.equal(profile.fields.length,47);
   assert.equal(profile.fields[0].key,'COD_GRUPOEMPRESA');
   assert.equal(profile.fields[45].key,'COD_TIPOCULTURA');
   assert.equal(profile.fields[45].column,'AT');
+  assert.equal(profile.fields[46].key,'COD_DESTINO');assert.equal(profile.fields[46].column,'AU');assert.equal(profile.fields[46].type,'text');
   assert.equal(profile.sheetName,'Plan1');
   assert.equal(profile.startRow,2);
   assert.equal(profile.entrySequenceStart,undefined);

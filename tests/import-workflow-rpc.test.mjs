@@ -34,7 +34,7 @@ test('PDF imports: revisions, duplicate retries, optional review, canonical deci
   assert.equal((await docs('list',{search:'Taquari'})).clients[0].clientName,'Destilaria Taquari');
   assert.equal((await docs('list',{search:'Capela'})).total,1,'Legal names remain searchable');
   assert.equal((await docs('list',{search:'moagem.pdf'})).total,1,'Source names remain searchable');
-  assert.deepEqual((await docs('export',{id:d.id})).rows[0].values,{A:'',B:'1234.1256',C:'2026-10-22'});
+  assert.deepEqual((await docs('export',{id:d.id})).rows[0].values,{A:'',B:'1234.1256',C:'2026-10-22',D:''});
   d=(await docs('finalize',{id:d.id,expectedUpdatedAt:d.updatedAt})).document;
   assert.equal(d.pendingCount,1);assert.equal(d.entries[0].reviewed,false);
   d=(await docs('reopen',{id:d.id,expectedUpdatedAt:d.updatedAt})).document;
@@ -66,7 +66,7 @@ test('PDF imports: revisions, duplicate retries, optional review, canonical deci
   assert.equal(p2.sheetName,'NovaAba');
   d=(await docs('finalize',{id:d.id,expectedUpdatedAt:d.updatedAt})).document;
   assert.equal(d.status,'finished');assert.equal((await docs('list',{status:'open'})).total,0);
-  const exported=await docs('export',{id:d.id});assert.equal(exported.sheetName,'Plan1');assert.deepEqual(exported.rows[0].values,{A:'938',B:'1234.1256',C:'2026-10-22'});
+  const exported=await docs('export',{id:d.id});assert.equal(exported.sheetName,'Plan1');assert.deepEqual(exported.rows[0].values,{A:'938',B:'1234.1256',C:'2026-10-22',D:''});
   await denied(()=>docs('save-entry',{...entryPayload,expectedUpdatedAt:d.updatedAt}),'23514');
   d=(await docs('reopen',{id:d.id,expectedUpdatedAt:d.updatedAt})).document;assert.equal(d.status,'open');
   await denied(()=>db.query('update public.billing_import_documents set status=$1 where id=$2',['finished',d.id]),'42501');

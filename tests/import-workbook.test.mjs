@@ -19,6 +19,16 @@ const ioSource = source('documentIO').replaceAll("'./defaults'",JSON.stringify(d
   .replace("import('exceljs/dist/exceljs.min.js')",`import(${JSON.stringify(pathToFileURL(require.resolve('exceljs/dist/exceljs.min.js')).href)})`);
 const {createImportWorkbook,inspectWorkbookTemplate} = await import(dataUrl(ioSource));
 
+test('COD_DESTINO is exported as native Excel text with leading zeros',async()=>{
+ const bytes=await createImportWorkbook({document:{profileSnapshot:{}},sheetName:'Plan1',startRow:2,
+  columns:[{key:'COD_DESTINO',column:'AU',label:'COD_DESTINO',type:'text'}],
+  rows:[{entryId:'one',values:{AU:'000042'}},{entryId:'two',values:{AU:'12345678901234567890'}}]});
+ const workbook=new ExcelJS.Workbook();await workbook.xlsx.load(bytes.buffer);const sheet=workbook.getWorksheet('Plan1');
+ assert.equal(sheet.getCell('AU1').value,'COD_DESTINO');
+ assert.equal(sheet.getCell('AU2').value,'000042');assert.equal(sheet.getCell('AU3').value,'12345678901234567890');
+ for(const row of [2,3]){assert.equal(sheet.getCell(`AU${row}`).type,ExcelJS.ValueType.String);assert.equal(sheet.getCell(`AU${row}`).numFmt,'@');}
+});
+
 test('analysis column Z exports truly blank cells and clears analysis numbers from the template',async()=>{
  const template=new ExcelJS.Workbook();const sheet=template.addWorksheet('Plan1');
  sheet.getCell('Z1').value='NUMERO_ANALISE';sheet.getCell('AA1').value='PESOBRUTO';

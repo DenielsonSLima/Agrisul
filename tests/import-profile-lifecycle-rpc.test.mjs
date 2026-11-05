@@ -26,7 +26,7 @@ test('Import profiles: exact inactive clones, scoped defaults, revisions, histor
   const sourceRevision=source.updatedAt;
   let clone=(await profiles('clone',{id:source.id,expectedUpdatedAt:source.updatedAt,name:'Cópia exata'})).profile;
   assert.notEqual(clone.id,source.id);assert.equal(clone.active,false);assert.equal(clone.isDefault,false);assert.equal(clone.clonedFromId,source.id);assert.equal(clone.clientId,source.clientId);
-  assert.equal(clone.fields.length,46);assert.deepEqual(clone.fields,source.fields);assert.equal(clone.templateBase64,templateBase64);assert.equal(clone.templateName,input.templateName);assert.equal(clone.parser,source.parser);assert.equal(clone.startRow,source.startRow);assert.equal(clone.sheetName,source.sheetName);
+  assert.equal(clone.fields.length,47);assert.deepEqual(clone.fields,source.fields);assert.equal(clone.templateBase64,templateBase64);assert.equal(clone.templateName,input.templateName);assert.equal(clone.parser,source.parser);assert.equal(clone.startRow,source.startRow);assert.equal(clone.sheetName,source.sheetName);
   assert.equal((await find(source.id)).updatedAt,sourceRevision,'Cloning never changes the source profile');
   await assert.rejects(()=>profiles('clone',{id:source.id,expectedUpdatedAt:source.updatedAt,name:source.name}),e=>e.code==='23505'&&e.message==='Já existe um modelo com esse nome ou um padrão para esse cliente.');
   assert.equal((await profiles('list')).profiles.length,2,'Inactive profiles remain visible in configuration');
@@ -50,7 +50,7 @@ test('Import profiles: exact inactive clones, scoped defaults, revisions, histor
   const retry=await docs('import',historyInput);assert.equal(retry.created,false);assert.equal(retry.document.id,original.id);
   await denied(()=>docs('import',imported(source,'new-inactive-file')),'23514');
   const inactiveOriginCopy=(await profiles('clone',{id:source.id,expectedUpdatedAt:source.updatedAt,name:'Cópia de origem inativa',clientId:null})).profile;
-  assert.equal(inactiveOriginCopy.active,false);assert.equal(inactiveOriginCopy.clientId,null);assert.deepEqual(inactiveOriginCopy.fields,fields);
+  assert.equal(inactiveOriginCopy.active,false);assert.equal(inactiveOriginCopy.clientId,null);assert.deepEqual(inactiveOriginCopy.fields,source.fields);
 
   let genericA=(await profiles('save',{...input,name:'Genérico A',clientId:null})).profile;
   let genericB=(await profiles('save',{...input,name:'Genérico B',clientId:null})).profile;

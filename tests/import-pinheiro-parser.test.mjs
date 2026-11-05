@@ -11,9 +11,10 @@ const row=(ba='944382',tara='24/10 07:24',arrival='24/10 06:48',analysis=tail)=>
 const pages=lines=>[{number:1,lines:[header,...lines]}];
 const profile=createPinheiroProfile();
 
-test('Pinheiro keeps its own 46 headers, native sample types and explicit mappings',()=>{
- assert.equal(profile.parser,'pinheiro-usjp-v1');assert.equal(profile.fields.length,46);assert.equal(profile.fields.at(-1).column,'AT');assert.equal(profile.sheetName,'Plan1');assert.equal(profile.startRow,2);assert.equal(profile.entrySequenceStart,'806');
+test('Pinheiro preserves its original headers and types and appends text destination',()=>{
+ assert.equal(profile.parser,'pinheiro-usjp-v1');assert.equal(profile.fields.length,47);assert.equal(profile.fields.at(-1).column,'AU');assert.equal(profile.sheetName,'Plan1');assert.equal(profile.startRow,2);assert.equal(profile.entrySequenceStart,'806');
  const field=key=>profile.fields.find(field=>field.key===key);
+ assert.equal(field('COD_DESTINO').type,'text');assert.equal(field('COD_DESTINO').source,'manual');assert.equal(field('COD_DESTINO').required,false);
  assert.equal(profile.fields.filter(field=>field.type==='decimal').length,18);assert.equal(profile.fields.filter(field=>field.type==='date').length,3);
  for(const key of ['COD_TIPOCOLHEITA','COD_TIPOCARGA','HORACHEGADA','HORASAIDA'])assert.equal(field(key).type,'text');
  const empty=['COD_FUNCIONARIO','DATACARREGAMENTO','HORACARREGAMENTO','ORDEM_CARREGAMENTO','NUMERO_ANALISE','PBU','LEITURA_SACARIMETRICA','BRIX','POL','COD_COLHEDORA','COD_OPER_COLHEDORA_TERCEIRO','COD_OPER_COLHEDORA_FUNCIONARIO','COD_TRANSBORDO','COD_OPER_TRANSBORDO_TERCEIRO','COD_OPER_TRANSBORDO_FUNCIONA','COD_CARREGADEIRA','COD_OPER_CARREGADEIRA_TERCEIRO','COD_OPER_CARREGADEIRA_FUNCIONA','COD_TRATOR_REBOQUE','COD_OPER_TRATOREBO_TERCEIRO','COD_OPER_TRATOREBO_FUNCIONARIO'];

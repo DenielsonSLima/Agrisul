@@ -20,9 +20,9 @@ test('imports may export and finish incomplete data without changing cells, snap
   const beforeEntries=structuredClone(document.entries),beforeSnapshot=structuredClone(document.profileSnapshot);
   const openExport=await docs('export',{id:document.id});
   assert.equal(openExport.document.status,'open');assert.equal(openExport.document.pendingCount,3);
-  assert.deepEqual(openExport.rows[2].values,{L:'',S:'',Y:'',R:'',Q:'',A:'',AA:''});
+  assert.deepEqual(openExport.rows[2].values,{L:'',S:'',Y:'',R:'',Q:'',A:'',AA:'',AB:''});
   assert.equal(openExport.rows[0].values.R,'2');assert.equal(openExport.rows[0].values.AA,'21.1256');
-  assert.deepEqual(openExport.columns.map(c=>c.type),['decimal','decimal','decimal','text','date','text','decimal']);
+  assert.deepEqual(openExport.columns.map(c=>c.type),['decimal','decimal','decimal','text','date','text','decimal','text']);
   assert.equal(openExport.document.profileSnapshot.templateBase64,input.templateBase64);
   await denied(()=>action('finalize',document,{expectedUpdatedAt:'2020-01-01'}),'PT409');
   await denied(()=>action('finalize',document,{ownerId:ids.otherOwner}),'22023');
