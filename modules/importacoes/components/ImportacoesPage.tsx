@@ -13,7 +13,7 @@ import {ImportEditableCell} from './ImportEditableCell';
 import {useImportPlotAreaChoice} from './ImportPlotAreaDialog';
 import {ImportWeightSummary} from './ImportWeightSummary';
 import {ImportHarvestOrders} from './ImportHarvestOrders';
-import {importCellNavigation,type ImportCellMove} from '../utils/cellNavigation';
+import {useImportCellNavigation} from '../hooks/useImportCellNavigation';
 import type {ImportTableFilters} from '../types';
 import type {ImportDocument,ImportDocumentInput,ImportEntry,ImportField,ImportProfile,ImportStatus,ImportOperationalSummary,ImportClientDay} from '../types';
 import {importClientFiltersFromSearch,importClientHref,importDocumentHref,importTabFromSearch,importTabHref,importUploadHref,type ImportTab} from '../navigation';
@@ -133,13 +133,7 @@ function ImportDayTable({date,document,entries,editable,atrEditable=editable,onE
   return result;
  }
  function chooseColumn(key:string){setBulkOpen(true);setFieldKey(key);setScope(selectedRows.length?'selected-column':'column');const field=fields.find(item=>item.key===key);if(field)setColumnTypeDraft(null);setError('');}
- function navigateCell(entryId:string,key:string,move:ImportCellMove){
-  const targets=importCellNavigation(entries,[INTERNAL_ATR_FIELD,...visibleFields],entryId,key,move);if(!targets.length)targets.push({entryId,fieldKey:key});let attempts=0;
-  const focus=()=>{if(!mounted.current)return;const nodes=Array.from(gridRef.current?.querySelectorAll<HTMLInputElement|HTMLButtonElement>('[data-import-cell]')??[]);
-   for(const target of targets){const node=nodes.find(item=>item.dataset.entryId===target.entryId&&item.dataset.fieldKey===target.fieldKey);if(node&&!node.disabled&&!(node instanceof HTMLInputElement&&node.readOnly)){node.scrollIntoView({block:'nearest',inline:'nearest'});node.focus();if(node instanceof HTMLButtonElement)node.click();return;}}
-   if(targets.length&&attempts++<12)requestAnimationFrame(focus);
-  };requestAnimationFrame(focus);
- }
+ const navigateCell=useImportCellNavigation({gridRef,entries,fields:[INTERNAL_ATR_FIELD,...visibleFields.filter(field=>field.key!=='NUMERO_ANALISE')],blocked:interactionBlocked,updating});
  async function saveCell(entry:ImportEntry,field:ImportField,nextValue:string,revision:string){
   if(interactionBlocked||cellPending.current)return false;
   cellPending.current=true;

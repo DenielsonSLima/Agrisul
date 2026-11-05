@@ -19,14 +19,15 @@ export function ImportEditableCell({entryId,field,value,revision,rowNumber,block
  async function commit(move?:ImportCellMove){
   if(!draft||locked.current||suppressBlur.current||blocked)return;
   locked.current=true;
+  if(move)suppressBlur.current=true;
   if(draft.value===draft.initial&&!saveUnchanged){setDraft(null);locked.current=false;if(move)onNavigate(move);return;}
   setSaving(true);
   try{
    const saved=await onSave(draft.value,draft.revision);
    if(saved){if(mounted.current)setDraft(null);if(move)onNavigate(move);}
-   else if(mounted.current)input.current?.focus();
+   else if(mounted.current){suppressBlur.current=false;input.current?.focus();}
   }catch(reason){
-   if(mounted.current){const message=reason instanceof Error?reason.message:'Não foi possível salvar esta célula.';setDraft(current=>current?{...current,error:message}:current);requestAnimationFrame(()=>input.current?.focus());}
+   if(mounted.current){suppressBlur.current=false;const message=reason instanceof Error?reason.message:'Não foi possível salvar esta célula.';setDraft(current=>current?{...current,error:message}:current);requestAnimationFrame(()=>input.current?.focus());}
   }finally{locked.current=false;if(mounted.current)setSaving(false);}
  }
  function keyDown(event:KeyboardEvent<HTMLInputElement>){
