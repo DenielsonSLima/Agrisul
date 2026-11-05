@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {NEWS_SOURCES,createNewsFeed,parseNewsRss,safeNewsUrl,classifyNewsTopic,curateNews,parseNewsPageImage} from './providers.mjs';
+import {NEWS_SOURCES,createNewsFeed,parseNewsRss,safeNewsUrl,classifyNewsTopic,curateNews,parseNewsPageImage,parseNewsPageDescription} from './providers.mjs';
 import {newsForScope,newsTopicLabel} from './presentation.ts';
 const at=Date.parse('2026-10-29T15:00:00Z'),source=NEWS_SOURCES[0];
 function rss(provider,index=0,extra='<enclosure url="https://cdn.example.com/article.jpg" type="image/jpeg"/>'){
@@ -105,6 +105,46 @@ test('shortages redistribute only real unique recent articles and never change t
 });
 
 const htmlResponse=html=>new Response(html,{headers:{'Content-Type':'text/html; charset=utf-8'}});
+test('publisher summaries use metadata fallbacks, preserve quotes, remove markup and avoid repeating the headline',()=>{
+ const title='Manchete suficientemente longa sobre o mercado de açúcar e etanol';
+ const summary="A indústria d'etanol ampliou a produção &amp; manteve os investimentos na safra.";
+ assert.equal(parseNewsPageDescription(`<meta content="${summary}" property="og:description">`),summary.replace('&amp;','&'));
+ assert.equal(parseNewsPageDescription(`<meta property="og:description" content="${title}"><meta name="twitter:description" content="${summary}">`,title),summary.replace('&amp;','&'));
+ assert.equal(parseNewsPageDescription('<meta name="description" content="&lt;p&gt;A produção de açúcar cresceu durante a safra e ampliou a oferta nacional.&lt;/p&gt;">'),'A produção de açúcar cresceu durante a safra e ampliou a oferta nacional.');
+ assert.equal(parseNewsPageDescription(`<meta property="og:description" content="${title}">`,title),'');
+ assert.equal(parseNewsPageDescription('<meta name="description" content="Leia mais">'),'');
+ const [article]=parseNewsRss(rss(source).replace('Resumo da notícia do setor sucroenergético para conferência.','mercado '.repeat(90)),source,at);
+ assert.ok(article.description.length<=360);assert.ok(article.description.endsWith('…'));assert.equal(article.description.includes('O post'),false);
+ const [fromContent]=parseNewsRss(rss(source).replace(/<description>[\s\S]*?<\/description>/,'<content:encoded><![CDATA[<p>A safra de cana cresceu e elevou a oferta de açúcar para exportação.</p>]]></content:encoded>'),source,at);
+ assert.equal(fromContent.description,'A safra de cana cresceu e elevou a oferta de açúcar para exportação.');
+});
+
+test('missing summaries are enriched even with an RSS image, shared concurrently and cached without replacing publisher fields',async()=>{
+ let now=at,pageCalls=0;
+ const description='A safra de cana cresceu e elevou a oferta de açúcar para exportação.';
+ const feed=createNewsFeed({now:()=>now,fetchImpl:async url=>{
+  const provider=NEWS_SOURCES.find(source=>source.url===url);
+  if(provider)return new Response(rss(provider).replace(/<description>[\s\S]*?<\/description>/,''));
+  pageCalls++;return htmlResponse(`<meta name="description" content="${description}">`);
+ }});
+ const [first,second]=await Promise.all([feed(),feed()]);
+ assert.deepEqual(first,second);assert.equal(pageCalls,1);
+ assert.equal(first.articles[0].description,description);assert.equal(first.articles[0].imageUrl,'https://cdn.example.com/article.jpg');
+ assert.equal(first.articles[0].title,'Cana & etanol 0');assert.equal(first.articles[0].publishedAt,new Date(at).toISOString());
+ now+=301000;assert.equal((await feed()).articles[0].description,description);assert.equal(pageCalls,1);
+});
+
+test('unavailable article summaries keep the original article and retry metadata after the refresh period',async()=>{
+ let now=at,pageCalls=0;
+ const feed=createNewsFeed({now:()=>now,fetchImpl:async url=>{
+  const provider=NEWS_SOURCES.find(source=>source.url===url);
+  if(provider)return new Response(rss(provider).replace(/<description>[\s\S]*?<\/description>/,''));
+  pageCalls++;return htmlResponse('<html>No summary</html>');
+ }});
+ const result=await feed();assert.equal(result.articles[0].description,'');assert.equal(result.articles[0].imageUrl,'https://cdn.example.com/article.jpg');
+ await feed();assert.equal(pageCalls,1);now+=301000;await feed();assert.equal(pageCalls,2);
+});
+
 test('article image metadata accepts attribute order, escaped and relative URLs and Twitter fallback',()=>{
  const page='https://www.noticiasagricolas.com.br/noticias/cana.html';
  assert.equal(parseNewsPageImage('<meta content="/images/cana.jpg?a=1&amp;b=2" property="og:image">',page),'https://www.noticiasagricolas.com.br/images/cana.jpg?a=1&b=2');

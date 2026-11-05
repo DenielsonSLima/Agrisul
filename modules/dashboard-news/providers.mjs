@@ -17,8 +17,29 @@ function decode(value){return unwrap(value).replace(/&(#x[0-9a-f]+|#\d+|[a-z][a-
 });}
 function plain(value,max=240){return decode(value).replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi,' ').replace(/<[^>]*>/g,' ').replace(/[\u0000-\u001f\u007f]/g,' ').replace(/\s+/g,' ').trim().slice(0,max);}
 const field=(xml,name)=>new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`,'i').exec(xml)?.[1]??'';
-const attribute=(tag,name)=>new RegExp(`\\b${name}\\s*=\\s*["']([^"']*)["']`,'i').exec(tag)?.[1]??'';
+const attribute=(tag,name)=>new RegExp(`\\b${name}\\s*=\\s*(["'])([\\s\\S]*?)\\1`,'i').exec(tag)?.[2]??'';
 const normalized=value=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+
+function newsDescription(value,title=''){
+ const text=plain(value,2000).replace(/\s*(?:O post\s|The post\s)[\s\S]*$/i,'').trim();
+ if(text.length<35||normalized(text)===normalized(title))return '';
+ if(text.length<=360)return text;
+ const excerpt=text.slice(0,357).replace(/\s+\S*$/,'').replace(/[\s,;:…]+$/,'');
+ return excerpt+'…';
+}
+
+export function parseNewsPageDescription(html,title=''){
+ const candidates=new Map();
+ for(const match of html.matchAll(/<meta\b[^>]*>/gi)){
+  const key=decode(attribute(match[0],'property')||attribute(match[0],'name')).toLowerCase();
+  if(!candidates.has(key))candidates.set(key,attribute(match[0],'content'));
+ }
+ for(const key of ['og:description','twitter:description','description']){
+  const description=newsDescription(candidates.get(key),title);
+  if(description)return description;
+ }
+ return '';
+}
 
 export function parseNewsPageImage(html,pageUrl){
  const candidates=new Map();
@@ -107,7 +128,7 @@ export function parseNewsRss(xml,source,now=Date.now()){
   const categories=[...item.matchAll(/<category(?:\s[^>]*)?>([\s\S]*?)<\/category>/gi)].map(match=>plain(match[1],60));
   const description=plain(field(item,'description'),700).replace(/\s*O post\s[\s\S]*$/i,'').trim();
   const topic=classifyNewsTopic(title,categories,description),category=topic==='cane'?'Cana, açúcar e etanol':topic==='grains'?'Soja e milho':categories.find(value=>! /^(?:geral|noticias|sem categoria)$/i.test(normalized(value)))||'Agronegócio';
-  articles.push({id:url,title,description:description.length>=35?description.slice(0,190):'',url,imageUrl:articleImage(item),
+  articles.push({id:url,title,description:newsDescription(description,title)||newsDescription(field(item,'content:encoded'),title),url,imageUrl:articleImage(item),
    publishedAt:new Date(published).toISOString(),sourceId:source.id,sourceName:source.name,topic,category});
   if(articles.length===60)break;
  }
@@ -125,13 +146,13 @@ async function limitedText(response,maxBytes=MAX_BYTES){
 
 export function createNewsFeed({fetchImpl=(...args)=>globalThis.fetch(...args),now=Date.now}={}){
  const cache=new Map(),pending=new Map();
- const imageCache=new Map(),pendingImages=new Map();
- function pageImage(article,signal){
+ const metadataCache=new Map(),pendingMetadata=new Map();
+ function pageMetadata(article,signal){
   const source=NEWS_SOURCES.find(source=>source.id===article.sourceId);
   if(!source||!safeNewsUrl(article.url,source.domain))return Promise.resolve(null);
-  const saved=imageCache.get(article.url);
-  if(saved&&now()<saved.expires)return Promise.resolve(saved.imageUrl);
-  if(pendingImages.has(article.url))return pendingImages.get(article.url);
+  const saved=metadataCache.get(article.url);
+  if(saved&&now()<saved.expires)return Promise.resolve(saved.metadata);
+  if(pendingMetadata.has(article.url))return pendingMetadata.get(article.url);
   const task=Promise.resolve().then(async()=>{
    const controller=new AbortController();let timer,onAbort;
    try{
@@ -139,7 +160,7 @@ export function createNewsFeed({fetchImpl=(...args)=>globalThis.fetch(...args),n
      const abort=reason=>{controller.abort(reason);reject(reason);};
      onAbort=()=>abort(signal.reason);signal.addEventListener('abort',onAbort,{once:true});
      if(signal.aborted)onAbort();
-     timer=setTimeout(()=>abort(Error('Tempo de consulta da imagem esgotado.')),1500);
+     timer=setTimeout(()=>abort(Error('Tempo de consulta da notícia esgotado.')),1500);
     });
     return await Promise.race([deadline,(async()=>{
      let url=article.url;
@@ -157,29 +178,31 @@ export function createNewsFeed({fetchImpl=(...args)=>globalThis.fetch(...args),n
       if(!response.ok||response.url&&!safeNewsUrl(response.url,source.domain))return null;
       const type=response.headers.get('content-type')??'';
       if(!/^(?:text\/html|application\/xhtml\+xml)\b/i.test(type))return null;
-      const imageUrl=parseNewsPageImage(await limitedText(response,300_000),url);
+      const html=await limitedText(response,300_000);
+      const metadata={imageUrl:parseNewsPageImage(html,url),description:parseNewsPageDescription(html,article.title)};
       controller.signal.throwIfAborted();
-      // Positive results last a day; absent metadata is retried in five minutes.
-      imageCache.delete(article.url);imageCache.set(article.url,{imageUrl,expires:now()+(imageUrl?MAX_CACHE_AGE:NEWS_REFRESH_SECONDS*1000)});
-      if(imageCache.size>512)imageCache.delete(imageCache.keys().next().value);
-      return imageUrl;
+      // Complete results last a day; missing requested fields are retried in five minutes.
+      const complete=(article.imageUrl||metadata.imageUrl)&&(article.description||metadata.description);
+      metadataCache.delete(article.url);metadataCache.set(article.url,{metadata,expires:now()+(complete?MAX_CACHE_AGE:NEWS_REFRESH_SECONDS*1000)});
+      if(metadataCache.size>512)metadataCache.delete(metadataCache.keys().next().value);
+      return metadata;
      }
      return null;
     })()]);
    }catch{return null;}
-   finally{clearTimeout(timer);if(onAbort)signal.removeEventListener('abort',onAbort);pendingImages.delete(article.url);}
+   finally{clearTimeout(timer);if(onAbort)signal.removeEventListener('abort',onAbort);pendingMetadata.delete(article.url);}
   });
-  pendingImages.set(article.url,task);return task;
+  pendingMetadata.set(article.url,task);return task;
  }
- async function withImages(articles){
-  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(Error('Tempo de imagens esgotado.')),4000);
+ async function withMetadata(articles){
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(Error('Tempo de detalhes das notícias esgotado.')),4000);
   const result=[...articles];let cursor=0;
   try{
    await Promise.all(Array.from({length:Math.min(6,articles.length)},async()=>{
     while(cursor<articles.length&&!controller.signal.aborted){
-     const index=cursor++,article=articles[index];if(article.imageUrl)continue;
-     const imageUrl=await pageImage(article,controller.signal);
-     if(imageUrl)result[index]={...article,imageUrl};
+     const index=cursor++,article=articles[index];if(article.imageUrl&&article.description)continue;
+     const metadata=await pageMetadata(article,controller.signal);
+     if(metadata)result[index]={...article,imageUrl:article.imageUrl||metadata.imageUrl,description:article.description||metadata.description};
     }
    }));
    return result;
@@ -213,7 +236,7 @@ export function createNewsFeed({fetchImpl=(...args)=>globalThis.fetch(...args),n
  }
  return async()=>{
   const responses=await Promise.all(NEWS_SOURCES.map(sourceFeed));
-  const chosen=await withImages(curateNews(responses.flatMap(response=>response.articles),30,now()));
+  const chosen=await withMetadata(curateNews(responses.flatMap(response=>response.articles),30,now()));
   return {articles:chosen,sources:responses.map(response=>response.source),checkedAt:new Date(now()).toISOString(),refreshSeconds:NEWS_REFRESH_SECONDS};
  };
 }
