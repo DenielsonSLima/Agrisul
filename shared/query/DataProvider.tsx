@@ -7,6 +7,7 @@ import {shouldRefreshAccessForMembershipChange,type MembershipRealtimeChange} fr
 import {RpcError} from '@/shared/supabase/rpc';
 import {billingKeys} from './keys';
 import {realtimeResources} from './realtimeResources';
+import {createRealtimeInvalidator} from './realtimeInvalidation';
 import {FeedbackProvider} from '@/shared/feedback';
 
 function RealtimeSync(){
@@ -14,25 +15,18 @@ function RealtimeSync(){
   useEffect(()=>{
     if(!userId)return;
     const client=getSupabaseBrowserClient();
-    const pending=new Set<string>();let timer:ReturnType<typeof setTimeout>|undefined;
+    const invalidator=createRealtimeInvalidator(queryClient,userId);
     let accessTimer:ReturnType<typeof setTimeout>|undefined;
     let recovery:ReturnType<typeof setInterval>|undefined;
     let active=true;
-    const invalidateAll=()=>{if(active)void queryClient.invalidateQueries({queryKey:billingKeys.all(userId)});};
+    const invalidateAll=()=>{if(active)invalidator.refreshAll();};
     const resetAuthorization=()=>{void (async()=>{
       const key=billingKeys.all(userId);
       await queryClient.cancelQueries({queryKey:key});
       if(active)await queryClient.resetQueries({queryKey:key});
     })();};
     const enqueue=(resources:readonly string[])=>{
-      resources.forEach(resource=>pending.add(resource));
-      if(timer)return;
-      timer=setTimeout(()=>{
-        timer=undefined;
-        if(!active)return;
-        for(const resource of pending)void queryClient.invalidateQueries({queryKey:billingKeys.resource(userId,resource)});
-        pending.clear();
-      },80);
+      invalidator.enqueue(resources);
     };
     const enqueueAccessRefresh=()=>{
       if(accessTimer)return;
@@ -71,7 +65,7 @@ function RealtimeSync(){
     });
     window.addEventListener('online',revalidateAfterConnectionRecovery);
     return()=>{
-      active=false;if(timer)clearTimeout(timer);if(accessTimer)clearTimeout(accessTimer);if(recovery)clearInterval(recovery);
+      active=false;invalidator.dispose();if(accessTimer)clearTimeout(accessTimer);if(recovery)clearInterval(recovery);
       window.removeEventListener('online',revalidateAfterConnectionRecovery);
       void client.removeChannel(channel);
     };

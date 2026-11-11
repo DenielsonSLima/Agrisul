@@ -2,6 +2,7 @@ import {useEffect,useRef} from 'react';
 import {useMutation,useQuery,useQueryClient} from '@tanstack/react-query';
 import {useAuth} from '@/shared/supabase/AuthProvider';
 import {RpcError} from '@/shared/supabase/rpc';
+import {withRequestTimeout} from '@/shared/supabase/requestTimeout';
 import {billingKeys} from '@/shared/query/keys';
 import {mutationResources} from '@/shared/query/derivedResources';
 
@@ -39,11 +40,20 @@ export function useCadastroMutation<TInput,TResult>(resource:string,save:(input:
   useEffect(()=>{activeUserIdRef.current=user?.id??null;},[user?.id]);
   const resources=mutationResources(resource,related);
   const refresh=async(actorId:string,settled=false)=>{
-    const jobs=resources.map(key=>queryClient.invalidateQueries({queryKey:billingKeys.resource(actorId,key)}));
-    if(settled){await Promise.allSettled(jobs);return;}
-    await Promise.all(jobs);
+    const jobs=resources.map(key=>queryClient.invalidateQueries({queryKey:billingKeys.resource(actorId,key)},{throwOnError:true}));
+    try{
+      await withRequestTimeout(async()=>{if(settled)await Promise.allSettled(jobs);else await Promise.all(jobs);});
+    }catch{
+      // Stop retries and hanging reads, including reads started by Realtime.
+      await Promise.all(resources.map(key=>queryClient.cancelQueries({queryKey:billingKeys.resource(actorId,key)})));
+      if(!settled)throw new RpcError('A alteração foi salva, mas não foi possível atualizar os dados da tela. Confira os dados antes de editar novamente.',504,'BILLING_REFRESH_FAILED');
+    }
   };
   return useMutation({
+    // A write must fail visibly while offline, rather than execute later when
+    // the connection returns with an obsolete form or account.
+    networkMode:'always',
+    retry:false,
     onMutate:async()=>{
       const actorId=activeUserIdRef.current;
       if(actorId){
@@ -60,6 +70,7 @@ export function useCadastroMutation<TInput,TResult>(resource:string,save:(input:
       await refresh(context.actorId);
     },
     onError:async(error,_input,context)=>{
+      if(error instanceof RpcError&&error.code==='BILLING_REFRESH_FAILED')return;
       if(!context?.actorId||activeUserIdRef.current!==context.actorId||!shouldRefreshAfterMutationError(error))return;
       // A falha pode ter ocorrido depois do commit. Reconciliamos o cache sem
       // substituir o erro original caso a própria reconsulta também falhe.

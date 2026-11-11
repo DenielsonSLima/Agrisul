@@ -21,8 +21,21 @@ export async function verifyImportCellKeyboard({page,fixtureUrl}){
  await cell('row-two','COD_TALHAO').press('Escape');await cell('row-one','PESOBRUTO').click();await cell('row-one','PESOBRUTO').fill('21');await cell('row-one','PESOBRUTO').press('Enter');
  await page.locator('[data-updating=true]').waitFor();await page.locator('#outside').click();
  await page.waitForFunction(()=>document.querySelector('[data-updating]').dataset.updating==='false');assert.equal(await page.evaluate(()=>document.activeElement.id),'outside','A later pointer choice cancels pending keyboard focus');
+ const transport='COD_EQUIPAMENTO_TRANSPORTE',compartment='COD_EQUIPAMENTO_COMPARTIMENTO';
+ await cell('row-one',transport).click();await cell('row-one',transport).fill('3496105');await cell('row-one',transport).press('Enter');
+ await active('row-three',transport);
+ assert.equal(await cell('row-two',transport).textContent(),'3.496.105','The mirrored row is filled but skipped by Enter');
+ assert.equal(await cell('row-two',compartment).textContent(),'3.496.105');
+ await cell('row-three',transport).fill('777');await cell('row-three',transport).press('Enter');await active('row-six',transport);
+ await cell('row-six',transport).press('Shift+Enter');await active('row-five',transport);
+ await cell('row-five',transport).press('Tab');await active('row-five',compartment);
+ await cell('row-five',compartment).fill('888');await cell('row-five',compartment).press('Enter');await active('row-six',compartment);
+ await cell('row-six',compartment).fill('invalid');await cell('row-six',compartment).press('Enter');
+ await cell('row-six',compartment).and(page.locator('[aria-invalid=true]')).waitFor();
+ assert.equal(await page.evaluate(()=>document.activeElement.dataset.entryId),'row-six','A failed save does not move to another group');
+ await cell('row-six',compartment).press('Escape');
  // Navigation is cancelled when the table unmounts.
  await cell('row-one','COD_DESTINO').click();await cell('row-one','COD_DESTINO').fill('20');await cell('row-one','COD_DESTINO').press('Enter');
  await page.goto('about:blank');assert.deepEqual(errors,[]);
- console.log('PASS: Enter/Shift+Enter after 850 ms refetch; fresh revisions; Tab/Shift+Tab; single writes; invalid drafts and Escape; pointer cancellation; unmount cleanup.');
+ console.log('PASS: Enter/Shift+Enter after 850 ms refetch; equipment skips groups of 2/3 rows in both columns; Tab remains cell-based; fresh revisions; invalid drafts and Escape; pointer cancellation; unmount cleanup.');
 }

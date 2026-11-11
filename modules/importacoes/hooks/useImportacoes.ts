@@ -4,6 +4,7 @@ import {billingKeys} from '@/shared/query/keys';
 import {rpcRequest} from '@/shared/supabase/rpc';
 import {useAuth} from '@/shared/supabase/AuthProvider';
 import {getSupabaseBrowserClient} from '@/shared/supabase/client';
+import {withRequestTimeout} from '@/shared/supabase/requestTimeout';
 import type {ImportTable,ImportTableFilters,ImportAtrInput,ImportHarvestOrderOptions,ImportHarvestOrdersInput,ImportPlotAreaInput,ImportPlotAreaResult} from '../types';
 import type {ImportBulkInput,ImportColumnTypeInput,ImportCollection,ImportDocument,ImportDocumentInput,ImportEntryInput,ImportExport,ImportProfile,ImportProfileInput,ImportProfileRevisionInput,ImportProfileCloneInput,ImportProfileActiveInput,ImportRevisionInput,ImportStatus,ImportOperationalSummary,ImportNumberGroupsInput,ImportLedger,ImportLedgerParams} from '../types';
 
@@ -30,12 +31,12 @@ export function useImportTable(id:string,filters:ImportTableFilters,enabled=true
    return key?.[1]===userId&&params?.view==='table'&&params.id===id?previous:undefined;
   },
  });
- return {data:query.data,loading:!ready||(!!user&&enabled&&query.isPending),updating:query.isFetching||query.isPlaceholderData,
+ return {data:query.data,loading:!ready||(!!user&&enabled&&query.isPending),updating:query.isFetching||query.isPlaceholderData,changingFilters:query.isPlaceholderData,
   error:ready&&!user?'Entre para acessar seus cadastros.':query.error?.message??'',reload:async()=>{if(user&&enabled)await query.refetch();}};
 }
 export function useImportMutations(){
  const {user}=useAuth();
- const assertActor=async()=>{const {data:{session},error}=await getSupabaseBrowserClient().auth.getSession();if(error||!user||session?.user.id!==user.id)throw new DOMException('A conta foi alterada. Reabra o formulário.','AbortError');};
+ const assertActor=async()=>{const {data:{session},error}=await withRequestTimeout(()=>getSupabaseBrowserClient().auth.getSession());if(error||!user||session?.user.id!==user.id)throw new DOMException('A conta foi alterada. Reabra o formulário.','AbortError');};
  const call=async<T>(resource:string,action:string,input:object)=>{await assertActor();const result=await rpcRequest<T>(resource,action,input as Record<string,unknown>);await assertActor();return result;};
  const profile=useCadastroMutation('import-profiles',(input:ImportProfileInput)=>call<{profile:ImportProfile}>('import-profiles','save',input));
  const cloned=useCadastroMutation('import-profiles',(input:ImportProfileCloneInput)=>call<{profile:ImportProfile}>('import-profiles','clone',input));

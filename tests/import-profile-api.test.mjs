@@ -9,13 +9,24 @@ export function useCadastroMutation(resource,save){return {resource,mutateAsync:
 export function useAuth(){return {user:state.user,ready:true}}
 export const billingKeys={resource:(userId,resource)=>['billing',userId,resource]};
 export function useQuery(options){state.queryOptions=options;return {data:state.queryData,isPending:false,isFetching:!!state.queryFetching,isPlaceholderData:!!state.queryPlaceholder,error:null,refetch:async()=>{}}}
-export function getSupabaseBrowserClient(){return {auth:{getSession:async()=>({data:{session:{user:{id:state.actor}}},error:null})}}}
+export function getSupabaseBrowserClient(){return {auth:{getSession:()=>state.hangSession?new Promise(resolve=>{state.releaseSession=resolve}):Promise.resolve({data:{session:{user:{id:state.actor}}},error:null})}}}
 export async function rpcRequest(resource,action,payload,signal){state.calls.push({resource,action,payload,signal});return action==='list'?{profiles:[{id:'inactive',active:false}],canManage:true}:{profile:{id:'new-profile',active:false,isDefault:false}}}`);
 const {state}=await import(fixtureUrl);
+const timeoutSource=ts.transpileModule(readFileSync(new URL('../shared/supabase/requestTimeout.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
 let source=ts.transpileModule(readFileSync(new URL('../modules/importacoes/hooks/useImportacoes.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
+source=source.replace(/from ['"]@\/shared\/supabase\/requestTimeout['"]/g,`from ${JSON.stringify(url(timeoutSource))}`);
 source=source.replace(/from ['"]@\/(?:modules\/cadastro\/hooks\/useCadastroQuery|shared\/supabase\/(?:rpc|AuthProvider|client))['"]/g,`from ${JSON.stringify(fixtureUrl)}`);
 source=source.replace(/from ['"](?:@tanstack\/react-query|@\/shared\/query\/keys)['"]/g,`from ${JSON.stringify(fixtureUrl)}`);
 const {useImportMutations,useImportProfiles,useImportDocuments,useImportLedger,useImportTable}=await import(url(source));
+
+test('a stalled session check releases the import save and cannot dispatch a late write',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});state.calls=[];state.hangSession=true;
+ const pending=useImportMutations().saveEntry({id:'document',date:'2026-11-05',values:{},reviewed:false,expectedUpdatedAt:'revision'});
+ const rejected=assert.rejects(pending,error=>error.name==='TimeoutError');
+ t.mock.timers.tick(30_000);await rejected;
+ state.hangSession=false;state.releaseSession({data:{session:{user:{id:state.actor}}},error:null});
+ await Promise.resolve();await Promise.resolve();assert.equal(state.calls.length,0);
+});
 
 test('profile lifecycle mutations route revision-protected payloads through the shared RPC wrapper',async()=>{
  state.calls=[];state.actor='owner-one';const actions=useImportMutations();
@@ -78,5 +89,7 @@ test('table retains prior results only for the same account and PDF and exposes 
  assert.equal(options.placeholderData(previous,{queryKey:['billing','other-owner','import-documents',{view:'table',id:'pdf-one'}]}),undefined);
  assert.equal(options.placeholderData(previous,{queryKey:['billing','owner-one','import-documents',{view:'table',id:'other-pdf'}]}),undefined);
  assert.equal(view.updating,true);
+ assert.equal(view.changingFilters,true);
+ state.queryPlaceholder=false;assert.equal(useImportTable('pdf-one',{}).changingFilters,false,'Background refetches keep the displayed rows editable');
  state.queryFetching=false;state.queryPlaceholder=false;assert.equal(useImportTable('pdf-one',{}).updating,false);
 });

@@ -31,5 +31,5 @@ export function useOvertimeAutoSave(input:OvertimeInput,report:OvertimeReport|un
   setStatus('saving');statusRef.current?.('saving');
   const timer=setTimeout(()=>void flushRef.current(),550);return()=>clearTimeout(timer);
  },[signature,wake]);
- return {status,flush:()=>flushRef.current()};
+ return {status,flush:async()=>{await flushRef.current();return latest.current.signature===saved.current;},acceptSnapshot:(value:OvertimeInput,updatedAt:string)=>{revision.current=updatedAt;saved.current=JSON.stringify(value);failed.current='';changeStatus('saved');}};
 }

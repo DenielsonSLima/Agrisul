@@ -56,6 +56,8 @@ try{
   const input={legalName:'Parceiro',cnpj:'entrada para validação no servidor'};
   assert.deepEqual(await clients.persistClient(input,'client-id'),{id:'client-id'});
   assert.deepEqual(calls.at(-1).payload,{...input,id:'client-id'});
+  await clients.persistClient({...input,destinationCode:'00008',createdAt:'server-only',updatedAt:'server-only'},'client-id');
+  assert.deepEqual(calls.at(-1).payload,{...input,destinationCode:'00008',id:'client-id'});
   await clients.fetchClientCnpj('12345678000195',controller.signal);
   assert.equal(calls.at(-1).authenticated,true);
   assert.equal(calls.at(-1).init.signal,controller.signal);

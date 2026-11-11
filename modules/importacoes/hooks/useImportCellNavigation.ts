@@ -1,10 +1,10 @@
 import {useEffect,useState,type RefObject} from 'react';
-import {importCellNavigation,type ImportCellMove} from '../utils/cellNavigation';
+import {importCellNavigation,type ImportCellMove,type ImportCellNavigationEntry} from '../utils/cellNavigation';
 
 type Target={entryId:string;fieldKey:string};
 /** Keep keyboard intent until mutation/refetch renders the next editable cell. */
 export function useImportCellNavigation({gridRef,entries,fields,blocked,updating}:{
- gridRef:RefObject<HTMLDivElement|null>;entries:readonly {id:string}[];fields:readonly {key:string}[];blocked:boolean;updating:boolean;
+ gridRef:RefObject<HTMLDivElement|null>;entries:readonly ImportCellNavigationEntry[];fields:readonly {key:string}[];blocked:boolean;updating:boolean;
 }){
  const [pending,setPending]=useState<Target[]|null>(null);
  useEffect(()=>{

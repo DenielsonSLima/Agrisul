@@ -1,0 +1,14 @@
+.daily-overtime-sheet-wrap{overflow-x:auto;background:#e8ece9;padding:16px}
+.daily-overtime-sheet{width:760px;margin:0 auto;background:white;color:#111;font-family:"Times New Roman",serif;border:1px solid #222}
+.daily-overtime-sheet h3{font-size:14px;font-weight:700;text-align:center;padding:8px;border-bottom:1px solid #222}
+.daily-overtime-sheet p{margin:0;padding:6px;font-size:12px;font-weight:700;border-bottom:1px solid #222;overflow-wrap:anywhere}
+.daily-overtime-sheet p span{margin-left:16px}
+.daily-overtime-sheet table{width:100%;border-collapse:collapse;table-layout:fixed;text-align:center}
+.daily-overtime-sheet th,.daily-overtime-sheet td{font-size:10px;border:1px solid #222;padding:4px 2px;height:22px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.daily-overtime-sheet table tr>:first-child{border-left:0}.daily-overtime-sheet table tr>:last-child{border-right:0}
+.daily-overtime-sheet thead tr:first-child th{border-top:0}.daily-overtime-sheet tbody th{font-weight:400}
+.daily-overtime-sheet .daily-overtime-rate{background:#fff600}.daily-overtime-sheet .daily-overtime-reason{text-align:left;white-space:pre-wrap}
+.daily-overtime-sheet tfoot td[colspan="9"]{text-align:left;white-space:pre-wrap;padding:6px;font-size:11px}
+.daily-overtime-sheet tfoot tr:last-child>*{font-weight:700;height:30px;border-bottom:0}
+.daily-overtime-sheet tfoot th{text-align:right;padding-right:8px}
+@media print{.daily-overtime-sheet-wrap{background:white;padding:0}.daily-overtime-sheet{width:100%;margin:0}}

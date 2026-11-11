@@ -1,5 +1,15 @@
 # Importações de colheita
 
+As edições da tabela usam a revisão retornada na mesma consulta das linhas, mesmo quando os metadados do documento ainda estão atualizando. Uma célula aberta acompanha a revisão atual enquanto seu valor original não mudou; mudanças na própria célula exigem conferência antes de gravar. O texto digitado é preservado e a RPC continua verificando a revisão atomicamente.
+
+Em Equipamento e Compartimento, Enter salva e leva à próxima linha visível de outro conjunto; Shift+Enter volta ao conjunto anterior. A navegação usa `groupKey` retornado pela RPC, respeita a ordem e os filtros da tabela e ignora outras linhas do conjunto atual mesmo quando estão separadas pela ordenação. Lançamentos sem identidade de conjunto continuam individuais. Nas demais colunas, Enter continua avançando por linha; Tab e Shift+Tab continuam avançando por célula.
+
+Eventos Realtime são agrupados sem cancelar consultas em andamento. Eventos recebidos durante uma leitura geram outra leitura ao final, preservando a atualização mais recente sem reiniciar continuamente a atualização aguardada pelas edições de células e operações em lote.
+
+O cadastro do parceiro possui **Código de destino**, armazenado como texto para preservar zeros à esquerda. O Postgres usa esse valor para preencher `COD_DESTINO` em novas importações, páginas complementares e novos lançamentos manuais. Ao salvar esse código no parceiro, células vazias dos documentos existentes também são preenchidas, incluindo os finalizados, mantendo seu status e suas evidências. Somente as linhas efetivamente alteradas perdem a conferência; valores explícitos já preenchidos permanecem intactos. Alterar ou limpar o código do parceiro não substitui códigos históricos já gravados. O Excel continua exportando `COD_DESTINO` como texto.
+
+Requisições RPC, conferência de sessão e atualização do cache após uma gravação têm limite de espera de 30 segundos por etapa. Falhas liberam o editor e preservam o texto digitado; uma gravação com resposta perdida reconcilia os dados antes de permitir a continuação. Gravações não ficam enfileiradas para execução após reconectar. **Atualizar dados** reconsulta documento e tabela sem recarregar a página. Uma tentativa manual usa a revisão atual somente se o valor original da célula não mudou; quando mudou, Esc permite conferir a versão atual antes de editar novamente.
+
 A coluna Z (`NUMERO_ANALISE`) permanece vazia na tabela e no Excel, inclusive nos documentos anteriores. A RPC ignora valores recebidos para esse campo em importações e edições; perfis não podem voltar a vinculá-lo ao PDF nem definir valor padrão ou obrigatoriedade. O número original continua apenas em `source.numeroAnalise` para conferência e identificação da origem.
 
 ## Pinheiro / USJP

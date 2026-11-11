@@ -1,12 +1,14 @@
 import {rpcRequest,authenticatedFetch,RpcError} from '@/shared/supabase/rpc';
 export {RpcError as ClientApiError} from '@/shared/supabase/rpc';
 import type {ClientInput,Client} from '../types';
+import {emptyClient} from '../types';
 
 export async function fetchClients(signal?:AbortSignal) {
   return (await rpcRequest<{clients:Client[]}>('clients','list',{},signal)).clients;
 }
 export async function persistClient(input:ClientInput,id?:string) {
-  return (await rpcRequest<{client:Client}>('clients','save',{...input,id})).client;
+  const fields=Object.fromEntries(Object.keys(emptyClient).filter(key=>Object.hasOwn(input,key)).map(key=>[key,input[key as keyof ClientInput]]));
+  return (await rpcRequest<{client:Client}>('clients','save',{...fields,id})).client;
 }
 export async function fetchClient(id:string,signal?:AbortSignal) {
   return (await rpcRequest<{client:Client}>('clients','get',{id},signal)).client;

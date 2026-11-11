@@ -1,5 +1,6 @@
 import {FunctionsFetchError,FunctionsHttpError,FunctionsRelayError} from '@supabase/supabase-js';
 import { getSupabaseBrowserClient } from './client';
+import {withRequestTimeout} from './requestTimeout';
 
 export class RpcError extends Error {
   constructor(message: string, public status = 400, public code?: string) { super(message); this.name = 'RpcError'; }
@@ -14,9 +15,15 @@ function errorStatus(code?: string, status?: number) {
 }
 export async function rpcRequest<T>(resource: string, action: string, payload: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
   const client = getSupabaseBrowserClient();
-  let request = client.rpc('billing_rpc', {p_resource: resource, p_action: action, p_payload: payload});
-  if (signal) request = request.abortSignal(signal);
-  const {data, error, status} = await request;
+  const {data, error, status} = await withRequestTimeout(requestSignal =>
+    client.rpc('billing_rpc', {p_resource: resource, p_action: action, p_payload: payload})
+      .retry(false).abortSignal(requestSignal), {signal},
+  ).catch(reason => {
+    if (reason instanceof DOMException && reason.name === 'TimeoutError') {
+      throw new RpcError(reason.message, 504, 'BILLING_REQUEST_TIMEOUT');
+    }
+    throw reason;
+  });
   if (signal?.aborted) throw new DOMException('Consulta cancelada', 'AbortError');
   if (error) {
     const code = error.code;

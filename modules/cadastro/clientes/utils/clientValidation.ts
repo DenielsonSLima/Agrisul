@@ -5,7 +5,7 @@ export {clientLimits} from './clientFields';
 export function validateClient(input:unknown):ClientInput {
   if(!input||typeof input!=='object')throw new Error('Dados do parceiro inválidos.');
   const data=input as Record<string,unknown>;const result={} as ClientInput;
-  for(const key of Object.keys(clientLimits) as (keyof ClientInput)[]){
+  for(const key of Object.keys(clientLimits) as (keyof typeof clientLimits)[]){
     if(typeof data[key]!=='string'||data[key].length>clientLimits[key])throw new Error('Verifique os campos do parceiro.');
     result[key]=data[key].trim();
   }

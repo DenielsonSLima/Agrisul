@@ -117,6 +117,17 @@ test('direct equipment-cell saves send one anchor and both fields for server-own
  const other=elements(table.render(),node=>node.props.entryId==='row-2'&&node.props.field?.key==='COD_TALHAO')[0];assert.equal(other.props.saveUnchanged,false);
 });
 
+test('table cells and bulk writes use the table revision while document metadata is still older',async()=>{
+ const table=tableFixture();table.props.revision='table-current';table.props.document.updatedAt='metadata-old';
+ const cell=elements(table.render(),node=>node.props.entryId==='row-2'&&node.props.field?.key==='COD_EQUIPAMENTO_TRANSPORTE')[0];
+ assert.equal(cell.props.revision,'table-current');
+ await cell.props.onSave('142',cell.props.revision);
+ assert.equal(fixture.state.calls[0].expectedUpdatedAt,'table-current');
+ column(table.render(),'COD_EQUIPAMENTO_TRANSPORTE').props.onClick();fillValue(table.render(),'143');
+ applyButton(table.render()).props.onClick();await new Promise(setImmediate);
+ assert.equal(fixture.state.calls[1].expectedUpdatedAt,'table-current');
+});
+
 test('continue general sequence delegates allocation to the server without a typed start or filtered row restriction',async()=>{
  const table=tableFixture();column(table.render(),'COD_ENTRADA').props.onClick();
  table.props.entries=table.props.entries.slice(0,1);

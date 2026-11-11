@@ -310,7 +310,7 @@ try{
  assert.match(cadastroQuerySource,/error instanceof TypeError/);
  assert.match(cadastroQuerySource,/Promise\.allSettled\(jobs\)/);
  assert.match(cadastroQuerySource,/activeUserIdRef\.current!==context\.actorId/);
- assert.match(cadastroQuerySource,/queryClient\.invalidateQueries\(\{queryKey:billingKeys\.resource\(actorId,key\)\}\)/);
+ assert.match(cadastroQuerySource,/queryClient\.invalidateQueries\(\{queryKey:billingKeys\.resource\(actorId,key\)\},\{throwOnError:true\}\)/);
  assert.match(atrHookSource,/useCadastroMutation\('atr',[\s\S]*?,\['contracts'\]\)/);
  assert.match(settingsHookSource,/useCadastroMutation<[\s\S]*?>\('settings',persistSettings,\['profile','users','planning'\]\)/);
  assert.match(culturesHookSource,/useCadastroMutation\('cultures',persistCulture,\['cultural-practices','planning'\]\)/);
