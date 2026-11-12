@@ -44,12 +44,12 @@ export function recoverReportDraft(base:OvertimeReport,local:OvertimeInput,remot
  return {input,conflicts,alreadySaved:same(input,reportDraft(remote))};
 }
 export type DailyDraft=Pick<OvertimeDaily,'activity'|'sector'|'entries'|'adjustment'>;
-function comparableDay(entry:OvertimeDailyEntry){
- return {date:entry.date,startTime:clock(entry.startTime),breakStart:clock(entry.breakStart),breakEnd:clock(entry.breakEnd),endTime:clock(entry.endTime),
+function comparableDay(entry:OvertimeDailyEntry,includeIdentity=true){
+ return {...(includeIdentity&&entry.id?{id:entry.id}:{}),date:entry.date,startTime:clock(entry.startTime),breakStart:clock(entry.breakStart),breakEnd:clock(entry.breakEnd),endTime:clock(entry.endTime),
   breakDuration:entry.breakStart||entry.breakEnd?'':duration(entry.breakDuration),rate:entry.rate,reason:text(entry.reason),approval:text(entry.approval)};
 }
 export function dailyDraft(daily:DailyDraft):DailyDraft{
- return {activity:text(daily.activity),sector:text(daily.sector),entries:daily.entries.map(comparableDay).sort((a,b)=>a.date.localeCompare(b.date)),
+ return {activity:text(daily.activity),sector:text(daily.sector),entries:daily.entries.map(entry=>comparableDay(entry)).sort((a,b)=>a.date.localeCompare(b.date)||(a.id??'').localeCompare(b.id??'')||a.startTime.localeCompare(b.startTime)||a.rate.localeCompare(b.rate)),
   adjustment:daily.adjustment?{hours50:duration(daily.adjustment.hours50),hours100:duration(daily.adjustment.hours100),reason:text(daily.adjustment.reason)}:null};
 }
 export function recoverDailyDraft(base:DailyDraft,local:DailyDraft,remote:DailyDraft,report:OvertimeReport,submitted?:DailyDraft){
@@ -59,8 +59,19 @@ export function recoverDailyDraft(base:DailyDraft,local:DailyDraft,remote:DailyD
   adjustment:choose(before.adjustment,draft.adjustment,current.adjustment,'Ajuste dos totais',conflicts),entries:[]};
  const dates=new Set([...before.entries,...draft.entries,...current.entries].map(entry=>entry.date));
  for(const date of [...dates].sort()){
-  const entry=choose(before.entries.find(item=>item.date===date),draft.entries.find(item=>item.date===date),current.entries.find(item=>item.date===date),'Dia '+date,conflicts);
-  if(entry)input.entries.push(entry);
+  const groups=[before.entries,draft.entries,current.entries].map(entries=>entries.filter(entry=>entry.date===date));
+  if(groups.some(entries=>entries.some(entry=>!entry.id))){
+   // Old clients had a single entry per date. Compare the whole date when an
+   // identity is missing, retaining every period instead of choosing the first.
+   const legacy=groups.map(entries=>entries.map(entry=>comparableDay(entry,false)).sort((a,b)=>serialize(a).localeCompare(serialize(b))));
+   input.entries.push(...choose(legacy[0],legacy[1],legacy[2],'Dia '+date,conflicts));
+   continue;
+  }
+  const ids=new Set(groups.flatMap(entries=>entries.map(entry=>entry.id!)));
+  for(const id of [...ids].sort()){
+   const entry=choose(groups[0].find(entry=>entry.id===id),groups[1].find(entry=>entry.id===id),groups[2].find(entry=>entry.id===id),'Período de '+date,conflicts);
+   if(entry)input.entries.push(entry);
+  }
  }
  if(input.entries.some(entry=>entry.date<report.dateFrom||entry.date>report.dateTo))conflicts.push('Período do relatório');
  return {input,conflicts,alreadySaved:same(input,current)};

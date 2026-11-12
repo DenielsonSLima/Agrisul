@@ -47,3 +47,30 @@ test('cached drafts survive transient refetch errors, but access failures remain
  for(const status of [401,403,404])assert.equal(blockingOvertimeRead({error:'Acesso',status,data:report()}),true);
  assert.equal(blockingOvertimeRead({error:'Rede',status:503,data:undefined}),true);
 });
+
+test('multiple periods on one day recover independently without dropping either rate',()=>{
+ const base=daily();base.entries=[{...day(),id:'period-one'},{...day(),id:'period-two',startTime:'20:00',endTime:'22:00',rate:'100'}];
+ const local=structuredClone(base),remote=structuredClone(base);local.entries[0].reason='Primeiro local';remote.entries[1].reason='Segundo remoto';
+ const recovered=recoverDailyDraft(base,local,remote,report());
+ assert.deepEqual(recovered.conflicts,[]);assert.equal(recovered.input.entries.length,2);
+ assert.equal(recovered.input.entries.find(entry=>entry.id==='period-one').reason,'Primeiro local');
+ assert.equal(recovered.input.entries.find(entry=>entry.id==='period-two').reason,'Segundo remoto');
+ assert.deepEqual(recovered.input.entries.map(entry=>entry.rate),['50','100']);
+ remote.entries[0].reason='Primeiro concorrente';assert.deepEqual(recoverDailyDraft(base,local,remote,report()).conflicts,['Período de 2026-11-01']);
+});
+
+test('concurrent period addition and deletion preserve stable identities and committed responses',()=>{
+ const base=daily();base.entries[0].id='period-one';
+ const local=structuredClone(base),remote=structuredClone(base);local.entries=[];
+ remote.entries.push({...day(),id:'period-two',startTime:'20:00',endTime:'21:00',rate:'100'});
+ let recovered=recoverDailyDraft(base,local,remote,report());assert.deepEqual(recovered.conflicts,[]);assert.deepEqual(recovered.input.entries.map(entry=>entry.id),['period-two']);
+ remote.entries[0].reason='Alterado antes da remoção';assert.deepEqual(recoverDailyDraft(base,local,remote,report()).conflicts,['Período de 2026-11-01']);
+ const submitted=structuredClone(remote),later=structuredClone(remote);later.entries[1].reason='Digitado depois da gravação';
+ recovered=recoverDailyDraft(base,later,remote,report(),submitted);assert.deepEqual(recovered.conflicts,[]);assert.equal(recovered.input.entries[1].reason,'Digitado depois da gravação');
+ assert.equal(recoverDailyDraft(base,submitted,{...remote,entries:[...remote.entries].reverse()},report(),submitted).alreadySaved,true);
+});
+
+test('legacy recovery compares all periods in a date instead of silently choosing the first',()=>{
+ const base=daily(),local=daily(),remote=daily();remote.entries.push({...day(),startTime:'20:00',endTime:'22:00',rate:'100'});
+ const recovered=recoverDailyDraft(base,local,remote,report());assert.deepEqual(recovered.conflicts,[]);assert.equal(recovered.input.entries.length,2);
+});

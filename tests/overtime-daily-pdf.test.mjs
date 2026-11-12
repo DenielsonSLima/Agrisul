@@ -36,6 +36,32 @@ try{
  for(const marker of ['INFORMATIVO DE HORAS EXTRAS','26/10/2026','25/11/2026','LUCAS SANTOS SILVA','3057','MOAGEM','AGRICOLA','50%','100%','06:05','18:05','10:00:00','121:22:33','40:11:12','PLANTAO MOAGEM','JOSE','Intervalo descontado:'])assert.ok(text.includes(marker),marker);
  assert.equal(result.fileName,'Horas extras - LUCAS SANTOS SILVA - 26-10-2026 a 25-11-2026.pdf');
  assert.equal(text.split('(121:22:33) Tj').length-1,1,'Print the exact server total once without recalculating from the daily times');
+ const mixedEntries=[
+  {...entry,id:'10000000-0000-4000-8000-000000000001',startTime:'06:00:00',endTime:'09:45:12',breakDuration:'00:00:00',rate:'50',hours50:'03:45:12',hours100:'00:00:00',reason:'PERIODO50',approval:'C50'},
+  {...entry,id:'10000000-0000-4000-8000-000000000002',startTime:'09:45:12',endTime:'11:00:00',breakDuration:'00:00:00',rate:'100',hours50:'00:00:00',hours100:'01:14:48',reason:'PERIODO100',approval:'C100'},
+ ];
+ const mixedCalendar=dailyOvertimeCalendar(report.dateFrom,report.dateTo,mixedEntries);
+ assert.equal(mixedCalendar.length,32,'Keep every calendar date and an extra row for the second period');
+ assert.deepEqual(mixedCalendar.filter(item=>item.date===entry.date).map(item=>item.entry.id),mixedEntries.map(item=>item.id),'Both periods on the same date remain in RPC order');
+ assert.equal(mixedCalendar.filter(item=>!item.entry).length,30,'Dates without entries retain one blank line each');
+ assert.equal(new Set(mixedCalendar.map(item=>item.rowKey)).size,mixedCalendar.length,'Document preview rows have unique period keys');
+ const mixedRow={...row,daily:{...row.daily,entries:mixedEntries}},mixedBefore=JSON.stringify(mixedRow);
+ const mixedDoc=(await createDailyOvertimePdf(report,mixedRow,brand)).doc,mixedCommands=mixedDoc.internal.pages.slice(1).flat(),mixedText=mixedCommands.join('\n');
+ assert.equal(JSON.stringify(mixedRow),mixedBefore,'Same-date export preserves the server snapshot');
+ for(const marker of ['PERIODO50','PERIODO100','C50','C100','03:45:12','01:14:48'])assert.equal(mixedText.split('('+marker+') Tj').length-1,1,'Print every saved period value exactly once: '+marker);
+ const printedX=value=>Number(mixedCommands.find(command=>command.includes('('+value+') Tj')).match(/([\d.-]+) ([\d.-]+) Td/)[1]);
+ assert.ok(printedX('03:45:12')<printedX('01:14:48'),'50% and 100% stay in their separate model columns on same-date rows');
+ assert.equal(mixedText.split('(121:22:33) Tj').length-1,1,'Keep the exact server summary even when it differs from period totals');
+ const manyPeriods=Array.from({length:7},(_,day)=>Array.from({length:8},(_,period)=>{
+  const date=new Date('2026-10-26T12:00:00Z');date.setUTCDate(date.getUTCDate()+day);
+  return {...entry,id:`20000000-0000-4000-8000-${String(day*8+period+1).padStart(12,'0')}`,date:date.toISOString().slice(0,10),startTime:String(period).padStart(2,'0')+':00:00',endTime:String(period+1).padStart(2,'0')+':00:00',breakDuration:'00:00:00',rate:period%2?'100':'50',hours50:period%2?'00:00:00':'01:00:00',hours100:period%2?'01:00:00':'00:00:00',reason:`DIA${day}PERIODO${period}`,approval:''};
+ })).flat();
+ const multiplePages=(await createDailyOvertimePdf(report,{...row,daily:{...row.daily,entries:manyPeriods}},brand)).doc,multiplePageTexts=multiplePages.internal.pages.slice(1).map(page=>page.join('\n')),allPeriodsText=multiplePageTexts.join('\n');
+ assert.ok(multiplePages.getNumberOfPages()>1,'Several periods per date paginate the complete calendar');
+ for(const savedPeriod of manyPeriods)assert.equal(allPeriodsText.split('('+savedPeriod.reason+') Tj').length-1,1,'No period dropped or repeated across pages: '+savedPeriod.reason);
+ for(const page of multiplePageTexts)assert.ok(page.includes('LUCAS SANTOS SILVA'),'Every period page repeats the employee header');
+ assert.equal(multiplePageTexts.filter(page=>page.includes('(121:22:33) Tj')).length,1,'Server summary occurs once on the final period page');
+ assert.ok(multiplePageTexts.at(-1).includes('(121:22:33) Tj'));
  const longName='MARIA DE LOURDES OLIVEIRA '.repeat(6).trim(),longRegistration='3057'.repeat(15);
  assert.ok(longName.length<=160&&longRegistration.length===60,'Use employee values accepted by the RPC');
  const headerRow={...row,employeeName:longName,registrationNumber:longRegistration,daily:{...row.daily,activity:'ATIVIDADE DE OPERACAO '.repeat(9).trim(),sector:'SETOR AGRICOLA '.repeat(8).trim()}};
@@ -80,5 +106,5 @@ try{
  assert.ok(pages.join('\n').includes('MOTIVO499'),'No final reason lines dropped');
  for(const page of pages){assert.ok(page.includes('LUCAS SANTOS SILVA'));assert.ok(page.includes('26/10/2026'));}
  assert.equal(pages.filter(page=>page.includes('121:22:33')).length,1,'Final totals occur once on the last page');
- console.log('Passed: individual daily PDF, long bold headers inside drawn frames, real calendar dates, explicit intervals, exact server totals, legacy/adjustment disclosure and complete pagination.');
+ console.log('Passed: individual daily PDF, both rates and every period on the same date, complete calendar and period pagination, long bold headers inside drawn frames, explicit intervals, exact server totals and legacy/adjustment disclosure.');
 }finally{await rm(directory,{recursive:true,force:true});}

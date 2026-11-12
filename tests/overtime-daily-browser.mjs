@@ -22,15 +22,22 @@ export async function verifyDailyOvertimeBrowser({directory,ref,session,report,e
   assert.equal(await daily.locator('.overtime-employee-kpis article').count(),4);
   assert.equal(await daily.getByLabel('Total de horas do funcionário',{exact:true}).textContent(),'19:00:00');
   assert.equal(await daily.getByLabel('Dias lançados do funcionário',{exact:true}).textContent(),'2');
-  assert.equal(await daily.locator('tbody tr').count(),31);
-  await daily.getByLabel('Inicial de 28/10/2026',{exact:true}).fill('08:00:00');
-  await daily.getByLabel('Final de 28/10/2026',{exact:true}).fill('10:00:00');
-  await daily.getByRole('textbox',{name:'Motivo de 28/10/2026',exact:true}).fill('Conferência pelo navegador');
+  const selector=form.getByLabel('Dia dos lançamentos',{exact:true});assert.equal(await selector.locator('option').count(),31);
+  await selector.selectOption('2026-10-28');
+  await daily.getByLabel('Inicial de 28/10/2026, período 1',{exact:true}).fill('08:00:00');
+  await daily.getByLabel('Final de 28/10/2026, período 1',{exact:true}).fill('10:00:00');
+  await daily.getByRole('textbox',{name:'Motivo de 28/10/2026, período 1',exact:true}).fill('Conferência pelo navegador');
+  await form.getByRole('button',{name:'Adicionar período 100%',exact:true}).click();
+  await daily.getByLabel('Inicial de 28/10/2026, período 2',{exact:true}).fill('10:00:00');
+  await daily.getByLabel('Final de 28/10/2026, período 2',{exact:true}).fill('11:00:00');
+  await daily.getByRole('textbox',{name:'Motivo de 28/10/2026, período 2',exact:true}).fill('Mesmo dia com adicional de 100%');
   await form.getByRole('button',{name:'Salvar lançamentos',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('.overtime-daily-actions [role=status]')?.textContent==='Lançamentos salvos.');
   const saved=await rpc('daily-get',{companyId:report.companyId,id:report.id,employeeId:employee.id});
   assert.equal(saved.daily.calculated50,'12:30:00');assert.equal(saved.daily.total50,'11:00:00','Adjustment stays explicit while daily calculation changes');
   assert.equal(saved.daily.totalHours,'19:00:00');assert.equal(saved.daily.entryCount,3);
+  assert.equal(saved.daily.calculated100,'10:30:00');assert.deepEqual(saved.daily.entries.filter(entry=>entry.date==='2026-10-28').map(entry=>entry.rate),['50','100']);
+  await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));
   await page.screenshot({path:resolve(directory,'employee-page-desktop.png'),fullPage:false});
   await page.reload();await form.waitFor();assert.equal(await daily.getByLabel('Dias lançados do funcionário',{exact:true}).textContent(),'3');
   await page.goBack();await editor.waitFor();await page.goForward();await form.waitFor();
@@ -41,6 +48,13 @@ export async function verifyDailyOvertimeBrowser({directory,ref,session,report,e
   assert.equal(readFileSync(path).subarray(0,4).toString(),'%PDF');
   await page.screenshot({path:resolve(directory,'daily-export-desktop.png'),fullPage:true});
   await preview.getByRole('button',{name:'Close',exact:true}).click();
+  for(const width of [1024,768]){
+   await page.setViewportSize({width,height:900});await selector.selectOption('2026-10-28');
+   assert.equal(await form.locator('.overtime-period-card').count(),2);
+   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Tablet daily page fits '+width);
+   await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));
+   await page.screenshot({path:resolve(directory,`daily-tablet-${width}.png`),fullPage:true});
+  }
   await page.setViewportSize({width:390,height:844});
   await page.waitForTimeout(250);
   const bounds=await daily.evaluate(node=>{const rect=node.getBoundingClientRect();return {left:rect.left,right:rect.right,width:innerWidth,scrollWidth:node.scrollWidth,clientWidth:node.clientWidth};});

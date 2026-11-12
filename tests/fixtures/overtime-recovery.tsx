@@ -23,7 +23,7 @@ function initialReport(actor:string):OvertimeReport{
  const report:OvertimeReport={id:'report-one',companyId:'company-one',dateFrom:'2026-10-26',dateTo:'2026-10-28',referenceMonth:'2026-10',sector:'Agrícola',notes:actor==='owner-one'?'Observação original':'Observação da outra conta',employeeCount:2,total50:'00:00:00',total100:'00:00:00',createdAt:'0',updatedAt:'0',status:'open',finishedAt:null,canFinish:false,rows};
  rows[0].daily!.entries=[entry('2026-10-26',{reason:'Motivo original'})];recalculate(report);return report;
 }
-function entry(date:string,patch:Partial<OvertimeDailyEntry>={}):OvertimeDailyEntry{return {date,startTime:'08:00:00',breakStart:'',breakEnd:'',breakDuration:'00:00:00',endTime:'09:00:00',rate:'50',reason:'Motivo remoto',approval:'',...patch};}
+function entry(date:string,patch:Partial<OvertimeDailyEntry>={}):OvertimeDailyEntry{return {id:crypto.randomUUID(),date,startTime:'08:00:00',breakStart:'',breakEnd:'',breakDuration:'00:00:00',endTime:'09:00:00',rate:'50',reason:'Motivo remoto',approval:'',...patch};}
 function recalculate(report:OvertimeReport){
  for(const row of report.rows){
   if(!row.daily)continue;const sheet=row.daily;
@@ -36,11 +36,11 @@ function recalculate(report:OvertimeReport){
   sheet.entries.sort((a,b)=>a.date.localeCompare(b.date));
   sheet.calculated50=hours(sheet.entries.reduce((sum,day)=>sum+seconds(day.hours50!),0));sheet.calculated100=hours(sheet.entries.reduce((sum,day)=>sum+seconds(day.hours100!),0));
   sheet.total50=sheet.adjustment?.hours50||sheet.calculated50;sheet.total100=sheet.adjustment?.hours100||sheet.calculated100;row.hours50=sheet.total50;row.hours100=sheet.total100;
-  sheet.totalHours=hours(seconds(sheet.total50)+seconds(sheet.total100));sheet.entryCount=sheet.entries.length;
+  sheet.totalHours=hours(seconds(sheet.total50)+seconds(sheet.total100));sheet.entryCount=new Set(sheet.entries.map(entry=>entry.date)).size;
  }
  report.employeeCount=report.rows.length;report.total50=hours(report.rows.reduce((sum,row)=>sum+seconds(row.hours50),0));report.total100=hours(report.rows.reduce((sum,row)=>sum+seconds(row.hours100),0));report.canFinish=report.rows.length>0&&report.rows.every(row=>seconds(row.hours50)+seconds(row.hours100)>0);
 }
-type Failure='network'|'commit-lost'|'commit-lost-pending'|'';
+type Failure='network'|'commit-lost'|'commit-lost-pending'|'validation'|'';
 type Response={data:unknown;error:null|{code:string;message:string};status:number};
 const listeners=new Set<()=>void>();
 const server=new Map<string,OvertimeReport>([['owner-one',initialReport('owner-one')],['owner-two',initialReport('owner-two')]]);
@@ -55,7 +55,7 @@ const state={
  async refresh(){await queryClient.invalidateQueries({queryKey:['billing',state.actor,'overtime']});},
  changeReport(patch:Partial<OvertimeReport>){Object.assign(server.get(state.actor)!,clone(patch));bump();},
  changeDaily(employeeId:string,date:string,patch:Partial<OvertimeDailyEntry>={}){
-  const sheet=server.get(state.actor)!.rows.find(row=>row.employeeId===employeeId)!.daily!,existing=sheet.entries.find(day=>day.date===date);
+  const sheet=server.get(state.actor)!.rows.find(row=>row.employeeId===employeeId)!.daily!,existing=sheet.entries.find(day=>patch.id?day.id===patch.id:day.date===date);
   if(existing)Object.assign(existing,clone(patch));else sheet.entries.push(entry(date,patch));bump();
  },
  switchActor(actor:string){state.actor=actor;queryClient.clear();state.notify();},
@@ -72,6 +72,7 @@ async function handle(resource:string,action:string,payload:Record<string,unknow
  if(action==='save'||action==='daily-save'){
   state.writes.push({actor:state.actor,action,payload:clone(payload)});
   const fail=state.failNextWrite;state.failNextWrite='';if(fail==='network')throw new TypeError('Failed to fetch');
+  if(fail==='validation')return error('22023','Confira os horários do período.');
   const report=server.get(state.actor)!;
   if(payload.expectedUpdatedAt!==report.updatedAt)return error('23514','O relatório foi alterado. Reconsulte os dados.');
   if(action==='save'){

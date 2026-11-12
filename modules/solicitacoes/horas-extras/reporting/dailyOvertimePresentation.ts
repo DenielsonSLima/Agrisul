@@ -2,12 +2,17 @@ import type {OvertimeDailyEntry} from '../types';
 
 // Calendar rows and formatting only. Durations and totals come from the RPC.
 export function dailyOvertimeCalendar(dateFrom:string,dateTo:string,entries:OvertimeDailyEntry[]){
- const byDate=new Map(entries.map(entry=>[entry.date,entry]));
+ const byDate=new Map<string,OvertimeDailyEntry[]>();
+ for(const entry of entries){
+  const periods=byDate.get(entry.date)??[];periods.push(entry);byDate.set(entry.date,periods);
+ }
  const start=new Date(dateFrom+'T12:00:00Z'),end=new Date(dateTo+'T12:00:00Z');
  if(!Number.isFinite(start.getTime())||!Number.isFinite(end.getTime())||start>end)return [];
- const result:{date:string;entry:OvertimeDailyEntry|undefined}[]=[];
+ const result:{date:string;entry:OvertimeDailyEntry|undefined;rowKey:string}[]=[];
  for(const cursor=new Date(start);cursor<=end;cursor.setUTCDate(cursor.getUTCDate()+1)){
-  const date=cursor.toISOString().slice(0,10);result.push({date,entry:byDate.get(date)});
+  const date=cursor.toISOString().slice(0,10),periods=byDate.get(date)??[];
+  if(!periods.length)result.push({date,entry:undefined,rowKey:date+':blank'});
+  else periods.forEach((entry,index)=>result.push({date,entry,rowKey:date+':'+(entry.id??index)}));
  }
  return result;
 }

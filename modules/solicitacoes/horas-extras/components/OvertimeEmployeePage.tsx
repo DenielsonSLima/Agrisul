@@ -1,7 +1,7 @@
 'use client';
 import {useEffect,useRef,useState,type FormEvent,type MouseEvent,type ReactNode} from 'react';
 import {useQueryClient} from '@tanstack/react-query';
-import {ArrowLeft,CalendarDays,ChevronRight,Clock3,Download,Loader2,RotateCcw,Save,SlidersHorizontal} from 'lucide-react';
+import {ArrowLeft,CalendarDays,ChevronRight,Clock3,Download,Loader2,Save,SlidersHorizontal} from 'lucide-react';
 import {Field} from '@/shared/components/Common';
 import {notifications,useConfirmation} from '@/shared/feedback';
 import {PdfExportDialog} from '@/shared/reporting/PdfExportDialog';
@@ -19,6 +19,7 @@ import {fetchOvertimeDetail} from '../services/overtimeApi';
 import {blockingOvertimeRead,recoverDailyDraft,type DailyDraft} from '../utils/draftRecovery';
 import type {OvertimeDaily,OvertimeDailyEntry,OvertimeDailyResult,OvertimeReport,OvertimeRow} from '../types';
 import {OvertimeDurationInput} from './OvertimeDurationInput';
+import {OvertimeDailySchedule} from './OvertimeDailySchedule';
 
 type Props={companyId:string;reportId:string;employeeId:string;companyName:string;reportHref:string;reportListHref:string;initialAdjustment?:boolean};
 type EditorProps=Props&{report:OvertimeReport;readOnly:boolean;initial:OvertimeDailyResult;onSaved:(result:OvertimeDailyResult)=>void;refreshError:string;onRefresh:()=>void};
@@ -27,18 +28,20 @@ async function createDailyPdf(snapshot:DailyPdfSnapshot,brand:ReportPdfBrand){
  const {createDailyOvertimePdf}=await import('../reporting/dailyOvertimePdf');
  return createDailyOvertimePdf(snapshot.report,snapshot.row,brand);
 }
-function blankDay(date:string):OvertimeDailyEntry{return {date,startTime:'',breakStart:'',breakEnd:'',breakDuration:'00:00:00',endTime:'',rate:'50',reason:'',approval:''};}
+function blankDay(date:string,rate:'50'|'100'='50'):OvertimeDailyEntry{return {id:crypto.randomUUID(),date,startTime:'',breakStart:'',breakEnd:'',breakDuration:'00:00:00',endTime:'',rate,reason:'',approval:''};}
 function calendarEntries(report:OvertimeReport,daily:OvertimeDaily){
- const entries=new Map(daily.entries.map(entry=>[entry.date,entry]));
+ const byDate=new Map<string,OvertimeDailyEntry[]>();
+ for(const entry of daily.entries){const grouped=byDate.get(entry.date)??[];grouped.push(entry);byDate.set(entry.date,grouped);}
  const days:OvertimeDailyEntry[]=[];
  const cursor=new Date(report.dateFrom+'T12:00:00Z'),end=new Date(report.dateTo+'T12:00:00Z');
- for(;cursor<=end&&days.length<366;cursor.setUTCDate(cursor.getUTCDate()+1)){
-  const date=cursor.toISOString().slice(0,10);days.push({...blankDay(date),...entries.get(date)});
+ for(let dayCount=0;cursor<=end&&dayCount<366;cursor.setUTCDate(cursor.getUTCDate()+1),dayCount++){
+  const date=cursor.toISOString().slice(0,10),periods=byDate.get(date)??[];
+  days.push(...(periods.length?periods.map(entry=>({...entry,id:entry.id??crypto.randomUUID()})):[blankDay(date)]));
  }
  return days;
 }
 const hasValues=(entry:OvertimeDailyEntry)=>!!(entry.startTime||entry.endTime||entry.breakStart||entry.breakEnd||entry.reason||entry.approval||(entry.breakDuration&&entry.breakDuration!=='00:00:00'));
-function inputEntries(entries:OvertimeDailyEntry[]){return entries.filter(hasValues).map(({date,startTime,breakStart,breakEnd,breakDuration,endTime,rate,reason,approval})=>({date,startTime,breakStart,breakEnd,breakDuration:breakStart||breakEnd?'':breakDuration,endTime,rate,reason,approval}));}
+function inputEntries(entries:OvertimeDailyEntry[]){return entries.filter(hasValues).map(({id,date,startTime,breakStart,breakEnd,breakDuration,endTime,rate,reason,approval})=>({id,date,startTime,breakStart,breakEnd,breakDuration:breakStart||breakEnd?'':breakDuration,endTime,rate,reason,approval}));}
 
 function EmployeePageFrame({reportHref,reportListHref,report,employeeName,children,onNavigate}:Pick<Props,'reportHref'|'reportListHref'>&{report?:OvertimeReport;employeeName?:string;children:ReactNode;onNavigate?:(event:MouseEvent<HTMLAnchorElement>,href:string)=>void}){
  return <section className="overtime-workspace overtime-employee-page">
@@ -79,7 +82,20 @@ function DailyEditor({initial,report,employeeId,readOnly,initialAdjustment=false
  const dirty=JSON.stringify(values)!==JSON.stringify(savedValues),busy=mutations.savingDaily||exporting||recovering;
  const row=saved.report.rows.find(item=>item.employeeId===employeeId);
  const hasLegacySummary=row?.source==='legacy'&&!saved.daily.hasDailyEntries&&[saved.daily.legacyHours50,saved.daily.legacyHours100].some(value=>value&&!/^0+:00:00$/.test(value));
- const patch=(date:string,value:Partial<OvertimeDailyEntry>)=>setEntries(current=>current.map(entry=>entry.date===date?{...entry,...value}:entry));
+ const patch=(id:string,value:Partial<OvertimeDailyEntry>)=>setEntries(current=>current.map(entry=>entry.id===id?{...entry,...value,hours50:undefined,hours100:undefined}:entry));
+ const addPeriod=(date:string,rate:'50'|'100')=>setEntries(current=>{
+  const existing=current.filter(entry=>entry.date===date);
+  if(existing.length>=8)return current;
+  return [...current,blankDay(date,rate)];
+ });
+ const removePeriod=async(entry:OvertimeDailyEntry)=>{
+  if(hasValues(entry)&&!await confirm({title:'Remover período do dia?',description:'Os horários, motivo e visto deste período de '+dateLabel(entry.date)+' serão removidos quando você salvar. Os demais períodos serão mantidos.',confirmLabel:'Remover período',tone:'destructive'}))return;
+  setEntries(current=>{const remaining=current.filter(item=>item.id!==entry.id);return remaining.some(item=>item.date===entry.date)?remaining:[...remaining,blankDay(entry.date)];});
+ };
+ const clearDay=async(date:string)=>{
+  if(!await confirm({title:'Limpar lançamentos do dia?',description:'Todos os períodos, horários, motivos e vistos de '+dateLabel(date)+' serão removidos quando você salvar.',confirmLabel:'Limpar dia',tone:'destructive'}))return;
+  setEntries(current=>[...current.filter(entry=>entry.date!==date),blankDay(date)]);
+ };
  const close=async(href=reportHref)=>{
   if(busy)return;
   if(dirty&&!await confirm({title:'Descartar alterações deste funcionário?',description:'Os lançamentos e ajustes ainda não salvos serão descartados.',confirmLabel:'Descartar alterações',tone:'destructive'}))return;
@@ -95,7 +111,7 @@ function DailyEditor({initial,report,employeeId,readOnly,initialAdjustment=false
    submitted.current=values;
    const result=await mutations.saveDaily({companyId:report.companyId,id:report.id,employeeId,expectedUpdatedAt:saved.report.updatedAt,...values});
    if(!mounted.current)return;acceptSaved(result);notifications.saved('Os lançamentos e o resumo do funcionário foram atualizados.');
-  }catch(reason){if(mounted.current){setNeedsRecovery(true);const message=reason instanceof Error?reason.message:'Não foi possível salvar os lançamentos.';setError(message);notifications.error(message);}}
+  }catch(reason){if(mounted.current){setNeedsRecovery(!(reason instanceof RpcError&&reason.code?.startsWith('22')));const message=reason instanceof Error?reason.message:'Não foi possível salvar os lançamentos.';setError(message);notifications.error(message);}}
   finally{saving.current=false;}
  };
  const acceptSaved=(result:OvertimeDailyResult)=>{
@@ -143,15 +159,13 @@ function DailyEditor({initial,report,employeeId,readOnly,initialAdjustment=false
   <section className="overtime-employee-kpis" aria-label="Resumo de horas do funcionário"><article className="is-featured"><span><Clock3 size={16}/>Total de horas</span><strong><output aria-label="Total de horas do funcionário">{saved.daily.totalHours}</output></strong><small>{saved.daily.adjustment?'Total com ajuste justificado':'Resumo do período'}</small></article><article><span>Horas extras 50%</span><strong><output aria-label="Horas extras 50% do funcionário">{saved.daily.total50}</output></strong><small>Adicional de 50%</small></article><article><span>Horas extras 100%</span><strong><output aria-label="Horas extras 100% do funcionário">{saved.daily.total100}</output></strong><small>Adicional de 100%</small></article><article><span><CalendarDays size={16}/>Dias lançados</span><strong><output aria-label="Dias lançados do funcionário">{saved.daily.entryCount}</output></strong><small>Dias com horários salvos</small></article></section>
   {refreshError&&<div className="overtime-notice" role="alert"><p>A atualização falhou. Seu rascunho foi mantido. {refreshError}</p><button type="button" className="btn" onClick={onRefresh}>Reconsultar dados</button></div>}
   <form id="overtime-daily-form" className="overtime-daily-editor" onSubmit={event=>void submit(event)}>
-  <div className="overtime-daily-intro"><p>Informe o período de <strong>hora extra</strong> de cada dia. O banco calcula a duração, desconta o intervalo informado e atualiza o resumo mensal.</p>{hasLegacySummary&&<p className="overtime-legacy-note">Este funcionário possui horas no resumo anterior, sem detalhamento diário. Elas serão preservadas até você salvar os lançamentos ou um ajuste.</p>}</div>
+  <div className="overtime-daily-intro"><p>Selecione o dia e informe os períodos de <strong>hora extra</strong>. No mesmo dia, você pode lançar horários de <strong>50% e 100%</strong>. Salve para atualizar o resumo.</p>{hasLegacySummary&&<p className="overtime-legacy-note">Este funcionário possui horas no resumo anterior, sem detalhamento diário. Elas serão preservadas até você salvar os lançamentos ou um ajuste.</p>}</div>
   <fieldset disabled={readOnly||busy}>
    <div className="overtime-daily-metadata"><Field label="Atividade"><input maxLength={120} value={activity} onChange={event=>setActivity(event.target.value)} placeholder="Atividade do funcionário"/></Field><Field label="Setor"><input maxLength={120} value={sector} onChange={event=>setSector(event.target.value)} placeholder="Setor"/></Field></div>
-   <p className="overtime-daily-help">Intervalo: preencha saída e retorno, ou informe a duração a descontar. Sem intervalo, mantenha 00:00:00. Horário final anterior ao inicial indica término no dia seguinte.</p>
-   <div className="overtime-table-wrap overtime-daily-scroll"><table className="overtime-table overtime-daily-table"><thead><tr><th scope="col">Dia</th><th scope="col">Inicial</th><th scope="col">Saída intervalo</th><th scope="col">Retorno</th><th scope="col">Final</th><th scope="col">Desconto intervalo</th><th scope="col">Tipo</th><th scope="col">Total salvo</th><th scope="col">Motivo da hora extra</th><th scope="col">Visto</th>{!readOnly&&<th scope="col"><span className="sr-only">Limpar dia</span></th>}</tr></thead><tbody>{entries.map(entry=>{
-    const original=saved.daily.entries.find(item=>item.date===entry.date),changed=JSON.stringify(inputEntries([entry]))!==JSON.stringify(inputEntries(original?[original]:[]));
-    const day=new Date(entry.date+'T12:00:00Z').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',weekday:'short',timeZone:'UTC'});
-    return <tr key={entry.date}><th scope="row">{day}</th>{(['startTime','breakStart','breakEnd','endTime'] as const).map(key=><td key={key}><input type="time" step={1} aria-label={`${{startTime:'Inicial',breakStart:'Saída intervalo',breakEnd:'Retorno',endTime:'Final'}[key]} de ${dateLabel(entry.date)}`} value={entry[key]} onChange={event=>patch(entry.date,{[key]:event.target.value,hours50:undefined,hours100:undefined})}/></td>)}<td>{entry.breakStart||entry.breakEnd?<span className="overtime-daily-calculated">Pelos horários</span>:<OvertimeDurationInput label={'Intervalo a descontar em '+dateLabel(entry.date)} value={entry.breakDuration} onChange={value=>patch(entry.date,{breakDuration:value})}/>}</td><td><select aria-label={'Tipo de hora extra em '+dateLabel(entry.date)} value={entry.rate} onChange={event=>patch(entry.date,{rate:event.target.value as '50'|'100'})}><option value="50">50%</option><option value="100">100%</option></select></td><td className="overtime-daily-saved-hours">{changed&&hasValues(entry)?'Salvar para calcular':entry.rate==='100'?entry.hours100||'—':entry.hours50||'—'}</td><td><input aria-label={'Motivo de '+dateLabel(entry.date)} maxLength={500} value={entry.reason} onChange={event=>patch(entry.date,{reason:event.target.value})}/></td><td><input aria-label={'Visto de '+dateLabel(entry.date)} maxLength={120} value={entry.approval} onChange={event=>patch(entry.date,{approval:event.target.value})}/></td>{!readOnly&&<td><button type="button" className="icon-btn" disabled={!hasValues(entry)} aria-label={'Limpar '+dateLabel(entry.date)} onClick={async()=>{if(await confirm({title:'Limpar lançamentos do dia?',description:'Os horários, motivo e visto de '+dateLabel(entry.date)+' serão removidos quando você salvar.',confirmLabel:'Limpar dia',tone:'destructive'}))patch(entry.date,blankDay(entry.date));}}><RotateCcw size={15}/></button></td>}</tr>;
-   })}</tbody></table></div>
+  </fieldset>
+  <p className="overtime-daily-help">Horário final anterior ao inicial indica término no dia seguinte. Separe os períodos sem sobrepor horários, inclusive quando houver intervalo.</p>
+  <OvertimeDailySchedule dates={[...new Set(entries.map(entry=>entry.date))].sort()} entries={entries} savedEntries={saved.daily.entries} readOnly={readOnly} busy={busy} onPatch={patch} onAdd={addPeriod} onRemove={entry=>void removePeriod(entry)} onClear={date=>void clearDay(date)}/>
+  <fieldset disabled={readOnly||busy}>
    <div className="overtime-daily-adjust-heading"><button className="btn" type="button" onClick={()=>setShowAdjustment(value=>!value)}><SlidersHorizontal size={16}/>Ajustar totais</button>{adjustment&&<span>Ajuste manual ativo</span>}</div>
    {showAdjustment&&<section className="overtime-daily-adjustment" aria-label="Ajuste excepcional dos totais"><p>O ajuste substitui os totais calculados deste funcionário. Informe o total correto e o motivo. Remover o ajuste restaura os totais dos lançamentos diários.</p>{adjustment?<><div className="overtime-daily-adjust-fields"><Field label="Total ajustado 50%"><OvertimeDurationInput label="Total ajustado 50%" value={adjustment.hours50} onChange={hours50=>setAdjustment(current=>current?{...current,hours50}:current)}/></Field><Field label="Total ajustado 100%"><OvertimeDurationInput label="Total ajustado 100%" value={adjustment.hours100} onChange={hours100=>setAdjustment(current=>current?{...current,hours100}:current)}/></Field><Field label="Motivo do ajuste *"><input required maxLength={500} value={adjustment.reason} onChange={event=>setAdjustment(current=>current?{...current,reason:event.target.value}:current)}/></Field></div><button type="button" className="btn small overtime-delete" onClick={async()=>{if(await confirm({title:'Remover ajuste dos totais?',description:'Ao salvar, os totais voltarão a ser calculados pelos lançamentos diários.',confirmLabel:'Remover ajuste',tone:'destructive'}))setAdjustment(null);}}>Remover ajuste</button></>:<button type="button" className="btn" onClick={()=>setAdjustment({hours50:saved.daily.total50,hours100:saved.daily.total100,reason:''})}>Informar ajuste</button>}</section>}
   </fieldset>
@@ -159,6 +173,6 @@ function DailyEditor({initial,report,employeeId,readOnly,initialAdjustment=false
   {saved.daily.adjustment&&<p className="overtime-daily-help">Calculado pelos dias: 50% {saved.daily.calculated50} · 100% {saved.daily.calculated100}. Motivo do ajuste salvo: {saved.daily.adjustment.reason}</p>}
   {error&&<p className="form-error" role="alert">{error}</p>}
   {needsRecovery&&!readOnly&&<div className="overtime-recovery-actions"><button className="btn" type="button" disabled={busy} onClick={()=>void recover()}>Reconsultar e tentar salvar</button>{hasConflict&&<button className="btn" type="button" disabled={busy} onClick={()=>void recover(true)}>Carregar versão atual</button>}</div>}
-  <div className="overtime-daily-actions"><button type="button" className="btn" disabled={busy} onClick={()=>void close()}><ArrowLeft size={16}/>Voltar ao relatório</button><span role="status">{dirty?'Salve para atualizar os totais e exportar.':'Lançamentos salvos.'}</span><button type="button" className="btn" disabled={busy||dirty||needsRecovery} onClick={()=>void exportPdf()}>{exporting?<Loader2 size={16} className="animate-spin"/>:<Download size={16}/>}Exportar individual</button>{!readOnly&&<button className="btn company-primary" type="submit" disabled={busy||!dirty||needsRecovery}>{mutations.savingDaily?<Loader2 size={16} className="animate-spin"/>:<Save size={16}/>}Salvar lançamentos</button>}</div>
+  <div className="overtime-daily-actions"><button type="button" className="btn overtime-daily-return" disabled={busy} onClick={()=>void close()}><ArrowLeft size={16}/>Voltar ao relatório</button><span role="status">{dirty?'Salve para atualizar os totais e exportar.':'Lançamentos salvos.'}</span><button type="button" className="btn overtime-daily-export" disabled={busy||dirty||needsRecovery} onClick={()=>void exportPdf()}>{exporting?<Loader2 size={16} className="animate-spin"/>:<Download size={16}/>}Exportar individual</button>{!readOnly&&<button className="btn company-primary overtime-daily-save" type="submit" disabled={busy||!dirty||needsRecovery}>{mutations.savingDaily?<Loader2 size={16} className="animate-spin"/>:<Save size={16}/>}Salvar lançamentos</button>}</div>
  </form>{exportData&&<PdfExportDialog companyId={report.companyId} snapshot={exportData.snapshot} brand={exportData.brand} createPdf={createDailyPdf} orientation="portrait" allowShare title="Informativo individual de horas extras" description={(row?.employeeName||'Funcionário')+' · '+dateLabel(report.dateFrom)+' a '+dateLabel(report.dateTo)} onClose={()=>setExportData(null)}/>}</EmployeePageFrame>;
 }

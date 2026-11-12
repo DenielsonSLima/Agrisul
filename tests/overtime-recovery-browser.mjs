@@ -6,7 +6,7 @@ export async function verifyOvertimeRecovery({page,fixtureUrl}){
  await page.route(/^https?:/,route=>{if(new URL(route.request().url()).origin===new URL(fixtureUrl).origin)return route.continue();requests.push(route.request().url());return route.abort();});
  const monthly=()=>page.locator('.overtime-editor'),daily=()=>page.locator('.overtime-daily-editor');
  const notes=()=>monthly().locator('textarea.overtime-notes-input');
- const reason=()=>daily().getByLabel('Motivo de 26/10/2026',{exact:true});
+ const reason=()=>daily().getByLabel('Motivo de 26/10/2026, período 1',{exact:true});
  const retry=scope=>scope.getByRole('button',{name:'Reconsultar e tentar salvar',exact:true});
  const reset=async()=>{await page.goto(fixtureUrl);await monthly().waitFor();};
  const count=()=>page.evaluate(()=>window.overtimeRecovery.writes.length);
@@ -67,6 +67,10 @@ export async function verifyOvertimeRecovery({page,fixtureUrl}){
  await reset();await openDaily();await failNext('commit-lost');await editDaily('Commit diário confirmado');assert.equal(await committed(),1);
  await retry(daily()).click();await waitDailySaved();assert.equal(await count(),1,'Lost daily response must not replay committed write');assert.equal(await reason().inputValue(),'Commit diário confirmado');
 
+ await reset();await openDaily();await failNext('validation');await reason().fill('Entrada que precisa de correção');await daily().getByRole('button',{name:'Salvar lançamentos',exact:true}).click();
+ await daily().getByText('Confira os horários do período.',{exact:true}).waitFor();assert.equal(await retry(daily()).count(),0,'Validation failure allows editing and saving normally');
+ await reason().fill('Entrada corrigida');await daily().getByRole('button',{name:'Salvar lançamentos',exact:true}).click();await waitDailySaved();assert.equal(await count(),2);assert.equal(await committed(),1);
+
  await reset();await openDaily();await failNext('commit-lost');await editDaily('Primeira alteração diária confirmada');
  await reason().fill('Nova alteração no mesmo dia após resposta perdida');await retry(daily()).click();await waitDailySaved();
  assert.equal(await reason().inputValue(),'Nova alteração no mesmo dia após resposta perdida');assert.equal(await count(),2);assert.equal(await committed(),2);
@@ -78,7 +82,7 @@ export async function verifyOvertimeRecovery({page,fixtureUrl}){
 
  await reset();await openDaily();await reason().fill('Rascunho sem acesso');
  await page.evaluate(async()=>{window.overtimeRecovery.readFailures={get:403,'daily-get':403};await window.overtimeRecovery.refresh();});
- await monthly().waitFor({state:'detached'});assert.equal(await daily().count(),0);assert.equal(await page.getByLabel('Motivo de 26/10/2026',{exact:true}).count(),0);assert.equal(await count(),0);
+ await monthly().waitFor({state:'detached'});assert.equal(await daily().count(),0);assert.equal(await page.getByLabel('Motivo de 26/10/2026, período 1',{exact:true}).count(),0);assert.equal(await count(),0);
 
  await reset();await openDaily();await reason().fill('SEGREDO_DO_RASCUNHO_ANTERIOR');const oldDaily=await daily().elementHandle();await page.evaluate(()=>window.overtimeRecovery.switchActor('owner-two'));
  await page.waitForFunction(node=>!node.isConnected,oldDaily);await reason().waitFor();assert.equal(await reason().inputValue(),'Motivo original');

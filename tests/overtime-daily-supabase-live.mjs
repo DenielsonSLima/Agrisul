@@ -39,8 +39,9 @@ try{
  const scope={companyId:company.id,id:report.id,employeeId:employee.id};
  const independent=createClient(url,publicKey,{...options,global:{headers:{Authorization:'Bearer '+a.session.access_token}}});clients.push(independent);
  const entries=[
-  {date:'2026-10-27',startTime:'06:00',breakStart:'12:00',breakEnd:'13:30',breakDuration:'',endTime:'18:00',rate:'50',reason:'Serviço de teste',approval:'Conferido'},
-  {date:'2026-11-01',startTime:'22:00',breakStart:'',breakEnd:'',breakDuration:'00:30:00',endTime:'06:00',rate:'100',reason:'Plantão noturno de teste',approval:''},
+  {id:randomUUID(),date:'2026-10-27',startTime:'06:00',breakStart:'12:00',breakEnd:'13:30',breakDuration:'',endTime:'18:00',rate:'50',reason:'Serviço de teste',approval:'Conferido'},
+  {id:randomUUID(),date:'2026-10-27',startTime:'18:00',breakStart:'',breakEnd:'',breakDuration:'00:00:00',endTime:'20:00',rate:'100',reason:'Segundo período no mesmo dia',approval:''},
+  {id:randomUUID(),date:'2026-11-01',startTime:'22:00',breakStart:'',breakEnd:'',breakDuration:'00:30:00',endTime:'06:00',rate:'100',reason:'Plantão noturno de teste',approval:''},
  ];
  const input={...scope,activity:'Operação de teste',sector:'Agrícola',entries,adjustment:null};
  let resolveSeen;const seen=new Promise(resolve=>{resolveSeen=resolve;});
@@ -49,10 +50,12 @@ try{
  await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('Daily Realtime subscription timed out')),25000);channel.on('system',{},event=>{if(event.status==='ok'&&event.extension==='postgres_changes'){clearTimeout(timer);resolve();}});channel.subscribe(status=>{if(['CHANNEL_ERROR','TIMED_OUT'].includes(status)){clearTimeout(timer);reject(Error(status));}});});
  let result=await rpc(independent,'daily-save',{...input,expectedUpdatedAt:report.updatedAt});
  let eventTimer;try{await Promise.race([seen,new Promise((_,reject)=>{eventTimer=setTimeout(()=>reject(Error('Daily Realtime event missing')),25000);})]);}finally{clearTimeout(eventTimer);}
- assert.equal(result.daily.calculated50,'10:30:00');assert.equal(result.daily.calculated100,'07:30:00');
- assert.equal(result.daily.totalHours,'18:00:00');assert.equal(result.daily.entryCount,2);
- assert.equal(result.report.total50,'10:30:00');assert.equal(result.report.total100,'07:30:00');report=result.report;
- assert.equal((await rpc(independent,'daily-get',scope)).daily.entries.length,2);
+ assert.equal(result.daily.calculated50,'10:30:00');assert.equal(result.daily.calculated100,'09:30:00');
+ assert.equal(result.daily.totalHours,'20:00:00');assert.equal(result.daily.entryCount,2);
+ assert.equal(result.report.total50,'10:30:00');assert.equal(result.report.total100,'09:30:00');report=result.report;
+ const snapshot=await rpc(independent,'daily-get',scope);assert.equal(snapshot.daily.entries.length,3);
+ assert.deepEqual(snapshot.daily.entries.map(entry=>entry.id).sort(),entries.map(entry=>entry.id).sort());
+ await assert.rejects(rpc(a.client,'daily-save',{...input,expectedUpdatedAt:report.updatedAt,entries:[...entries,{...entries[1],id:randomUUID(),startTime:'17:00'}]}),e=>e.code==='23514');
  await assert.rejects(rpc(independent,'daily-save',{...input,expectedUpdatedAt:base.updatedAt??'2000-01-01T00:00:00Z'}),e=>e.code==='23514');
  await assert.rejects(rpc(b.client,'daily-get',{...scope,companyId:otherCompany.id}),e=>e.code==='P0002');
  await assert.rejects(rpc(a.client,'daily-save',{...input,expectedUpdatedAt:report.updatedAt,ownerId:b.id}),e=>e.code==='22023');
@@ -65,7 +68,7 @@ try{
   assert.equal((await a.client.from(table).insert({owner_id:a.id,report_id:report.id,employee_id:employee.id})).error?.code,'42501');
  }
  const preserved=await rpc(a.client,'save',{...base,id:report.id,expectedUpdatedAt:report.updatedAt,notes:'Metadados atualizados'});
- assert.equal(preserved.report.total50,'10:30:00');assert.equal((await rpc(a.client,'daily-get',scope)).daily.entries.length,2);report=preserved.report;
+ assert.equal(preserved.report.total50,'10:30:00');assert.equal((await rpc(a.client,'daily-get',scope)).daily.entries.length,3);report=preserved.report;
  result=await rpc(a.client,'daily-save',{...input,expectedUpdatedAt:report.updatedAt,adjustment:{hours50:'11:00:00',hours100:'08:00:00',reason:'Ajuste de conferência'}});
  assert.equal(result.daily.calculated50,'10:30:00');assert.equal(result.report.total50,'11:00:00');report=result.report;
  assert.equal(result.daily.totalHours,'19:00:00');assert.equal(result.daily.entryCount,2);
