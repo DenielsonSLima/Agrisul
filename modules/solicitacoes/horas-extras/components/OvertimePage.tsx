@@ -19,6 +19,7 @@ import {fetchOvertimeReport} from '../services/overtimeApi';
 import type {OvertimeCreateInput,OvertimeFilters,OvertimeInput,OvertimeReport,OvertimeSummary} from '../types';
 import {OvertimeCreateModal} from './OvertimeCreateModal';
 import {OvertimeForm} from './OvertimeForm';
+import {OvertimeEmployeePage} from './OvertimeEmployeePage';
 import {blockingOvertimeRead} from '../utils/draftRecovery';
 import '../styles.css';
 
@@ -38,6 +39,7 @@ export function OvertimePage(){
 function OvertimeWorkspace({companyId,companyName}:{companyId:string;companyName:string}){
  const {user}=useAuth(),{searchParams,navigate}=useModuleNavigation(),confirm=useConfirmation(),access=useWorkspaceAccess();
  const id=searchParams.get('relatorio')??'',creating=searchParams.get('novo')==='1'&&!id;
+ const employeeId=searchParams.get('funcionario')??'';
  const dateFrom=searchParams.get('de')??'',dateTo=searchParams.get('ate')??'',search=searchParams.get('busca')??'';
  const status=searchParams.get('aba')==='finalizados'?'finished':'open';
  const filters:OvertimeFilters={companyId,status,search,...(dateFrom&&dateTo?{dateFrom,dateTo}:{})};
@@ -87,6 +89,7 @@ function OvertimeWorkspace({companyId,companyName}:{companyId:string;companyName
   finally{if(mounted.current)setExporting(false);}
  };
  const openNew=()=>{setCreateError('');navigate(href()+'&novo=1');};
+ if(id&&employeeId)return <OvertimeEmployeePage key={id+':'+employeeId} companyId={companyId} reportId={id} employeeId={employeeId} companyName={companyName} reportHref={href(id,false)} reportListHref={href()} initialAdjustment={searchParams.get('ajustar')==='1'}/>;
  return <section className="overtime-workspace">
   <nav className="overtime-breadcrumb" aria-label="Caminho do relatório"><ModuleLink href="/solicitacoes">Solicitações</ModuleLink><ChevronRight size={13}/>{id?<><ModuleLink href={href()}>Relatório de hora extra</ModuleLink><ChevronRight size={13}/><span aria-current="page">{report?dateLabel(report.dateFrom)+' a '+dateLabel(report.dateTo):'Detalhes'}</span></>:<span aria-current="page">Relatório de hora extra</span>}</nav>
   {id&&<ModuleLink className="request-back overtime-back" href={href()}><ArrowLeft size={16}/>Voltar para relatórios</ModuleLink>}

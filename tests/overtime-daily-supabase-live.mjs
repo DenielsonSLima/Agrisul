@@ -50,6 +50,7 @@ try{
  let result=await rpc(independent,'daily-save',{...input,expectedUpdatedAt:report.updatedAt});
  let eventTimer;try{await Promise.race([seen,new Promise((_,reject)=>{eventTimer=setTimeout(()=>reject(Error('Daily Realtime event missing')),25000);})]);}finally{clearTimeout(eventTimer);}
  assert.equal(result.daily.calculated50,'10:30:00');assert.equal(result.daily.calculated100,'07:30:00');
+ assert.equal(result.daily.totalHours,'18:00:00');assert.equal(result.daily.entryCount,2);
  assert.equal(result.report.total50,'10:30:00');assert.equal(result.report.total100,'07:30:00');report=result.report;
  assert.equal((await rpc(independent,'daily-get',scope)).daily.entries.length,2);
  await assert.rejects(rpc(independent,'daily-save',{...input,expectedUpdatedAt:base.updatedAt??'2000-01-01T00:00:00Z'}),e=>e.code==='23514');
@@ -67,6 +68,7 @@ try{
  assert.equal(preserved.report.total50,'10:30:00');assert.equal((await rpc(a.client,'daily-get',scope)).daily.entries.length,2);report=preserved.report;
  result=await rpc(a.client,'daily-save',{...input,expectedUpdatedAt:report.updatedAt,adjustment:{hours50:'11:00:00',hours100:'08:00:00',reason:'Ajuste de conferência'}});
  assert.equal(result.daily.calculated50,'10:30:00');assert.equal(result.report.total50,'11:00:00');report=result.report;
+ assert.equal(result.daily.totalHours,'19:00:00');assert.equal(result.daily.entryCount,2);
  await assert.rejects(rpc(a.client,'daily-save',{...input,expectedUpdatedAt:report.updatedAt,adjustment:{hours50:'11:00:00',hours100:'08:00:00',reason:''}}),e=>e.code==='22023');
  if(process.env.BILLING_DAILY_BROWSER==='1'){
   const {verifyDailyOvertimeBrowser}=await import('./overtime-daily-browser.mjs');

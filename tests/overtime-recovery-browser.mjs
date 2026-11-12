@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 // Real page + confirmations + RPC/mutation lifecycle, with an in-memory server.
 export async function verifyOvertimeRecovery({page,fixtureUrl}){
  const errors=[],requests=[];page.on('pageerror',error=>errors.push(error.message));
- await page.route(/^https?:/,route=>{requests.push(route.request().url());return route.abort();});
+ await page.route(/^https?:/,route=>{if(new URL(route.request().url()).origin===new URL(fixtureUrl).origin)return route.continue();requests.push(route.request().url());return route.abort();});
  const monthly=()=>page.locator('.overtime-editor'),daily=()=>page.locator('.overtime-daily-editor');
  const notes=()=>monthly().locator('textarea.overtime-notes-input');
  const reason=()=>daily().getByLabel('Motivo de 26/10/2026',{exact:true});
@@ -80,8 +80,8 @@ export async function verifyOvertimeRecovery({page,fixtureUrl}){
  await page.evaluate(async()=>{window.overtimeRecovery.readFailures={get:403,'daily-get':403};await window.overtimeRecovery.refresh();});
  await monthly().waitFor({state:'detached'});assert.equal(await daily().count(),0);assert.equal(await page.getByLabel('Motivo de 26/10/2026',{exact:true}).count(),0);assert.equal(await count(),0);
 
- await reset();await openDaily();await reason().fill('SEGREDO_DO_RASCUNHO_ANTERIOR');await page.evaluate(()=>window.overtimeRecovery.switchActor('owner-two'));
- await daily().waitFor({state:'detached'});await monthly().waitFor();assert.equal(await notes().inputValue(),'Observação da outra conta');
+ await reset();await openDaily();await reason().fill('SEGREDO_DO_RASCUNHO_ANTERIOR');const oldDaily=await daily().elementHandle();await page.evaluate(()=>window.overtimeRecovery.switchActor('owner-two'));
+ await page.waitForFunction(node=>!node.isConnected,oldDaily);await reason().waitFor();assert.equal(await reason().inputValue(),'Motivo original');
  assert.equal(await page.getByText('SEGREDO_DO_RASCUNHO_ANTERIOR',{exact:true}).count(),0);assert.equal(await count(),0,'Switching accounts cannot flush the previous account draft');
 
  await reset();await failNext();await notes().fill('RASCUNHO_MENSAL_DA_CONTA_ANTERIOR');await retry(monthly()).waitFor();

@@ -16,16 +16,25 @@ export async function verifyDailyOvertimeBrowser({directory,ref,session,report,e
   assert.equal(await page.locator('.pdf-export-preview').count(),0,'No document preview in employee list');
   assert.equal(await editor.locator('tbody input').count(),0,'Monthly quantities are no longer editable');
   await editor.locator('.overtime-employee-open').filter({hasText:employee.fullName}).click();
-  const daily=page.locator('.overtime-daily-modal');await daily.locator('.overtime-daily-editor').waitFor();
+  const daily=page.locator('.overtime-employee-page'),form=daily.locator('.overtime-daily-editor');await form.waitFor();
+  assert.equal(new URL(page.url()).searchParams.get('funcionario'),employee.id);
+  assert.equal(await page.getByRole('dialog').count(),0,'Employee daily entry is a routed page');
+  assert.equal(await daily.locator('.overtime-employee-kpis article').count(),4);
+  assert.equal(await daily.getByLabel('Total de horas do funcionário',{exact:true}).textContent(),'19:00:00');
+  assert.equal(await daily.getByLabel('Dias lançados do funcionário',{exact:true}).textContent(),'2');
   assert.equal(await daily.locator('tbody tr').count(),31);
   await daily.getByLabel('Inicial de 28/10/2026',{exact:true}).fill('08:00:00');
   await daily.getByLabel('Final de 28/10/2026',{exact:true}).fill('10:00:00');
   await daily.getByRole('textbox',{name:'Motivo de 28/10/2026',exact:true}).fill('Conferência pelo navegador');
-  await daily.getByRole('button',{name:'Salvar lançamentos',exact:true}).click();
+  await form.getByRole('button',{name:'Salvar lançamentos',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('.overtime-daily-actions [role=status]')?.textContent==='Lançamentos salvos.');
   const saved=await rpc('daily-get',{companyId:report.companyId,id:report.id,employeeId:employee.id});
   assert.equal(saved.daily.calculated50,'12:30:00');assert.equal(saved.daily.total50,'11:00:00','Adjustment stays explicit while daily calculation changes');
-  await daily.getByRole('button',{name:'Exportar individual',exact:true}).click();
+  assert.equal(saved.daily.totalHours,'19:00:00');assert.equal(saved.daily.entryCount,3);
+  await page.screenshot({path:resolve(directory,'employee-page-desktop.png'),fullPage:false});
+  await page.reload();await form.waitFor();assert.equal(await daily.getByLabel('Dias lançados do funcionário',{exact:true}).textContent(),'3');
+  await page.goBack();await editor.waitFor();await page.goForward();await form.waitFor();
+  await form.getByRole('button',{name:'Exportar individual',exact:true}).click();
   const preview=page.locator('.pdf-export-modal');await preview.locator('iframe').waitFor();
   const download=page.waitForEvent('download');await preview.getByRole('button',{name:'Baixar PDF',exact:true}).click();
   const file=await download;const path=resolve(directory,'daily-browser.pdf');await file.saveAs(path);
@@ -35,14 +44,14 @@ export async function verifyDailyOvertimeBrowser({directory,ref,session,report,e
   await page.setViewportSize({width:390,height:844});
   await page.waitForTimeout(250);
   const bounds=await daily.evaluate(node=>{const rect=node.getBoundingClientRect();return {left:rect.left,right:rect.right,width:innerWidth,scrollWidth:node.scrollWidth,clientWidth:node.clientWidth};});
-  assert.ok(bounds.left>=0&&bounds.right<=bounds.width&&bounds.scrollWidth<=bounds.clientWidth+1,'Mobile dialog contains its horizontal overflow: '+JSON.stringify(bounds));
+  assert.ok(bounds.left>=0&&bounds.right<=bounds.width&&bounds.scrollWidth<=bounds.clientWidth+1,'Mobile page contains its horizontal overflow: '+JSON.stringify(bounds));
   await daily.evaluate(node=>{node.scrollTop=0;node.scrollLeft=0;});
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Mobile editor fits viewport');
   await page.screenshot({path:resolve(directory,'daily-editor-mobile.png'),fullPage:true});
-  await daily.getByRole('button',{name:'Fechar',exact:true}).click();
+  await daily.getByRole('link',{name:'Voltar para o relatório mensal',exact:true}).click();await editor.waitFor();
   await page.reload();await editor.waitFor();
   assert.ok((await editor.textContent()).includes('11:00:00'));
   assert.deepEqual(errors,[],'No browser runtime errors');
-  console.log('PASS browser: employee list, complete daily calendar, save through RPC, adjusted and calculated totals, PDF preview/download and mobile layout.');
+  console.log('PASS browser: employee page and breadcrumb/back, server KPIs, complete daily calendar, save through RPC, direct URL/reload/history, adjusted totals, PDF preview/download and mobile layout.');
  }finally{await context.close();await browser.close();}
 }

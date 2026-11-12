@@ -1,7 +1,7 @@
 'use client';
-import {useEffect,useRef,useState,type FormEvent} from 'react';
-import {Download,Loader2,RotateCcw,Save,SlidersHorizontal} from 'lucide-react';
-import {Dialog,DialogContent,DialogDescription,DialogHeader,DialogTitle} from '@/components/ui/dialog';
+import {useEffect,useRef,useState,type FormEvent,type MouseEvent,type ReactNode} from 'react';
+import {useQueryClient} from '@tanstack/react-query';
+import {ArrowLeft,CalendarDays,ChevronRight,Clock3,Download,Loader2,RotateCcw,Save,SlidersHorizontal} from 'lucide-react';
 import {Field} from '@/shared/components/Common';
 import {notifications,useConfirmation} from '@/shared/feedback';
 import {PdfExportDialog} from '@/shared/reporting/PdfExportDialog';
@@ -9,8 +9,10 @@ import type {ReportPdfBrand} from '@/shared/reporting/types';
 import {useAuth} from '@/shared/supabase/AuthProvider';
 import {assertSessionActor} from '@/shared/supabase/sessionActor';
 import {RpcError} from '@/shared/supabase/rpc';
+import {billingKeys} from '@/shared/query/keys';
+import {ModuleLink,useModuleNavigation} from '@/shared/navigation/ModuleNavigation';
 import {dateLabel} from '@/shared/utils/presentation';
-import {useOvertimeDaily,useOvertimeMutations} from '../hooks/useOvertime';
+import {useOvertimeDaily,useOvertimeMutations,useOvertimeOptions} from '../hooks/useOvertime';
 import {fetchOvertimeBrand} from '../services/overtimeBrandApi';
 import {fetchOvertimeDaily} from '../services/overtimeApi';
 import {fetchOvertimeDetail} from '../services/overtimeApi';
@@ -18,7 +20,8 @@ import {blockingOvertimeRead,recoverDailyDraft,type DailyDraft} from '../utils/d
 import type {OvertimeDaily,OvertimeDailyEntry,OvertimeDailyResult,OvertimeReport,OvertimeRow} from '../types';
 import {OvertimeDurationInput} from './OvertimeDurationInput';
 
-type Props={report:OvertimeReport;employeeId:string;readOnly:boolean;initialAdjustment?:boolean;onClose:()=>void;onSaved:(report:OvertimeReport)=>void};
+type Props={companyId:string;reportId:string;employeeId:string;companyName:string;reportHref:string;reportListHref:string;initialAdjustment?:boolean};
+type EditorProps=Props&{report:OvertimeReport;readOnly:boolean;initial:OvertimeDailyResult;onSaved:(result:OvertimeDailyResult)=>void;refreshError:string;onRefresh:()=>void};
 type DailyPdfSnapshot={report:OvertimeReport;row:OvertimeRow};
 async function createDailyPdf(snapshot:DailyPdfSnapshot,brand:ReportPdfBrand){
  const {createDailyOvertimePdf}=await import('../reporting/dailyOvertimePdf');
@@ -37,17 +40,31 @@ function calendarEntries(report:OvertimeReport,daily:OvertimeDaily){
 const hasValues=(entry:OvertimeDailyEntry)=>!!(entry.startTime||entry.endTime||entry.breakStart||entry.breakEnd||entry.reason||entry.approval||(entry.breakDuration&&entry.breakDuration!=='00:00:00'));
 function inputEntries(entries:OvertimeDailyEntry[]){return entries.filter(hasValues).map(({date,startTime,breakStart,breakEnd,breakDuration,endTime,rate,reason,approval})=>({date,startTime,breakStart,breakEnd,breakDuration:breakStart||breakEnd?'':breakDuration,endTime,rate,reason,approval}));}
 
-export function OvertimeDailyDialog(props:Props){
- const [openedRevision]=useState(props.report.updatedAt);
- const query=useOvertimeDaily(props.report.companyId,props.report.id,props.employeeId,openedRevision);
- const employee=props.report.rows.find(row=>row.employeeId===props.employeeId);
- const oversized=(Date.parse(props.report.dateTo)-Date.parse(props.report.dateFrom))/86400000>=366;
- return <Dialog open onOpenChange={open=>{if(!open)document.getElementById('overtime-daily-close')?.click();}}><DialogContent className="form-modal overtime-daily-modal" showCloseButton={false} onEscapeKeyDown={event=>{event.preventDefault();document.getElementById('overtime-daily-close')?.click();}} onPointerDownOutside={event=>event.preventDefault()}>
-  <DialogHeader><DialogTitle>{employee?.employeeName||'Lançamentos diários'}</DialogTitle><DialogDescription>{employee?.registrationNumber?'Matrícula '+employee.registrationNumber+' · ':''}{dateLabel(props.report.dateFrom)} a {dateLabel(props.report.dateTo)}</DialogDescription></DialogHeader>
-  {oversized?<div role="alert"><p>Os lançamentos diários aceitam períodos de até 366 dias. Ajuste as datas do relatório para continuar.</p><button id="overtime-daily-close" className="btn" onClick={props.onClose}>Fechar</button></div>:query.loading?<div className="client-loading" role="status"><Loader2 className="animate-spin" size={20}/>Carregando lançamentos…<button id="overtime-daily-close" className="btn" onClick={props.onClose}>Fechar</button></div>:blockingOvertimeRead(query)?<div role="alert"><p className="form-error">{query.error}</p><div className="form-actions"><button className="btn" onClick={()=>void query.reload()}>Tentar novamente</button><button id="overtime-daily-close" className="btn" onClick={props.onClose}>Fechar</button></div></div>:query.data?<><p hidden={!query.error} className="form-error" role={query.error?'alert':undefined}>{query.error&&<>Não foi possível atualizar os dados. Seu rascunho foi mantido. <button className="btn small" onClick={()=>void query.reload()}>Reconsultar dados</button></>}</p><DailyEditor key={props.employeeId} {...props} initial={query.data}/></>:null}
- </DialogContent></Dialog>;
+function EmployeePageFrame({reportHref,reportListHref,report,employeeName,children,onNavigate}:Pick<Props,'reportHref'|'reportListHref'>&{report?:OvertimeReport;employeeName?:string;children:ReactNode;onNavigate?:(event:MouseEvent<HTMLAnchorElement>,href:string)=>void}){
+ return <section className="overtime-workspace overtime-employee-page">
+  <nav className="overtime-breadcrumb" aria-label="Caminho do funcionário"><ModuleLink href="/solicitacoes" onClick={event=>onNavigate?.(event,'/solicitacoes')}>Solicitações</ModuleLink><ChevronRight size={13}/><ModuleLink href={reportListHref} onClick={event=>onNavigate?.(event,reportListHref)}>Relatório de hora extra</ModuleLink><ChevronRight size={13}/><ModuleLink href={reportHref} onClick={event=>onNavigate?.(event,reportHref)}>{report?dateLabel(report.dateFrom)+' a '+dateLabel(report.dateTo):'Relatório mensal'}</ModuleLink><ChevronRight size={13}/><span aria-current="page">{employeeName||'Funcionário'}</span></nav>
+  <ModuleLink className="request-back overtime-back" href={reportHref} onClick={event=>onNavigate?.(event,reportHref)}><ArrowLeft size={16}/>Voltar para o relatório mensal</ModuleLink>
+  {children}
+ </section>;
 }
-function DailyEditor({initial,report,employeeId,readOnly,initialAdjustment=false,onSaved,onClose}:Props&{initial:OvertimeDailyResult}){
+export function OvertimeEmployeePage(props:Props){
+ const {user}=useAuth(),queryClient=useQueryClient();
+ const query=useOvertimeDaily(props.companyId,props.reportId,props.employeeId),options=useOvertimeOptions(props.companyId);
+ const blocked=blockingOvertimeRead(query)||blockingOvertimeRead(options),report=blocked?undefined:query.data?.report;
+ const employee=report?.rows.find(row=>row.employeeId===props.employeeId);
+ const oversized=!!report&&(Date.parse(report.dateTo)-Date.parse(report.dateFrom))/86400000>=366;
+ const remember=(result:OvertimeDailyResult)=>{
+  if(!user)return;
+  queryClient.setQueryData([...billingKeys.resource(user.id,'overtime'),{view:'detail',companyId:props.companyId,id:props.reportId}],result.report);
+  queryClient.setQueryData([...billingKeys.resource(user.id,'overtime'),{view:'daily',companyId:props.companyId,id:props.reportId,employeeId:props.employeeId}],result);
+ };
+ if(query.loading||options.loading||blocked||oversized||!query.data||!employee)return <EmployeePageFrame {...props} report={report} employeeName={employee?.employeeName}>
+  {query.loading||options.loading?<div className="client-loading" role="status"><Loader2 className="animate-spin" size={20}/>Carregando lançamentos…</div>:<div className="company-empty" role="alert"><h2>Lançamentos diários</h2><p>{oversized?'Os lançamentos diários aceitam períodos de até 366 dias. Ajuste as datas do relatório para continuar.':query.error||options.error||'Funcionário não encontrado neste relatório.'}</p><button className="btn" onClick={()=>void Promise.all([query.reload(),options.reload()])}>Tentar novamente</button></div>}
+ </EmployeePageFrame>;
+ return <DailyEditor key={props.employeeId} {...props} initial={query.data} report={query.data.report} readOnly={!options.data?.canManage||query.data.report.status!=='open'} onSaved={remember} refreshError={query.error||options.error} onRefresh={()=>void Promise.all([query.reload(),options.reload()])}/>;
+}
+function DailyEditor({initial,report,employeeId,readOnly,initialAdjustment=false,onSaved,companyName,reportHref,reportListHref,refreshError,onRefresh}:EditorProps){
+ const {navigate}=useModuleNavigation();
  const {user}=useAuth(),confirm=useConfirmation(),mutations=useOvertimeMutations();
  const [saved,setSaved]=useState(initial),[entries,setEntries]=useState(()=>calendarEntries(initial.report,initial.daily));
  const [activity,setActivity]=useState(initial.daily.activity),[sector,setSector]=useState(initial.daily.sector);
@@ -63,11 +80,12 @@ function DailyEditor({initial,report,employeeId,readOnly,initialAdjustment=false
  const row=saved.report.rows.find(item=>item.employeeId===employeeId);
  const hasLegacySummary=row?.source==='legacy'&&!saved.daily.hasDailyEntries&&[saved.daily.legacyHours50,saved.daily.legacyHours100].some(value=>value&&!/^0+:00:00$/.test(value));
  const patch=(date:string,value:Partial<OvertimeDailyEntry>)=>setEntries(current=>current.map(entry=>entry.date===date?{...entry,...value}:entry));
- const close=async()=>{
+ const close=async(href=reportHref)=>{
   if(busy)return;
   if(dirty&&!await confirm({title:'Descartar alterações deste funcionário?',description:'Os lançamentos e ajustes ainda não salvos serão descartados.',confirmLabel:'Descartar alterações',tone:'destructive'}))return;
-  onClose();
+  navigate(href);window.scrollTo({top:0,behavior:'instant'});
  };
+ const guardNavigation=(event:MouseEvent<HTMLAnchorElement>,href:string)=>{if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;event.preventDefault();void close(href);};
  const submit=async(event:FormEvent)=>{
   event.preventDefault();if(readOnly||saving.current||busy||needsRecovery||!dirty)return;
   if(hasLegacySummary&&!await confirm({title:'Atualizar o resumo deste funcionário?',description:'As horas do resumo anterior serão substituídas pelos lançamentos diários e pelo ajuste informado. Confira os totais após salvar.',confirmLabel:'Salvar lançamentos'}))return;
@@ -82,7 +100,7 @@ function DailyEditor({initial,report,employeeId,readOnly,initialAdjustment=false
  };
  const acceptSaved=(result:OvertimeDailyResult)=>{
   submitted.current=undefined;
-  setSaved(result);setEntries(calendarEntries(result.report,result.daily));setActivity(result.daily.activity);setSector(result.daily.sector);setAdjustment(result.daily.adjustment);setNeedsRecovery(false);setHasConflict(false);setError('');onSaved(result.report);
+  setSaved(result);setEntries(calendarEntries(result.report,result.daily));setActivity(result.daily.activity);setSector(result.daily.sector);setAdjustment(result.daily.adjustment);setNeedsRecovery(false);setHasConflict(false);setError('');onSaved(result);
  };
  const recover=async(discard=false)=>{
   if(!user||readOnly||saving.current||busy)return;
@@ -117,8 +135,14 @@ function DailyEditor({initial,report,employeeId,readOnly,initialAdjustment=false
   catch(reason){if(mounted.current){const message=reason instanceof Error?reason.message:'Não foi possível gerar o relatório individual.';setError(message);notifications.error(message);}}
   finally{if(mounted.current)setExporting(false);}
  };
- if(accessBlocked)return <div role="alert"><p className="form-error">{error}</p><button id="overtime-daily-close" className="btn" onClick={onClose}>Fechar</button></div>;
- return <><form className="overtime-daily-editor" onSubmit={event=>void submit(event)}>
+ if(accessBlocked)return <EmployeePageFrame reportHref={reportHref} reportListHref={reportListHref}><p className="form-error" role="alert">{error}</p></EmployeePageFrame>;
+ return <EmployeePageFrame reportHref={reportHref} reportListHref={reportListHref} report={saved.report} employeeName={row?.employeeName} onNavigate={guardNavigation}>
+  <div className="companies-heading overtime-employee-heading"><div><span className="eyebrow">LANÇAMENTOS DIÁRIOS</span><h2>{row?.employeeName}</h2><p>{companyName}</p><div className="overtime-employee-context"><span>Matrícula {row?.registrationNumber||'não informada'}</span><span>{row?.jobTitle}</span><span><CalendarDays size={14}/>{dateLabel(saved.report.dateFrom)} a {dateLabel(saved.report.dateTo)}</span><span className={'overtime-status '+report.status}>{report.status==='open'?'Em aberto':'Finalizado'}</span></div></div>
+   <div className="overtime-heading-actions"><button className="btn" type="button" disabled={busy||dirty||needsRecovery} onClick={()=>void exportPdf()}>{exporting?<Loader2 size={16} className="animate-spin"/>:<Download size={16}/>}Exportar individual</button>{!readOnly&&<button className="btn company-primary" type="submit" form="overtime-daily-form" disabled={busy||!dirty||needsRecovery}><Save size={16}/>Salvar lançamentos</button>}</div>
+  </div>
+  <section className="overtime-employee-kpis" aria-label="Resumo de horas do funcionário"><article className="is-featured"><span><Clock3 size={16}/>Total de horas</span><strong><output aria-label="Total de horas do funcionário">{saved.daily.totalHours}</output></strong><small>{saved.daily.adjustment?'Total com ajuste justificado':'Resumo do período'}</small></article><article><span>Horas extras 50%</span><strong><output aria-label="Horas extras 50% do funcionário">{saved.daily.total50}</output></strong><small>Adicional de 50%</small></article><article><span>Horas extras 100%</span><strong><output aria-label="Horas extras 100% do funcionário">{saved.daily.total100}</output></strong><small>Adicional de 100%</small></article><article><span><CalendarDays size={16}/>Dias lançados</span><strong><output aria-label="Dias lançados do funcionário">{saved.daily.entryCount}</output></strong><small>Dias com horários salvos</small></article></section>
+  {refreshError&&<div className="overtime-notice" role="alert"><p>A atualização falhou. Seu rascunho foi mantido. {refreshError}</p><button type="button" className="btn" onClick={onRefresh}>Reconsultar dados</button></div>}
+  <form id="overtime-daily-form" className="overtime-daily-editor" onSubmit={event=>void submit(event)}>
   <div className="overtime-daily-intro"><p>Informe o período de <strong>hora extra</strong> de cada dia. O banco calcula a duração, desconta o intervalo informado e atualiza o resumo mensal.</p>{hasLegacySummary&&<p className="overtime-legacy-note">Este funcionário possui horas no resumo anterior, sem detalhamento diário. Elas serão preservadas até você salvar os lançamentos ou um ajuste.</p>}</div>
   <fieldset disabled={readOnly||busy}>
    <div className="overtime-daily-metadata"><Field label="Atividade"><input maxLength={120} value={activity} onChange={event=>setActivity(event.target.value)} placeholder="Atividade do funcionário"/></Field><Field label="Setor"><input maxLength={120} value={sector} onChange={event=>setSector(event.target.value)} placeholder="Setor"/></Field></div>
@@ -135,6 +159,6 @@ function DailyEditor({initial,report,employeeId,readOnly,initialAdjustment=false
   {saved.daily.adjustment&&<p className="overtime-daily-help">Calculado pelos dias: 50% {saved.daily.calculated50} · 100% {saved.daily.calculated100}. Motivo do ajuste salvo: {saved.daily.adjustment.reason}</p>}
   {error&&<p className="form-error" role="alert">{error}</p>}
   {needsRecovery&&!readOnly&&<div className="overtime-recovery-actions"><button className="btn" type="button" disabled={busy} onClick={()=>void recover()}>Reconsultar e tentar salvar</button>{hasConflict&&<button className="btn" type="button" disabled={busy} onClick={()=>void recover(true)}>Carregar versão atual</button>}</div>}
-  <div className="overtime-daily-actions"><button id="overtime-daily-close" type="button" className="btn" disabled={busy} onClick={()=>void close()}>Fechar</button><span role="status">{dirty?'Salve para atualizar os totais e exportar.':'Lançamentos salvos.'}</span><button type="button" className="btn" disabled={busy||dirty||needsRecovery} onClick={()=>void exportPdf()}>{exporting?<Loader2 size={16} className="animate-spin"/>:<Download size={16}/>}Exportar individual</button>{!readOnly&&<button className="btn company-primary" type="submit" disabled={busy||!dirty||needsRecovery}>{mutations.savingDaily?<Loader2 size={16} className="animate-spin"/>:<Save size={16}/>}Salvar lançamentos</button>}</div>
- </form>{exportData&&<PdfExportDialog companyId={report.companyId} snapshot={exportData.snapshot} brand={exportData.brand} createPdf={createDailyPdf} orientation="portrait" allowShare title="Informativo individual de horas extras" description={(row?.employeeName||'Funcionário')+' · '+dateLabel(report.dateFrom)+' a '+dateLabel(report.dateTo)} onClose={()=>setExportData(null)}/>}</>;
+  <div className="overtime-daily-actions"><button type="button" className="btn" disabled={busy} onClick={()=>void close()}><ArrowLeft size={16}/>Voltar ao relatório</button><span role="status">{dirty?'Salve para atualizar os totais e exportar.':'Lançamentos salvos.'}</span><button type="button" className="btn" disabled={busy||dirty||needsRecovery} onClick={()=>void exportPdf()}>{exporting?<Loader2 size={16} className="animate-spin"/>:<Download size={16}/>}Exportar individual</button>{!readOnly&&<button className="btn company-primary" type="submit" disabled={busy||!dirty||needsRecovery}>{mutations.savingDaily?<Loader2 size={16} className="animate-spin"/>:<Save size={16}/>}Salvar lançamentos</button>}</div>
+ </form>{exportData&&<PdfExportDialog companyId={report.companyId} snapshot={exportData.snapshot} brand={exportData.brand} createPdf={createDailyPdf} orientation="portrait" allowShare title="Informativo individual de horas extras" description={(row?.employeeName||'Funcionário')+' · '+dateLabel(report.dateFrom)+' a '+dateLabel(report.dateTo)} onClose={()=>setExportData(null)}/>}</EmployeePageFrame>;
 }

@@ -2,6 +2,7 @@ import React from 'react';
 import {createRoot} from 'react-dom/client';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
 import {FeedbackProvider} from '../../shared/feedback';
+import {ModuleNavigationProvider} from '../../shared/navigation/ModuleNavigation';
 import {OvertimePage} from '../../modules/solicitacoes/horas-extras/components/OvertimePage';
 import type {OvertimeDaily,OvertimeDailyEntry,OvertimeEmployee,OvertimeReport,OvertimeRow} from '../../modules/solicitacoes/horas-extras/types';
 
@@ -16,7 +17,7 @@ const employees:OvertimeEmployee[]=[
 const hours=(seconds:number)=>`${String(Math.floor(seconds/3600)).padStart(2,'0')}:${String(Math.floor(seconds/60)%60).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;
 const seconds=(value:string)=>{const [h=0,m=0,s=0]=value.split(':').map(Number);return h*3600+m*60+s;};
 const clock=(value:string)=>value.length===5?value+':00':value;
-function daily(employeeId:string):OvertimeDaily{return {employeeId,activity:'Operação',sector:'Agrícola',entries:[],adjustment:null,calculated50:'00:00:00',calculated100:'00:00:00',total50:'00:00:00',total100:'00:00:00',hasDailyEntries:true,legacyHours50:'00:00:00',legacyHours100:'00:00:00'};}
+function daily(employeeId:string):OvertimeDaily{return {employeeId,activity:'Operação',sector:'Agrícola',entries:[],adjustment:null,calculated50:'00:00:00',calculated100:'00:00:00',total50:'00:00:00',total100:'00:00:00',totalHours:'00:00:00',entryCount:0,hasDailyEntries:true,legacyHours50:'00:00:00',legacyHours100:'00:00:00'};}
 function initialReport(actor:string):OvertimeReport{
  const rows:OvertimeRow[]=employees.slice(0,2).map(employee=>({employeeId:employee.id,employeeName:employee.fullName,registrationNumber:employee.registrationNumber,jobTitle:employee.jobTitle,hours50:'00:00:00',hours100:'00:00:00',source:'daily',daily:daily(employee.id)}));
  const report:OvertimeReport={id:'report-one',companyId:'company-one',dateFrom:'2026-10-26',dateTo:'2026-10-28',referenceMonth:'2026-10',sector:'Agrícola',notes:actor==='owner-one'?'Observação original':'Observação da outra conta',employeeCount:2,total50:'00:00:00',total100:'00:00:00',createdAt:'0',updatedAt:'0',status:'open',finishedAt:null,canFinish:false,rows};
@@ -35,6 +36,7 @@ function recalculate(report:OvertimeReport){
   sheet.entries.sort((a,b)=>a.date.localeCompare(b.date));
   sheet.calculated50=hours(sheet.entries.reduce((sum,day)=>sum+seconds(day.hours50!),0));sheet.calculated100=hours(sheet.entries.reduce((sum,day)=>sum+seconds(day.hours100!),0));
   sheet.total50=sheet.adjustment?.hours50||sheet.calculated50;sheet.total100=sheet.adjustment?.hours100||sheet.calculated100;row.hours50=sheet.total50;row.hours100=sheet.total100;
+  sheet.totalHours=hours(seconds(sheet.total50)+seconds(sheet.total100));sheet.entryCount=sheet.entries.length;
  }
  report.employeeCount=report.rows.length;report.total50=hours(report.rows.reduce((sum,row)=>sum+seconds(row.hours50),0));report.total100=hours(report.rows.reduce((sum,row)=>sum+seconds(row.hours100),0));report.canFinish=report.rows.length>0&&report.rows.every(row=>seconds(row.hours50)+seconds(row.hours100)>0);
 }
@@ -96,4 +98,4 @@ async function handle(resource:string,action:string,payload:Record<string,unknow
  if(action==='daily-get')return {data:{report,daily:report.rows.find(row=>row.employeeId===payload.employeeId)!.daily},error:null,status:200};
  throw Error(`Unexpected fixture action ${action}`);
 }
-createRoot(document.getElementById('root')!).render(<QueryClientProvider client={queryClient}><FeedbackProvider><OvertimePage/></FeedbackProvider></QueryClientProvider>);
+createRoot(document.getElementById('root')!).render(<QueryClientProvider client={queryClient}><ModuleNavigationProvider initialHref={location.pathname+location.search}><FeedbackProvider><OvertimePage/></FeedbackProvider></ModuleNavigationProvider></QueryClientProvider>);

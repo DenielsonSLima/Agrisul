@@ -1,0 +1,43 @@
+import assert from 'node:assert/strict';
+
+export async function verifyOvertimeEmployeePage({page,fixtureUrl,screenshotPath}){
+ const errors=[];page.on('pageerror',error=>errors.push(error.message));
+ const context='&busca=ANA&de=2026-10-01&ate=2026-11-01';
+ const monthly=page.locator('.overtime-editor'),daily=page.locator('.overtime-daily-editor'),screen=page.locator('.overtime-employee-page');
+ await page.goto(fixtureUrl+context);await monthly.waitFor();
+ await monthly.locator('.overtime-employee-open').filter({hasText:'ANA TESTE'}).click();await daily.waitFor();
+ assert.equal(new URL(page.url()).searchParams.get('funcionario'),'employee-one');
+ assert.equal(await page.getByRole('dialog').count(),0,'Daily data entry is a page without an overlay');
+ assert.equal(await monthly.count(),0,'Monthly form is replaced, not covered by a dialog');
+ assert.equal(await screen.locator('.overtime-breadcrumb [aria-current=page]').textContent(),'ANA TESTE');
+ assert.equal(await screen.locator('.overtime-employee-kpis article').count(),4);
+ assert.equal(await screen.getByLabel('Total de horas do funcionário',{exact:true}).textContent(),'01:00:00');
+ assert.equal(await screen.getByLabel('Horas extras 50% do funcionário',{exact:true}).textContent(),'01:00:00');
+ assert.equal(await screen.getByLabel('Horas extras 100% do funcionário',{exact:true}).textContent(),'00:00:00');
+ assert.equal(await screen.getByLabel('Dias lançados do funcionário',{exact:true}).textContent(),'1');
+ assert.equal(await daily.locator('tbody tr').count(),3);
+ const scrolling=await screen.locator('.overtime-daily-scroll').evaluate(node=>({maxHeight:getComputedStyle(node).maxHeight,innerScroll:node.scrollHeight>node.clientHeight+1}));
+ assert.equal(scrolling.maxHeight,'none');assert.equal(scrolling.innerScroll,false,'Daily rows use the page vertical scroll');
+ const back=screen.getByRole('link',{name:'Voltar para o relatório mensal',exact:true}),target=new URL(await back.getAttribute('href'),page.url());
+ assert.equal(target.searchParams.get('busca'),'ANA');assert.equal(target.searchParams.get('de'),'2026-10-01');assert.equal(target.searchParams.get('ate'),'2026-11-01');assert.equal(target.searchParams.has('funcionario'),false);
+ await page.reload();await daily.waitFor();assert.equal(await page.getByRole('dialog').count(),0,'Reload and direct employee URL keep the page layout');
+ await page.goBack();await monthly.waitFor();assert.equal(new URL(page.url()).searchParams.has('funcionario'),false);
+ await page.goForward();await daily.waitFor();assert.equal(new URL(page.url()).searchParams.get('funcionario'),'employee-one');
+ await daily.getByLabel('Motivo de 26/10/2026',{exact:true}).fill('Rascunho antes de voltar');await back.click();
+ const confirmation=page.getByRole('alertdialog');await confirmation.getByRole('button',{name:'Cancelar',exact:true}).click();
+ assert.equal(await daily.getByLabel('Motivo de 26/10/2026',{exact:true}).inputValue(),'Rascunho antes de voltar');
+ await back.click();await confirmation.getByRole('button',{name:'Descartar alterações',exact:true}).click();await monthly.waitFor();
+ assert.equal(await page.evaluate(()=>window.overtimeRecovery.writes.length),0,'Returning does not save or drop a draft without confirmation');
+ await monthly.locator('.overtime-employee-open').filter({hasText:'ANA TESTE'}).click();await daily.waitFor();
+ await screen.getByRole('button',{name:'Voltar ao relatório',exact:true}).click();await monthly.waitFor();
+ assert.equal(await page.evaluate(()=>scrollY),0,'Footer return opens the monthly page at its header');
+ await monthly.locator('tbody tr').first().getByRole('button',{name:'Ajustar',exact:true}).click();await daily.waitFor();
+ assert.equal(new URL(page.url()).searchParams.get('ajustar'),'1');await screen.getByRole('button',{name:'Informar ajuste',exact:true}).waitFor();
+ if(screenshotPath)await page.screenshot({path:screenshotPath,fullPage:true});
+ await page.setViewportSize({width:390,height:844});
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Employee page fits mobile viewport');
+ const columns=await screen.locator('.overtime-employee-kpis').evaluate(node=>getComputedStyle(node).gridTemplateColumns.split(' ').length);assert.equal(columns,2);
+ if(screenshotPath)await page.screenshot({path:screenshotPath.replace('.png','-mobile.png'),fullPage:true});
+ assert.deepEqual(errors,[]);
+ console.log('PASS employee page: routed entry, breadcrumb/back with preserved filters, direct URL/reload/history, four server KPIs, normal page scrolling, confirmed discard, Ajustar deep link and mobile layout.');
+}
