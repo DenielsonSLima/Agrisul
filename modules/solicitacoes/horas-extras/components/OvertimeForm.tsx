@@ -1,20 +1,30 @@
 'use client';
 import {useEffect,useRef,useState,type FormEvent} from 'react';
-import {CalendarDays,Loader2,Plus,SlidersHorizontal,Trash2} from 'lucide-react';
+import {useQueryClient} from '@tanstack/react-query';
+import {CalendarDays,Loader2,Plus,RefreshCw,SlidersHorizontal,Trash2} from 'lucide-react';
 import {Field} from '@/shared/components/Common';
 import {notifications,useConfirmation} from '@/shared/feedback';
 import {useEmployeeMutations} from '@/modules/cadastro/funcionarios/hooks/useEmployees';
 import {EmployeeForm} from '@/modules/cadastro/funcionarios/components/EmployeeForm';
 import type {OvertimeEmployee,OvertimeInput,OvertimeReport,OvertimeRowInput} from '../types';
 import {OvertimeDailyDialog} from './OvertimeDailyDialog';
-import {fetchOvertimeReport} from '../services/overtimeApi';
+import {fetchOvertimeDetail,fetchOvertimeReport} from '../services/overtimeApi';
+import {useAuth} from '@/shared/supabase/AuthProvider';
+import {assertSessionActor} from '@/shared/supabase/sessionActor';
+import {RpcError} from '@/shared/supabase/rpc';
+import {billingKeys} from '@/shared/query/keys';
+import {recoverReportDraft,reportDraft} from '../utils/draftRecovery';
 import {OvertimeEmployeeSelect} from './OvertimeEmployeeSelect';
 import {OvertimeAddEmployeesModal} from './OvertimeAddEmployeesModal';
 import {useOvertimeAutoSave,type OvertimeSaveStatus} from '../hooks/useOvertimeAutoSave';
 
 type DraftRow=OvertimeRowInput & {key:string};
-export function OvertimeForm({report,employees,companyId,busy,error,onSave,canRegisterEmployees=false,onStatusChange,readOnly=false}:{report?:OvertimeReport;employees:OvertimeEmployee[];companyId:string;busy:boolean;error:string;onClose:()=>void;onSave:(input:OvertimeInput)=>Promise<OvertimeReport>;canRegisterEmployees?:boolean;onStatusChange?:(status:OvertimeSaveStatus)=>void;readOnly?:boolean}){
+export function OvertimeForm({report,employees,companyId,busy,error,onSave,canRegisterEmployees=false,onStatusChange,readOnly=false,onRecovered}:{report?:OvertimeReport;employees:OvertimeEmployee[];companyId:string;busy:boolean;error:string;onClose:()=>void;onSave:(input:OvertimeInput)=>Promise<OvertimeReport>;canRegisterEmployees?:boolean;onStatusChange?:(status:OvertimeSaveStatus)=>void;readOnly?:boolean;onRecovered?:()=>void}){
  const confirm=useConfirmation();
+ const {user}=useAuth();
+ const queryClient=useQueryClient();
+ const [recovering,setRecovering]=useState(false),[recoveryError,setRecoveryError]=useState(''),[hasConflict,setHasConflict]=useState(false),[accessBlocked,setAccessBlocked]=useState(false);
+ const recoveryLock=useRef(false);
  const [daily,setDaily]=useState<{employeeId:string;report:OvertimeReport;adjustment:boolean}|null>(null),[openingDaily,setOpeningDaily]=useState(false);
  const dailyController=useRef<AbortController|null>(null);
  const employeeMutations=useEmployeeMutations(),[registeringFor,setRegisteringFor]=useState<string|null>(null);
@@ -27,11 +37,39 @@ export function OvertimeForm({report,employees,companyId,busy,error,onSave,canRe
  const availableEmployees=readOnly&&report?report.rows.map(row=>({id:row.employeeId,fullName:row.employeeName,registrationNumber:row.registrationNumber,jobTitle:row.jobTitle})):employees;
  const patchRow=(key:string,patch:Partial<OvertimeRowInput>)=>setRows(current=>current.map(row=>row.key===key?{...row,...patch}:row));
  const autosave=useOvertimeAutoSave({companyId,id:report?.id,...metadata,rows:rows.filter(row=>!!row.employeeId).map(({employeeId,hours50,hours100})=>({employeeId,hours50,hours100}))},readOnly?undefined:report,onSave,onStatusChange);
+ const applyDraft=(input:OvertimeInput)=>{
+  const {dateFrom,dateTo,referenceMonth,sector,notes=''}=input;
+  setMetadata({dateFrom,dateTo,referenceMonth,sector,notes});setRows(current=>input.rows.map(row=>({...row,key:current.find(item=>item.employeeId===row.employeeId)?.key??crypto.randomUUID()})));
+ };
  const acceptSnapshot=(snapshot:OvertimeReport)=>{
-  const nextMetadata={dateFrom:snapshot.dateFrom,dateTo:snapshot.dateTo,referenceMonth:snapshot.referenceMonth,sector:snapshot.sector,notes:snapshot.notes};
-  const nextRows=snapshot.rows.map(row=>({employeeId:row.employeeId,hours50:row.hours50,hours100:row.hours100}));
-  autosave.acceptSnapshot({companyId,id:snapshot.id,...nextMetadata,rows:nextRows},snapshot.updatedAt);
-  setMetadata(nextMetadata);setRows(nextRows.map(row=>({...row,key:crypto.randomUUID()})));
+  if(user)queryClient.setQueryData([...billingKeys.resource(user.id,'overtime'),{view:'detail',companyId,id:snapshot.id}],snapshot);
+  const input=reportDraft(snapshot);autosave.acceptSnapshot(input,snapshot);applyDraft(input);
+ };
+ const recover=async(discard=false)=>{
+  if(!report||!user||recoveryLock.current)return;
+  recoveryLock.current=true;setRecovering(true);setRecoveryError('');
+  const controller=new AbortController();dailyController.current=controller;const actorId=user.id;
+  try{
+   const draft=await autosave.snapshot();if(!draft.baseline)return;
+   await assertSessionActor(actorId);
+   const latest=await fetchOvertimeDetail(companyId,report.id,controller.signal);
+   await assertSessionActor(actorId);if(!mounted.current||controller.signal.aborted)return;
+   if(!latest.canManage||latest.report.status!=='open')throw new Error('O relatório não está disponível para edição. Feche e abra novamente para consultar a versão atual. Seu rascunho foi mantido.');
+   if(discard){
+    if(!await confirm({title:'Carregar a versão atual?',description:'Suas alterações ainda não salvas serão descartadas e substituídas pelos dados atuais do relatório.',confirmLabel:'Carregar versão atual',tone:'destructive'}))return;
+    if(!mounted.current||controller.signal.aborted)return;
+    acceptSnapshot(latest.report);setHasConflict(false);onRecovered?.();return;
+   }
+   const recovered=recoverReportDraft(draft.baseline,draft.input,latest.report,draft.submitted);
+   if(recovered.conflicts.length){setHasConflict(true);setRecoveryError('Há alterações concorrentes em: '+recovered.conflicts.join(', ')+'. Seu rascunho foi mantido. Confira-o antes de carregar a versão atual.');return;}
+   queryClient.setQueryData([...billingKeys.resource(actorId,'overtime'),{view:'detail',companyId,id:latest.report.id}],latest.report);
+   applyDraft(recovered.input);setHasConflict(false);
+   if(await autosave.resume(recovered.input,latest.report)){
+    if(recovered.alreadySaved)notifications.saved('As alterações já estavam salvas e foram conferidas.');
+    onRecovered?.();
+   }
+  }catch(reason){if(mounted.current){if(reason instanceof RpcError&&[401,403,404].includes(reason.status))setAccessBlocked(true);const message=reason instanceof Error?reason.message:'Não foi possível recuperar o salvamento.';setRecoveryError(message);notifications.error(message);}}
+  finally{recoveryLock.current=false;if(mounted.current)setRecovering(false);}
  };
  const openDaily=async(employeeId:string,adjustment=false)=>{
   if(!report||openingDaily)return;setOpeningDaily(true);
@@ -50,8 +88,9 @@ export function OvertimeForm({report,employees,companyId,busy,error,onSave,canRe
   setRows(current=>current.filter(item=>item.key!==row.key));
  };
  const submit=(event:FormEvent)=>{event.preventDefault();if(!busy&&!readOnly)void autosave.flush();};
+ if(accessBlocked)return <p className="form-error" role="alert">{recoveryError}</p>;
  return <><form className="overtime-editor" onSubmit={submit} onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget))void autosave.flush();}}>
-  <fieldset disabled={busy||openingDaily||!!daily}>
+  <fieldset disabled={busy||openingDaily||!!daily||recovering||accessBlocked} hidden={accessBlocked}>
    <div className="overtime-metadata">
     <Field label="Data inicial *"><input type="date" disabled={readOnly} required value={metadata.dateFrom} onChange={event=>setMetadata({...metadata,dateFrom:event.target.value})}/></Field>
     <Field label="Data final *"><input type="date" disabled={readOnly} required value={metadata.dateTo} onChange={event=>setMetadata({...metadata,dateTo:event.target.value})}/></Field>
@@ -69,6 +108,8 @@ export function OvertimeForm({report,employees,companyId,busy,error,onSave,canRe
   </fieldset>
   <section className="overtime-draft-summary" aria-label="Resumo das horas extras"><h3>Resumo do relatório</h3><div><span>Total de horas 50%</span><output aria-label="Total de horas 50%">{report?.total50??'00:00:00'}</output></div><div><span>Total de horas 100%</span><output aria-label="Total de horas 100%">{report?.total100??'00:00:00'}</output></div></section>
   {error&&<p className="form-error" role="alert">{error}</p>}
+  {recoveryError&&<p className="form-error" role="alert">{recoveryError}</p>}
+  {!readOnly&&!accessBlocked&&(autosave.status==='error'||hasConflict)&&<div className="overtime-recovery-actions"><button type="button" className="btn" disabled={recovering} onClick={()=>void recover()}>{recovering?<Loader2 className="animate-spin" size={15}/>:<RefreshCw size={15}/>}Reconsultar e tentar salvar</button>{hasConflict&&<button className="btn" type="button" disabled={recovering} onClick={()=>void recover(true)}>Carregar versão atual</button>}</div>}
   <div className="overtime-auto-save-status" role="status">{readOnly?'Consulta do relatório.':autosave.status==='saving'?<><Loader2 className="animate-spin" size={14}/>Salvando automaticamente…</>:autosave.status==='error'?'Não foi possível salvar. Confira a mensagem acima.':'Alterações salvas automaticamente.'}</div>
  </form>{daily&&<OvertimeDailyDialog report={daily.report} employeeId={daily.employeeId} readOnly={readOnly||daily.report.status==='finished'} initialAdjustment={daily.adjustment} onClose={()=>setDaily(null)} onSaved={snapshot=>{acceptSnapshot(snapshot);setDaily(current=>current?{...current,report:snapshot}:current);}}/>}{addingEmployees&&!readOnly&&<OvertimeAddEmployeesModal employees={employees.filter(employee=>!rows.some(row=>row.employeeId===employee.id))} maxSelections={500-rows.filter(row=>row.employeeId).length} onClose={()=>setAddingEmployees(false)} onAdd={ids=>{
   setRows(current=>{

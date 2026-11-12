@@ -13,16 +13,16 @@ export async function createDailyOvertimePdf(report:OvertimeReport,row:OvertimeR
  const widths=[.045,.08,.08,.08,.08,.09,.09,.33,.125].map(fraction=>fraction*content);
  const edges=[margin];for(const value of widths)edges.push(edges[edges.length-1]+value);
  const daily=row.daily;
- const wrap=(text:string,width:number,size=7.5)=>{doc.setFont('times','normal');doc.setFontSize(size);return doc.splitTextToSize(text,Math.max(1,width-2.2)) as string[];};
+ const wrap=(text:string,width:number,size=7.5,bold=false)=>{doc.setFont('times',bold?'bold':'normal');doc.setFontSize(size);return doc.splitTextToSize(text,Math.max(1,width-2.2)) as string[];};
  const frame=(x:number,y:number,w:number,h:number)=>{doc.setDrawColor('#222222');doc.setLineWidth(.18);doc.rect(x,y,w,h);};
  const cell=(text:string,x:number,y:number,w:number,h:number,{bold=false,size=7.5,align='center' as 'left'|'center'|'right',fill=''}={})=>{
   if(fill){doc.setFillColor(fill);doc.rect(x,y,w,h,'F');}frame(x,y,w,h);
-  const lines=wrap(text,w,size),lineHeight=size*.3528*1.12;
+  const lines=wrap(text,w,size,bold),lineHeight=size*.3528*1.12;
   doc.setFont('times',bold?'bold':'normal');doc.setFontSize(size);doc.setTextColor('#111111');
   doc.text(lines,align==='left'?x+1.1:align==='right'?x+w-1.1:x+w/2,y+(h-lines.length*lineHeight)/2+lineHeight*.8,{align,lineHeightFactor:1.12});
  };
  const fullLine=(text:string,y:number,size=9,bold=true)=>{
-  const h=Math.max(7,wrap(text,content,size).length*size*.3528*1.12+2);
+  const h=Math.max(7,wrap(text,content,size,bold).length*size*.3528*1.12+2);
   cell(text,margin,y,content,h,{bold,size,align:'left'});return y+h;
  };
  const header=()=>{
@@ -44,7 +44,7 @@ export async function createDailyOvertimePdf(report:OvertimeReport,row:OvertimeR
  let y=header();const pageBodyStart=y;
  const nextPage=()=>{doc.addPage();y=header();};
  const tableRow=(values:string[],bold=false)=>{
-  const lineSets=values.map((value,index)=>wrap(value,widths[index])),lineCount=Math.max(1,...lineSets.map(lines=>lines.length));
+  const lineSets=values.map((value,index)=>wrap(value,widths[index],7.5,bold)),lineCount=Math.max(1,...lineSets.map(lines=>lines.length));
   // A long reason or approval can span pages without dropping its final lines.
   let offset=0;
   while(offset<lineCount){

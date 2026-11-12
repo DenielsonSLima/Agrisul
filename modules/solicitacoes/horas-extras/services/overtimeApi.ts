@@ -5,7 +5,8 @@ import type {OvertimeCollection,OvertimeCreateInput,OvertimeDeleteInput,Overtime
 export const fetchOvertimeOptions=(companyId:string,signal:AbortSignal)=>rpcRequest<OvertimeOptions>('overtime','options',{companyId},signal);
 export const fetchOvertimeList=(filters:OvertimeFilters,signal:AbortSignal)=>rpcRequest<OvertimeCollection>('overtime','list',filters,signal);
 export const fetchOvertimeTotals=(companyId:string,rows:{hours50:string;hours100:string}[],signal:AbortSignal)=>rpcRequest<OvertimeTotals>('overtime','preview',{companyId,rows},signal);
-export const fetchOvertimeReport=async(companyId:string,id:string,signal:AbortSignal)=>(await rpcRequest<OvertimeDetail>('overtime','get',{companyId,id},signal)).report;
+export const fetchOvertimeDetail=(companyId:string,id:string,signal:AbortSignal)=>rpcRequest<OvertimeDetail>('overtime','get',{companyId,id},signal);
+export const fetchOvertimeReport=async(companyId:string,id:string,signal:AbortSignal)=>(await fetchOvertimeDetail(companyId,id,signal)).report;
 export const fetchOvertimeDaily=(companyId:string,id:string,employeeId:string,signal:AbortSignal)=>rpcRequest<OvertimeDailyResult>('overtime','daily-get',{companyId,id,employeeId},signal);
 export type OvertimeExecution={actorId:string;signal:AbortSignal};
 async function assertExecution(execution:OvertimeExecution){

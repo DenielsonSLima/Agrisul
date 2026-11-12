@@ -19,6 +19,7 @@ import {fetchOvertimeReport} from '../services/overtimeApi';
 import type {OvertimeCreateInput,OvertimeFilters,OvertimeInput,OvertimeReport,OvertimeSummary} from '../types';
 import {OvertimeCreateModal} from './OvertimeCreateModal';
 import {OvertimeForm} from './OvertimeForm';
+import {blockingOvertimeRead} from '../utils/draftRecovery';
 import '../styles.css';
 
 async function createPdf(snapshot:OvertimeReport,brand:ReportPdfBrand){
@@ -93,11 +94,12 @@ function OvertimeWorkspace({companyId,companyName}:{companyId:string;companyName
    {!id&&canManage&&<button className="btn company-primary" type="button" disabled={mutations.creating} onClick={openNew}><Plus size={17}/>Novo relatório</button>}
    {id&&report&&<><button className="btn" type="button" onClick={()=>void exportPdf()} disabled={exporting||!!detail.error||!report.employeeCount||(editing&&draftStatus!=='saved')}>{exporting?<Loader2 className="animate-spin" size={16}/>:<Download size={16}/>} {exporting?'Gerando…':'Exportar PDF'}</button>{canManage&&<>{isOpen?<><button className="btn company-primary" type="button" disabled={busy||!report.canFinish||(editing&&draftStatus!=='saved')} onClick={()=>void finish()}><CheckCircle2 size={16}/>Finalizar</button></>:<button className="btn company-primary" type="button" disabled={busy} onClick={async()=>{if(!await confirm({title:'Abrir relatório novamente?',description:'O relatório voltará para Em aberto e poderá receber alterações nos funcionários e nas horas.',confirmLabel:'Abrir novamente'}))return;try{await mutations.reopen({companyId,id:report.id,expectedUpdatedAt:report.updatedAt});if(mounted.current){notifications.updated('O relatório está em aberto novamente.');setDraftStatus('saved');navigate(href(id,true,'open'));}}catch(error){if(mounted.current)notifications.error(error instanceof Error?error.message:'Não foi possível abrir o relatório.');}}}><FolderOpen size={16}/>Abrir novamente</button>}<button className="btn overtime-delete" type="button" disabled={busy} onClick={()=>void remove(report)}><Trash2 size={16}/>Excluir</button></>}</>}
   </div></div>
-  {options.error&&<ErrorState error={options.error} onRetry={()=>void options.reload()}/>}
+  {options.error&&(!id?<ErrorState error={options.error} onRetry={()=>void options.reload()}/>:!blockingOvertimeRead(options)&&<RefreshNotice error={options.error} onRetry={()=>void options.reload()}/>)}
   {id&&!options.loading&&!options.error&&!options.data?.employees.length&&<div className="overtime-notice"><Users size={20}/><p>Cadastre os funcionários com nome e cargo para preencher as horas.</p>{canOpenWorkspaceHref(access.data,'/cadastro?secao=funcionarios')&&<ModuleLink className="text-link" href="/cadastro?secao=funcionarios">Abrir funcionários</ModuleLink>}</div>}
   {exportError&&<p className="form-error" role="alert">{exportError}</p>}
-  {id?detail.loading||options.loading?<Loading/>:detail.error?<ErrorState error={detail.error} onRetry={()=>void detail.reload()}/>:report&&<>
-   <OvertimeForm key={id} report={report} companyId={companyId} employees={options.data?.employees??[]} canRegisterEmployees={options.data?.canRegisterEmployees??false} busy={mutations.finishing||mutations.reopening} readOnly={!editing} onStatusChange={setDraftStatus} error={formError} onClose={()=>navigate(href(id))} onSave={save}/>
+  {id?detail.loading||options.loading?<Loading/>:blockingOvertimeRead(options)?<ErrorState error={options.error} onRetry={()=>void options.reload()}/>:blockingOvertimeRead(detail)?<ErrorState error={detail.error} onRetry={()=>void detail.reload()}/>:report&&<>
+   {detail.error&&<RefreshNotice error={detail.error} onRetry={()=>void detail.reload()}/>}
+   <OvertimeForm key={id} report={report} companyId={companyId} employees={options.data?.employees??[]} canRegisterEmployees={options.data?.canRegisterEmployees??false} busy={mutations.finishing||mutations.reopening} readOnly={!editing} onStatusChange={setDraftStatus} error={formError} onRecovered={()=>setFormError('')} onClose={()=>navigate(href(id))} onSave={save}/>
 
   </>:<>
    <OvertimeListFilters key={search+dateFrom+dateTo} search={search} dateFrom={dateFrom} dateTo={dateTo} onApply={(term,from,to)=>navigate(href(undefined,false,status,term,from,to))}/>
@@ -114,6 +116,7 @@ function OvertimeWorkspace({companyId,companyName}:{companyId:string;companyName
 }
 function Loading(){return <div className="client-loading" role="status"><Loader2 className="animate-spin" size={20}/>Carregando relatórios…</div>;}
 function ErrorState({error,onRetry}:{error:string;onRetry:()=>void}){return <div className="company-empty" role="alert"><h3>Não foi possível carregar os dados</h3><p>{error}</p><button className="btn" onClick={onRetry}><RefreshCw size={16}/>Tentar novamente</button></div>;}
+function RefreshNotice({error,onRetry}:{error:string;onRetry:()=>void}){return <div className="overtime-notice" role="alert"><p>A atualização falhou. Seus lançamentos em edição foram mantidos. {error}</p><button className="btn" type="button" onClick={onRetry}>Reconsultar dados</button></div>;}
 function OvertimeListFilters({search,dateFrom,dateTo,onApply}:{search:string;dateFrom:string;dateTo:string;onApply:(search:string,from:string,to:string)=>void}){
  const [term,setTerm]=useState(search),[from,setFrom]=useState(dateFrom),[to,setTo]=useState(dateTo);
  const submit=(event:FormEvent)=>{event.preventDefault();onApply(term,from,to);};
