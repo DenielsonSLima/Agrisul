@@ -9,5 +9,5 @@ export function useExecutiveSummary(from:string,to:string,selection:SummarySelec
  const normalized=normalizeSummarySelection(selection),{partnerIds,contractIds,farmIds,plotIds,...single}=normalized;
  // A new projection must not reuse cached snapshots without operational periods.
  const params={projection:'periods-v4',from,to,...single,partnerIds:JSON.stringify(partnerIds),contractIds:JSON.stringify(contractIds),farmIds:JSON.stringify(farmIds),plotIds:JSON.stringify(plotIds)};
- return useBillingQuery('summary',params,(companyId,signal)=>fetchExecutiveSummary(companyId,from,to,signal,normalized),{refetchInterval:60000,enabled});
+ return useBillingQuery('summary',params,(companyId,signal)=>fetchExecutiveSummary(companyId,from,to,signal,normalized),{refetchInterval:60000,enabled,keepPreviousData:true});
 }

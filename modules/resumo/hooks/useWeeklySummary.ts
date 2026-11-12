@@ -29,5 +29,5 @@ export function useWeeklySummary(from:string,to:string,selection:SummarySelectio
    throw new Error('Não foi possível conferir os filtros da aba Semanal. Atualize os dados.');
   }
   return data;
- },{refetchInterval:60000,enabled});
+ },{refetchInterval:60000,enabled,keepPreviousData:true});
 }
