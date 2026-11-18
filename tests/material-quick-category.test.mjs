@@ -89,7 +89,7 @@ test('quick category creation uses the material-categories RPC contract', async 
 test('material form keeps its draft mounted and selects a category created in place', async () => {
   const [materialsSource, categoryFormSource] = await Promise.all([
     readFile(
-      new URL('../modules/cadastro/materiais/components/MateriaisPage.tsx', import.meta.url),
+      new URL('../modules/cadastro/materiais/components/MaterialForm.tsx', import.meta.url),
       'utf8',
     ),
     readFile(
@@ -98,10 +98,8 @@ test('material form keeps its draft mounted and selects a category created in pl
     ),
   ]);
   const start = materialsSource.indexOf('function MaterialForm(');
-  const end = materialsSource.indexOf('function ReferenceForm(', start);
   assert.notEqual(start, -1, 'MaterialForm must exist');
-  assert.notEqual(end, -1, 'MaterialForm boundary must remain detectable');
-  const materialForm = materialsSource.slice(start, end);
+  const materialForm = materialsSource.slice(start);
 
   assert.match(materialsSource, /useMaterialCategoryMutations/);
   assert.match(materialsSource, /import \{CategoryForm\}/);

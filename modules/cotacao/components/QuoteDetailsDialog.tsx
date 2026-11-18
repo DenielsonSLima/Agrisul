@@ -12,6 +12,7 @@ import {
 import type {Signature} from '@/modules/cadastro/assinaturas/types';
 import {Field} from '@/shared/components/Common';
 import type {Quote, QuoteDetailsInput} from '../types';
+import {QuoteRequesterField} from './QuoteRequesterField';
 
 export function QuoteDetailsDialog({
   quote,
@@ -34,14 +35,13 @@ export function QuoteDetailsDialog({
 }) {
   const [title, setTitle] = useState(quote.title);
   const [requestDate, setRequestDate] = useState(quote.requestDate);
+  const [requester, setRequester] = useState(quote.requester);
   const [requesterSignatureId, setRequesterSignatureId] = useState(
     quote.requesterSignatureId ?? '',
   );
   const [notes, setNotes] = useState(quote.notes);
   const [error, setError] = useState('');
   const submittingRef = useRef(false);
-  const requesterAvailable = requesters.some(requester => requester.id === requesterSignatureId);
-  const currentRequesterMissing = !!quote.requesterSignatureId && !requesterAvailable;
 
   const close = () => {
     if (!saving && !submittingRef.current) onClose();
@@ -50,8 +50,8 @@ export function QuoteDetailsDialog({
   const submit = async () => {
     if (saving || submittingRef.current) return;
     setError('');
-    if (!title.trim() || !requestDate || !requesterSignatureId || !requesterAvailable) {
-      setError('Informe o título, a data e selecione um solicitante ativo.');
+    if (!title.trim() || !requestDate || requester.trim().length < 2) {
+      setError('Informe o título, a data e o nome do solicitante.');
       return;
     }
     submittingRef.current = true;
@@ -60,6 +60,7 @@ export function QuoteDetailsDialog({
         id: quote.id,
         title: title.trim(),
         requestDate,
+        requester: requester.trim(),
         requesterSignatureId,
         notes: notes.trim(),
       });
@@ -102,23 +103,11 @@ export function QuoteDetailsDialog({
                 onChange={event => setRequestDate(event.target.value)}
               />
             </Field>
-            <Field label="Solicitante *">
-              <select
-                value={requesterSignatureId}
-                disabled={saving || loading}
-                onChange={event => setRequesterSignatureId(event.target.value)}
-              >
-                <option value="">Selecione um solicitante</option>
-                {currentRequesterMissing && (
-                  <option value={quote.requesterSignatureId!} disabled>
-                    {quote.requester} (inativo)
-                  </option>
-                )}
-                {requesters.map(requester => (
-                  <option key={requester.id} value={requester.id}>{requester.name}</option>
-                ))}
-              </select>
-            </Field>
+            <QuoteRequesterField
+              value={requester}
+              requesters={requesters}
+              onChange={(name, signatureId) => {setRequester(name); setRequesterSignatureId(signatureId);}}
+            />
           </div>
           <Field label="Observações gerais">
             <textarea
@@ -133,20 +122,15 @@ export function QuoteDetailsDialog({
 
         {loading && (
           <p className="quote-details-status" role="status">
-            <Loader2 className="animate-spin" size={15}/>Carregando solicitantes…
+            <Loader2 className="animate-spin" size={15}/>Carregando sugestões de solicitantes…
           </p>
         )}
         {loadError && (
           <p className="form-error" role="alert">
-            {loadError}{' '}
+            Sugestões indisponíveis. Você pode digitar o nome para continuar.{' '}
             <button className="btn-link" type="button" disabled={saving} onClick={() => void onReload()}>
               <RefreshCw size={13}/>Tentar novamente
             </button>
-          </p>
-        )}
-        {!loading && !loadError && !requesters.length && (
-          <p className="form-error" role="alert">
-            Nenhum solicitante ativo foi encontrado. Cadastre um solicitante em Assinaturas.
           </p>
         )}
         {error && <p className="form-error" role="alert">{error}</p>}
@@ -156,7 +140,7 @@ export function QuoteDetailsDialog({
           <button
             className="btn company-primary"
             type="button"
-            disabled={saving || loading || !!loadError || !requesters.length || !requesterAvailable}
+            disabled={saving}
             onClick={() => void submit()}
           >
             {saving ? <Loader2 className="animate-spin" size={16}/> : <Save size={16}/>}

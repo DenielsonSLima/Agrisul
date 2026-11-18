@@ -148,7 +148,7 @@ test('open quotation details can be edited through a narrow RPC without replacin
   assert.match(detail, /notifications\.updated\('Dados da cotação atualizados\.'/);
   assert.match(dialog, /<DialogTitle>Editar dados da cotação<\/DialogTitle>/);
   assert.match(dialog, /Data da cotação \*/);
-  assert.match(dialog, /Solicitante \*/);
+  assert.match(dialog, /<QuoteRequesterField/);
   assert.match(dialog, /Observações gerais/);
   assert.match(dialog, /requesterSignatureId/);
   assert.match(api, /['"]quotations['"],['"]update-details['"]/);

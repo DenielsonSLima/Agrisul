@@ -1,4 +1,8 @@
-import {drawReportPdfHeader,drawReportPdfWatermark,formatReportCnpj,REPORT_MARGIN_MM,type ReportPdfBrand,type ReportPdfImage} from '@/shared/reporting';
+import {drawReportPdfHeader,type ReportPdfImage} from '@/shared/reporting/pdfHeader';
+import {drawReportPdfWatermark} from '@/shared/reporting/pdfWatermark';
+import {formatReportCnpj} from '@/shared/reporting/companyBrand';
+import {REPORT_MARGIN_MM} from '@/shared/reporting/reportLayout';
+import type {ReportPdfBrand} from '@/shared/reporting/types';
 import {loadReportImage} from '@/shared/reporting/loadReportImage';
 import {supplierNotes} from '@/shared/reporting/supplierText';
 import {dateLabel,moneyLabel} from '@/shared/utils/presentation';
@@ -21,12 +25,65 @@ export async function createPurchaseOrderPdf(order:PurchaseOrderSnapshot,brand:R
   const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});
   const width=doc.internal.pageSize.getWidth(),height=doc.internal.pageSize.getHeight(),margin=REPORT_MARGIN_MM,content=width-margin*2,bottom=height-margin-9;
   const [logo,watermark,images]=await Promise.all([loadReportImage(brand.company?.logoUrl??null),loadReportImage(brand.watermark.imageUrl),itemImages(order)]);
-  const addHeader=(continuation=false)=>{drawReportPdfWatermark(doc,width,height,brand.watermark,watermark);return drawReportPdfHeader({doc,pageWidth:width,margin,orientation:'portrait',settings:brand.header,company:brand.company,logo,title:continuation?'Pedido de compra · continuação':'Pedido de compra'})+6;};
+  const addHeader=(continuation=false)=>{drawReportPdfWatermark(doc,width,height,brand.watermark,watermark);return drawReportPdfHeader({doc,pageWidth:width,margin,orientation:'portrait',settings:brand.header,company:brand.company,logo,title:continuation?'Pedido de compra · continuação':'Pedido de compra'})+4;};
   let y=addHeader();
-  const pair=(label:string,value:string,x:number,w:number,top:number)=>{doc.setFont('helvetica','normal');doc.setFontSize(6.2);doc.setTextColor(120,136,125);doc.text(label.toUpperCase(),x,top);doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(48,78,57);doc.text(limitedLines(doc,value||'Não informado',w,2),x,top+4,{lineHeightFactor:1.1});};
-  const drawSummary=()=>{doc.setFillColor(242,247,243);doc.roundedRect(margin,y,content,22,1.5,1.5,'F');pair('Pedido',order.number,margin+4,37,y+5);pair('Cotação',order.quotationNumber,margin+43,38,y+5);pair('Ordem de compra',order.purchaseOrderNumber||'Não informada',margin+83,51,y+5);pair('Data da cotação',dateLabel(order.requestDate),margin+136,content-140,y+5);y+=27;};
-  const drawSupplier=()=>{doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(48,75,57);doc.text('Fornecedor',margin,y);y+=4;doc.setDrawColor(216,228,220);doc.roundedRect(margin,y,content,43,1.2,1.2);pair(order.providerDocumentType==='CPF'?'Nome':'Razão social',order.providerLegalName,margin+4,82,y+5);pair(order.providerDocumentType==='CPF'?'Nome profissional':'Nome fantasia',order.providerTradeName||'Não informado',margin+91,content-95,y+5);pair(order.providerDocumentType||'Documento',supplierDocument(order),margin+4,55,y+18);pair('Contato geral',[order.providerPhone,order.providerEmail].filter(Boolean).join(' · ')||'Não informado',margin+64,content-68,y+18);pair('RESP.',order.providerContactName||'Não informado',margin+4,82,y+31);pair('CONT.',order.providerContactPhone||'Não informado',margin+91,content-95,y+31);y+=48;};
-  const drawCommercial=()=>{doc.setFillColor(231,243,235);doc.roundedRect(margin,y,content,15,1.2,1.2,'F');pair('Forma de pagamento',order.paymentMethod||'Não informada',margin+4,90,y+5);pair('Situação',order.status==='finished'?'Finalizado':'Em aberto',margin+100,40,y+5);pair('Valor total',moneyLabel(order.total),margin+144,content-148,y+5);y+=20;};
+  type Field={label:string;value:string;offset:number;width:number};
+  const fieldLines=(field:Field)=>{
+    doc.setFont('helvetica','bold');doc.setFontSize(8);
+    return limitedLines(doc,field.value||'Não informado',field.width,2);
+  };
+  const drawFields=(fields:Field[],top:number)=>{
+    let rowHeight=8.5;
+    for(const field of fields){
+      const lines=fieldLines(field),x=margin+field.offset;
+      doc.setFont('helvetica','normal');doc.setFontSize(6.2);doc.setTextColor(120,136,125);
+      doc.text(field.label.toUpperCase(),x,top);
+      doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(48,78,57);
+      doc.text(lines,x,top+3.7,{lineHeightFactor:1.1});
+      rowHeight=Math.max(rowHeight,8.5+(lines.length-1)*3.1);
+    }
+    return rowHeight;
+  };
+  const drawFieldBlock=(rows:Field[][],fill:[number,number,number]|null,gap=3)=>{
+    const rowHeights=rows.map(fields=>Math.max(...fields.map(field=>8.5+(fieldLines(field).length-1)*3.1)));
+    const blockHeight=4+rowHeights.reduce((sum,rowHeight)=>sum+rowHeight,0);
+    if(fill){doc.setFillColor(...fill);doc.roundedRect(margin,y,content,blockHeight,1.2,1.2,'F');}
+    else{doc.setDrawColor(216,228,220);doc.roundedRect(margin,y,content,blockHeight,1.2,1.2);}
+    let top=y+4;
+    for(const fields of rows)top+=drawFields(fields,top);
+    y+=blockHeight+gap;
+  };
+  const drawSummary=()=>drawFieldBlock([[
+    {label:'Pedido',value:order.number,offset:4,width:33},
+    {label:'Cotação',value:order.quotationNumber,offset:41,width:31},
+    {label:'Ordem de compra',value:order.purchaseOrderNumber||'Não informada',offset:76,width:55},
+    {label:'Data da cotação',value:dateLabel(order.requestDate),offset:135,width:content-139},
+  ]],[242,247,243]);
+  const drawSupplier=()=>{
+    const rows:Field[][]=[[
+      {label:order.providerDocumentType==='CPF'?'Fornecedor · Nome':'Fornecedor · Razão social',value:order.providerLegalName,offset:4,width:117},
+      {label:order.providerDocumentType||'Documento',value:supplierDocument(order),offset:125,width:content-129},
+    ]];
+    const generalContact=[order.providerPhone,order.providerEmail].filter(Boolean).join(' · ');
+    if(order.providerTradeName||generalContact){
+      rows.push([
+        ...(order.providerTradeName?[{label:order.providerDocumentType==='CPF'?'Nome profissional':'Nome fantasia',value:order.providerTradeName,offset:4,width:generalContact?82:content-8}]:[]),
+        ...(generalContact?[{label:'Contato geral',value:generalContact,offset:order.providerTradeName?90:4,width:order.providerTradeName?content-94:content-8}]:[]),
+      ]);
+    }
+    if(order.providerContactName||order.providerContactPhone){
+      rows.push([
+        ...(order.providerContactName?[{label:'Responsável',value:order.providerContactName,offset:4,width:order.providerContactPhone?82:content-8}]:[]),
+        ...(order.providerContactPhone?[{label:'Contato do responsável',value:order.providerContactPhone,offset:order.providerContactName?90:4,width:order.providerContactName?content-94:content-8}]:[]),
+      ]);
+    }
+    drawFieldBlock(rows,null);
+  };
+  const drawCommercial=()=>drawFieldBlock([[
+    {label:'Forma de pagamento',value:order.paymentMethod||'Não informada',offset:4,width:86},
+    {label:'Situação',value:order.status==='finished'?'Finalizado':'Em aberto',offset:94,width:42},
+    {label:'Valor total',value:moneyLabel(order.total),offset:140,width:content-144},
+  ]],[231,243,235],4);
   const drawTableHeader=()=>{doc.setFillColor(226,238,230);doc.rect(margin,y,content,9,'F');doc.setFont('helvetica','bold');doc.setFontSize(6.2);doc.setTextColor(53,84,62);[['Foto',12],['Produto',35],['Qtd.',116],['Unit. bruto',143],['Total líquido',174]].forEach(([label,x])=>doc.text(String(label),margin+Number(x),y+5,{align:Number(x)>100?'center':'left'}));y+=9;};
   const drawImage=(image:ReportPdfImage,x:number,top:number,w:number,h:number)=>{let iw=w,ih=iw/image.ratio;if(ih>h){ih=h;iw=ih*image.ratio;}doc.addImage(image.bytes,image.format,x+(w-iw)/2,top+(h-ih)/2,iw,ih,undefined,'FAST');};
   const newPage=()=>{doc.addPage();y=addHeader(true);drawTableHeader();};

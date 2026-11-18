@@ -290,7 +290,8 @@ try{
  assert.match(materialsSource,/<Dialog open=\{materialOpen\}/);
  assert.match(materialsSource,/<MaterialForm material=\{editMaterial\}/);
  assert.doesNotMatch(materialsSource,/<MaterialForm[^>]*\bkey=/);
- assert.match(materialsSource,/const \[file,setFile\]=useState<File\|null>\(null\)/);
+ const materialFormSource=await readFile(new URL('../modules/cadastro/materiais/components/MaterialForm.tsx',import.meta.url),'utf8');
+ assert.match(materialFormSource,/const \[file,setFile\]=useState<File\|null>\(null\)/);
  // The quotation draft and its current step remain owned by the mounted modal.
  // Focus refetches only replace remote lists; they must not key or reconstruct it.
  assert.match(

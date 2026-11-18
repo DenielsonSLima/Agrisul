@@ -36,11 +36,13 @@ import type {Signature} from '@/modules/cadastro/assinaturas/types';
 import {useProviders} from '@/modules/cadastro/prestadores/hooks/useProviders';
 import {providerDocument} from '@/modules/cadastro/prestadores/presentation';
 import type {ServiceProvider} from '@/modules/cadastro/prestadores/types';
+import {MaterialCreateDialog} from '@/modules/cadastro/materiais/components/MaterialCreateDialog';
 import {useMaterials, useQuotationRequesters, useQuoteMutations} from '../hooks/useQuotes';
 import type {Material, QuoteAttachment, QuoteItem, QuoteProvider} from '../types';
 import {emptyItem, listHref, today} from './QuoteShared';
 import {MaterialThumbnail, QuoteMaterialPicker} from './QuoteMaterialPicker';
 import {quoteMaterialOptions} from './quoteMaterialOptions';
+import {QuoteRequesterField} from './QuoteRequesterField';
 
 type Draft = {
   requestDate: string;
@@ -91,20 +93,25 @@ export function QuoteCreatePage() {
   const [draft, setDraft] = useState<Draft>(initial);
   const [step, setStep] = useState(0);
   const [error, setError] = useState('');
+  const [creatingMaterial, setCreatingMaterial] = useState<{
+    itemId: string;
+    initialName: string;
+    returnFocus: HTMLElement | null;
+  } | null>(null);
   const providers = providersQuery.data?.providers ?? [];
 
   const patch = (value: Partial<Draft>) => {
     setDraft(current => ({...current, ...value}));
   };
 
-  const updateItem = (id: string, value: Partial<QuoteItem>) => {
+  const updateItem = (id: string, value: Partial<QuoteItem>, savedMaterial?: Material) => {
     setDraft(current => ({
       ...current,
       items: current.items.map(item => {
         if (item.id !== id) return item;
         const next = {...item, ...value};
         if (value.materialId !== undefined) {
-          const material = materials.materials.find(entry => entry.id === value.materialId);
+          const material = savedMaterial ?? materials.materials.find(entry => entry.id === value.materialId);
           const first = material?.references[0];
           next.materialVariantId = first?.id ?? null;
           next.materialName = material?.name ?? '';
@@ -150,8 +157,8 @@ export function QuoteCreatePage() {
   };
 
   const validateStep = (target: number) => {
-    if (target === 0 && (!draft.requestDate || !draft.requesterId)) {
-      return 'Informe a data e selecione o solicitante.';
+    if (target === 0 && (!draft.requestDate || draft.requester.trim().length < 2)) {
+      return 'Informe a data e o nome do solicitante.';
     }
     if (target === 1 && (
       !draft.items.length
@@ -269,6 +276,7 @@ export function QuoteCreatePage() {
               onAdd={() => patch({items: [...draft.items, emptyItem()]})}
               onRemove={id => patch({items: draft.items.filter(item => item.id !== id)})}
               onChange={updateItem}
+              onCreate={(itemId, initialName, returnFocus) => setCreatingMaterial({itemId, initialName, returnFocus})}
             />
           )}
           {step === 2 && (
@@ -323,6 +331,15 @@ export function QuoteCreatePage() {
             )}
           </footer>
         </main>
+        {creatingMaterial && <MaterialCreateDialog
+          initialName={creatingMaterial.initialName}
+          returnFocus={creatingMaterial.returnFocus}
+          onClose={() => setCreatingMaterial(null)}
+          onCreated={material => {
+            updateItem(creatingMaterial.itemId, {materialId: material.id}, material);
+            setError('');
+          }}
+        />}
       </DialogContent>
     </Dialog>
   );
@@ -363,31 +380,16 @@ function DataStep({
           <small id="quote-number-help" className="quote-field-help">Exemplo: COT-001</small>
         </Field>
       </div>
-      {loading ? (
-        <Load text="Carregando solicitantes…"/>
-      ) : loadError ? (
-        <Failure message={loadError} reload={onReload}/>
-      ) : !requesters.length ? (
-        <div className="company-empty">
-          <Users size={24}/>
-          <h3>Nenhum solicitante cadastrado</h3>
-          <p>Cadastre uma assinatura com a função Solicitante para continuar.</p>
-          <ModuleLink className="btn" href="/cadastro?secao=assinaturas">Abrir assinaturas</ModuleLink>
-        </div>
-      ) : (
-        <Field label="Solicitante *">
-          <select
-            value={draft.requesterId}
-            onChange={event => {
-              const selected = requesters.find(item => item.id === event.target.value);
-              patch({requesterId: event.target.value, requester: selected?.name ?? ''});
-            }}
-          >
-            <option value="">Selecione uma assinatura</option>
-            {requesters.map(requester => <option key={requester.id} value={requester.id}>{requester.name}</option>)}
-          </select>
-        </Field>
-      )}
+      <QuoteRequesterField
+        value={draft.requester}
+        requesters={requesters}
+        onChange={(requester, requesterId) => patch({requester, requesterId})}
+      />
+      {loading && <p className="quote-field-help" role="status">Carregando sugestões de solicitantes…</p>}
+      {loadError && <p className="quote-field-help" role="status">
+        Sugestões indisponíveis. Você pode digitar o nome para continuar.{' '}
+        <button type="button" className="btn-link" onClick={() => void onReload()}>Tentar novamente</button>
+      </p>}
       <Field label="Observações gerais">
         <textarea
           rows={5}
@@ -438,6 +440,7 @@ function MaterialsStep({
   onAdd,
   onRemove,
   onChange,
+  onCreate,
 }: {
   materials: Material[];
   loading: boolean;
@@ -447,6 +450,7 @@ function MaterialsStep({
   onAdd: () => void;
   onRemove: (id: string) => void;
   onChange: (id: string, value: Partial<QuoteItem>) => void;
+  onCreate: (itemId: string, name: string, returnFocus: HTMLElement | null) => void;
 }) {
   const options = quoteMaterialOptions(materials);
   return (
@@ -469,8 +473,10 @@ function MaterialsStep({
         <div className="company-empty">
           <ClipboardList size={24}/>
           <h3>Nenhum material cadastrado</h3>
-          <p>Abra Materiais e cadastre um produto para continuar.</p>
-          <ModuleLink className="btn" href="/cadastro?secao=materiais">Abrir materiais</ModuleLink>
+          <p>Cadastre um produto aqui para continuar a cotação.</p>
+          <button type="button" className="btn company-primary" onClick={event => onCreate(items[0].id, '', event.currentTarget)}>
+            <Plus size={16}/>Cadastrar produto
+          </button>
         </div>
       ) : (
         <div className="quote-item-list">
@@ -483,6 +489,7 @@ function MaterialsStep({
                   value={item.materialId}
                   itemNumber={index + 1}
                   onChange={materialId => onChange(item.id, {materialId})}
+                  onCreate={(name, returnFocus) => onCreate(item.id, name, returnFocus)}
                 />
                 <div className="quote-item-secondary">
                   <Field label={`Quantidade${item.unit ? ` (${item.unit})` : ''} *`}>

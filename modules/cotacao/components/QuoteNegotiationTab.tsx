@@ -10,10 +10,8 @@ import {
 } from '@/components/ui/tooltip';
 import {moneyLabel} from '@/shared/utils/presentation';
 import {useConfirmation} from '@/shared/feedback';
-import {PdfExportDialog} from '@/shared/reporting/PdfExportDialog';
 import {useWorkspaceCompany} from '@/shared/state/WorkspaceCompanyProvider';
 import {
-  createQuotationNegotiationPdf,
   createQuotationNegotiationSnapshot,
   type QuotationNegotiationSnapshot,
 } from '../reporting/quotationNegotiationPdf';
@@ -30,6 +28,7 @@ import type {
 } from '../types';
 import {MaterialThumbnail} from './QuoteMaterialPicker';
 import {QuotePriceDialog} from './QuotePriceDialog';
+import {QuoteNegotiationExportDialog} from './QuoteNegotiationExportDialog';
 
 type NegotiationDraft = Omit<QuoteNegotiationInput, 'id'>;
 type AwardDraft = Omit<QuoteItemAwardInput, 'id'>;
@@ -499,16 +498,9 @@ export function QuoteNegotiationTab({
         />
       )}
       {pdf && (
-        <PdfExportDialog
+        <QuoteNegotiationExportDialog
           snapshot={pdf}
           companyId={activeCompanyId}
-          createPdf={createQuotationNegotiationPdf}
-          orientation="landscape"
-          fitPreviewToWidth
-          showPreviewToolbar
-          title="Exportar mapa de negociação"
-          description={`${quote.number || quote.title} · ${quote.items.length} material(is) · ${quote.providers.length} fornecedor(es). Confira preços, descontos e aprovações antes de baixar.`}
-          previewClassName="quote-negotiation-pdf-preview"
           onClose={() => setPdf(null)}
         />
       )}

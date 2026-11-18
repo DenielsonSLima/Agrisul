@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import {useId, useMemo, useRef, useState} from 'react';
-import {PackageOpen} from 'lucide-react';
+import {PackageOpen, Plus} from 'lucide-react';
 import {
   Combobox,
   ComboboxContent,
@@ -79,15 +79,19 @@ export function QuoteMaterialPicker({
   value,
   itemNumber,
   onChange,
+  onCreate,
 }: {
   materials: Material[];
   value: string;
   itemNumber: number;
   onChange: (materialId: string) => void;
+  onCreate?: (name: string, returnFocus: HTMLElement | null) => void;
 }) {
   const labelId = useId();
   const container = useRef<HTMLDivElement>(null);
   const anchor = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
   const [search, setSearch] = useState<string | null>(null);
   const ordered = useMemo(
     () => [...materials].sort((left, right) =>
@@ -101,10 +105,23 @@ export function QuoteMaterialPicker({
     return term ? ordered.filter(material => searchableMaterial(material).includes(term)) : ordered;
   }, [ordered, search]);
 
+  const create = () => {
+    const name = search?.trim() ?? '';
+    setOpen(false);
+    setSearch(null);
+    onCreate?.(name, trigger.current);
+  };
+
   return (
     <div className="field quote-material-field" ref={container}>
-      <span id={labelId}>Produto *</span>
+      <div className="quote-material-label">
+        <span id={labelId}>Produto *</span>
+        {onCreate && <button type="button" className="quote-material-create" onClick={create}>
+          <Plus size={14}/>Cadastrar produto
+        </button>}
+      </div>
       <Combobox
+        open={open}
         items={ordered}
         filteredItems={filtered}
         value={selected}
@@ -114,7 +131,7 @@ export function QuoteMaterialPicker({
         itemToStringLabel={material => material.name}
         itemToStringValue={material => material.id}
         isItemEqualToValue={(left, right) => left.id === right.id}
-        onOpenChange={open => setSearch(open ? '' : null)}
+        onOpenChange={open => {setOpen(open); setSearch(open ? '' : null);}}
         onValueChange={material => {
           onChange(material?.id ?? '');
           setSearch(null);
@@ -125,6 +142,7 @@ export function QuoteMaterialPicker({
       >
         <div ref={anchor} className="quote-material-anchor">
           <ComboboxTrigger
+            ref={trigger}
             className="quote-material-trigger"
             aria-labelledby={labelId}
             aria-required="true"
@@ -163,6 +181,11 @@ export function QuoteMaterialPicker({
               </ComboboxItem>
             )}
           </ComboboxList>
+          {onCreate && <div className="quote-material-create-footer">
+            <button type="button" className="btn quote-material-create" onClick={create}>
+              <Plus size={16}/>Cadastrar produto
+            </button>
+          </div>}
         </ComboboxContent>
       </Combobox>
     </div>

@@ -115,7 +115,7 @@ test('final creation validates required data and materials while providers remai
   const save = section(source, 'constsave=', 'return(');
 
   assert.match(validator, /(?:target|index)===0/);
-  assert.match(validator, /!draft\.requestDate\|\|!draft\.requesterId/);
+  assert.match(validator, /!draft\.requestDate\|\|draft\.requester\.trim\(\)\.length<2/);
   assert.match(validator, /(?:target|index)===1/);
   assert.match(validator, /!draft\.items\.length/);
   assert.match(validator, /draft\.items\.some\(/);

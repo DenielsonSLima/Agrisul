@@ -1,14 +1,18 @@
-import {
-  drawReportPdfHeader,
-  drawReportPdfWatermark,
-  REPORT_MARGIN_MM,
-  type ReportPdfBrand,
-  type ReportPdfImage,
-} from '@/shared/reporting';
+import {drawReportPdfHeader, type ReportPdfImage} from '@/shared/reporting/pdfHeader';
+import {drawReportPdfWatermark} from '@/shared/reporting/pdfWatermark';
+import {REPORT_MARGIN_MM} from '@/shared/reporting/reportLayout';
+import type {ReportPdfBrand} from '@/shared/reporting/types';
 import {loadReportImage} from '@/shared/reporting/loadReportImage';
 import {dateLabel, moneyLabel} from '@/shared/utils/presentation';
 import type {jsPDF as JsPdf} from 'jspdf';
 import type {Quote, QuoteItem, QuoteOffer, QuoteProvider} from '../types';
+import {drawQuotationClosingSummary} from './quotationClosingSummary';
+
+export type QuotationProviderTerms = {
+  paymentTerms: string;
+  deliveryTime: string;
+  proposalValidity: string;
+};
 
 export type QuotationNegotiationItem = QuoteItem & {
   materialImageUrl: string | null;
@@ -25,14 +29,17 @@ export type QuotationNegotiationSnapshot = {
   awardedItemCount: number;
   awardedGrossTotal: string;
   awardedTotal: string;
+  providerTerms?: Record<string, QuotationProviderTerms>;
+  closingNotes?: string;
 };
 
 const MATERIAL_COLUMN_WIDTH = 62;
 const MIN_PROVIDER_COLUMN_WIDTH = 42;
-const TABLE_HEADER_HEIGHT = 14;
+const TABLE_HEADER_HEIGHT = 12;
 const ITEM_ROW_HEIGHT = 15.5;
-const TOTALS_ROW_HEIGHT = 32;
-const GENERAL_TOTALS_HEIGHT = 17;
+const TOTALS_ROW_HEIGHT = 26;
+const GENERAL_TOTALS_HEIGHT = 14;
+const GENERAL_TOTALS_GAP = 3;
 
 const safeFilePart = (value: string, maxLength = 80) => {
   const normalized = value
@@ -121,6 +128,8 @@ export function createQuotationNegotiationSnapshot(
     awardedItemCount: quote.awardedItemCount,
     awardedGrossTotal: quote.awardedGrossTotal,
     awardedTotal: quote.awardedTotal,
+    providerTerms: {},
+    closingNotes: '',
   };
 }
 
@@ -238,7 +247,7 @@ export async function createQuotationNegotiationPdf(
       company: brand.company,
       logo,
       title: continuation ? 'Mapa de negociação · continuação' : 'Mapa de negociação',
-    }) + 6;
+    }) + 4;
     drawMetadata(groupIndex);
     return drawTableHeader(providers);
   };
@@ -426,10 +435,10 @@ export async function createQuotationNegotiationPdf(
         ['Total aprovado com desconto', provider.awardedTotal ?? '0'],
       ] as const;
       rows.forEach(([label, value], index) => {
-        const lineY = top + 9.5 + index * 6;
+        const lineY = top + 9 + index * 4.5;
         if (index === 3) {
           doc.setFillColor(218, 240, 225);
-          doc.roundedRect(x + 1.5, lineY - 4.2, providerWidth - 3, 5.7, 1, 1, 'F');
+          doc.roundedRect(x + 1.5, lineY - 3.5, providerWidth - 3, 5.2, 1, 1, 'F');
         }
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(index >= 2 ? 5.7 : 5.4);
@@ -446,25 +455,25 @@ export async function createQuotationNegotiationPdf(
   };
 
   const drawGeneralTotals = () => {
-    const top = y + 4;
+    const top = y + GENERAL_TOTALS_GAP;
     doc.setFillColor(226, 244, 232);
     doc.setDrawColor(154, 203, 171);
     doc.roundedRect(margin, top, contentWidth, GENERAL_TOTALS_HEIGHT, 2, 2, 'FD');
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(5.8);
     doc.setTextColor(77, 111, 88);
-    doc.text('VALOR GERAL APROVADO', margin + 4, top + 5.2);
-    doc.text('VALOR GERAL APROVADO COM DESCONTO', margin + 67, top + 5.2);
+    doc.text('VALOR GERAL APROVADO', margin + 4, top + 4.5);
+    doc.text('VALOR GERAL APROVADO COM DESCONTO', margin + 67, top + 4.5);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10.2);
     doc.setTextColor(26, 112, 63);
-    doc.text(moneyLabel(snapshot.awardedGrossTotal), margin + 4, top + 12.7);
-    doc.text(moneyLabel(snapshot.awardedTotal), margin + 67, top + 12.7);
+    doc.text(moneyLabel(snapshot.awardedGrossTotal), margin + 4, top + 10.8);
+    doc.text(moneyLabel(snapshot.awardedTotal), margin + 67, top + 10.8);
     doc.setFontSize(7);
     doc.text(
       `${snapshot.awardedItemCount} de ${snapshot.items.length} itens aprovados`,
       width - margin - 4,
-      top + 10.2,
+      top + 8.7,
       {align: 'right'},
     );
     y = top + GENERAL_TOTALS_HEIGHT;
@@ -479,11 +488,13 @@ export async function createQuotationNegotiationPdf(
       drawItemRow(item, rowIndex, providers, providerWidth);
     });
     const isLastGroup = groupIndex === providerGroups.length - 1;
-    const requiredHeight = TOTALS_ROW_HEIGHT + (isLastGroup ? GENERAL_TOTALS_HEIGHT + 7 : 0);
+    const requiredHeight = TOTALS_ROW_HEIGHT + (isLastGroup ? GENERAL_TOTALS_HEIGHT + GENERAL_TOTALS_GAP : 0);
     if (y + requiredHeight > bottom) providerWidth = beginPage(providers, groupIndex, true);
     drawProviderTotals(providers, providerWidth);
     if (isLastGroup) drawGeneralTotals();
   });
+
+  drawQuotationClosingSummary(doc, snapshot, brand, logo, watermark);
 
   const pages = doc.getNumberOfPages();
   const issued = new Intl.DateTimeFormat('pt-BR', {

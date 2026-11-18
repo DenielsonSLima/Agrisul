@@ -182,7 +182,8 @@ export type QuoteDetailsInput = {
   id: string;
   title: string;
   requestDate: string;
-  requesterSignatureId: string;
+  requester: string;
+  requesterSignatureId?: string | null;
   notes: string;
 };
 
