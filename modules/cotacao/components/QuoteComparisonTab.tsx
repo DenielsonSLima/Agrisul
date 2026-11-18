@@ -3,6 +3,7 @@
 import {ArrowRight, CheckCircle2, Loader2, PackageOpen, Store, Trophy} from 'lucide-react';
 import {moneyLabel} from '@/shared/utils/presentation';
 import type {Quote, QuoteItem, QuoteItemAward, QuoteProvider} from '../types';
+import {sortQuotationItems} from '../presentation';
 
 type QuoteComparisonTabProps = {
   quote: Quote;
@@ -19,15 +20,16 @@ type ProviderAllocation = {
 };
 
 function approvedAllocations(quote: Quote): ProviderAllocation[] {
-  const itemById = new Map(quote.items.map(item => [item.id, item]));
+  const awardsByItem = new Map((quote.itemAwards ?? []).map(award => [award.itemId, award]));
+  const items = sortQuotationItems(quote.items);
 
   return quote.providers
     .map(provider => ({
       provider,
-      rows: (quote.itemAwards ?? []).flatMap(award => {
-        if (award.providerId !== provider.id) return [];
-        const item = itemById.get(award.itemId);
-        return item ? [{award, item}] : [];
+      rows: items.flatMap(item => {
+        const award = awardsByItem.get(item.id);
+        if (!award || award.providerId !== provider.id) return [];
+        return [{award, item}];
       }),
     }))
     .filter(allocation => allocation.rows.length > 0);

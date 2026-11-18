@@ -11,6 +11,7 @@ import type {ReportPdfBrand} from '@/shared/reporting/types';
 import {dateLabel} from '@/shared/utils/presentation';
 import type {jsPDF as JsPdf} from 'jspdf';
 import type {QuoteItem, QuoteProvider} from '../types';
+import {sortQuotationItems} from '../presentation';
 
 export type QuotationRequestItem = QuoteItem & {
   materialImageUrl?: string | null;
@@ -93,9 +94,10 @@ async function loadItemImages(items: QuotationRequestItem[]) {
 }
 
 export async function createQuotationRequestPdf(
-  snapshot: QuotationRequestSnapshot,
+  source: QuotationRequestSnapshot,
   brand: ReportPdfBrand,
 ) {
+  const snapshot = {...source, items: sortQuotationItems(source.items)};
   const {jsPDF} = await import('@/shared/reporting/jsPdfRuntime');
   const doc = new jsPDF({orientation: 'portrait', unit: 'mm', format: 'a4', compress: true});
   const fileName = supplierQuotationFileName(snapshot.provider.providerName, snapshot.number);

@@ -1,6 +1,7 @@
 import {getSupabaseBrowserClient} from '@/shared/supabase/client';
 import {rpcRequest,RpcError} from '@/shared/supabase/rpc';
 import {fetchWorkspaceId} from '@/shared/supabase/workspace';
+import {sortQuotationItems} from '../presentation';
 import type {Material,MaterialImageChange,MaterialInput,MaterialReference,MaterialReferenceInput,Quote,QuoteAddItemsInput,QuoteAddProvidersInput,QuoteAttachment,QuoteDetailsInput,QuoteFinalizeInput,QuoteFinalizeResult,QuoteInput,QuoteItemAwardInput,QuoteItemQuantityInput,QuoteItemUnawardInput,QuoteNegotiationInput,QuoteRemoveItemInput,QuoteRemoveProviderInput,QuoteStatus} from '../types';
 
 export const MATERIAL_IMAGE_BUCKET='billing-material-images';
@@ -79,7 +80,7 @@ export const deleteMaterialReference=(id:string)=>rpcRequest<{id:string;deleted:
 export const fetchQuotes = (status: QuoteStatus, signal: AbortSignal) => rpcRequest<{quotes: Quote[]; total: number}>('quotations','list',{status},signal);
 export const fetchQuote = async (id: string, signal: AbortSignal) => {
  const quote=(await rpcRequest<{quote:Quote}>('quotations','get',{id},signal)).quote;
- return withQuotationAttachmentUrl(await withQuotationImageUrls(quote,signal),signal);
+ return withQuotationAttachmentUrl(await withQuotationImageUrls({...quote,items:sortQuotationItems(quote.items)},signal),signal);
 };
 export async function persistQuote(input:QuoteInput,attachment?:QuoteAttachment|null){
  if(!attachment)return (await rpcRequest<{quote:Quote}>('quotations','save',input)).quote;

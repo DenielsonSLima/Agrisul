@@ -7,6 +7,7 @@ import {dateLabel, moneyLabel} from '@/shared/utils/presentation';
 import type {jsPDF as JsPdf} from 'jspdf';
 import type {Quote, QuoteItem, QuoteOffer, QuoteProvider} from '../types';
 import {drawQuotationClosingSummary} from './quotationClosingSummary';
+import {sortQuotationItems} from '../presentation';
 
 export type QuotationProviderTerms = {
   paymentTerms: string;
@@ -107,7 +108,7 @@ export function createQuotationNegotiationSnapshot(
     number: quote.number,
     requestDate: quote.requestDate,
     requester: quote.requester,
-    items: quote.items.map(item => ({
+    items: sortQuotationItems(quote.items).map(item => ({
       ...item,
       materialReferences: item.materialReferences.map(reference => ({...reference})),
       materialImageUrl: materialImages.get(item.materialId) ?? item.materialImageUrl ?? null,
@@ -134,9 +135,10 @@ export function createQuotationNegotiationSnapshot(
 }
 
 export async function createQuotationNegotiationPdf(
-  snapshot: QuotationNegotiationSnapshot,
+  source: QuotationNegotiationSnapshot,
   brand: ReportPdfBrand,
 ) {
+  const snapshot = {...source, items: sortQuotationItems(source.items)};
   const {jsPDF} = await import('@/shared/reporting/jsPdfRuntime');
   const doc = new jsPDF({orientation: 'landscape', unit: 'mm', format: 'a4', compress: true});
   const width = doc.internal.pageSize.getWidth();

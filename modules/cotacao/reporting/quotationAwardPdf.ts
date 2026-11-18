@@ -11,6 +11,7 @@ import {supplierNotes, supplierQuotationFileName, supplierQuotationTitle} from '
 import {dateLabel, moneyLabel} from '@/shared/utils/presentation';
 import type {jsPDF as JsPdf} from 'jspdf';
 import type {Quote, QuoteItem, QuoteProvider} from '../types';
+import {sortQuotationItems} from '../presentation';
 
 export type QuotationAwardItem = QuoteItem & {
   materialImageUrl?: string | null;
@@ -108,7 +109,7 @@ export function createQuotationAwardSnapshot(
     notes: quote.notes,
     provider,
     total: provider.awardedTotal ?? '0',
-    items: quote.items.flatMap(item => {
+    items: sortQuotationItems(quote.items).flatMap(item => {
       const award = awards.get(item.id);
       return award ? [{
         ...item,
@@ -125,9 +126,10 @@ export function createQuotationAwardSnapshot(
 }
 
 export async function createQuotationAwardPdf(
-  snapshot: QuotationAwardSnapshot,
+  source: QuotationAwardSnapshot,
   brand: ReportPdfBrand,
 ) {
+  const snapshot = {...source, items: sortQuotationItems(source.items)};
   const {jsPDF} = await import('@/shared/reporting/jsPdfRuntime');
   const doc = new jsPDF({orientation: 'portrait', unit: 'mm', format: 'a4', compress: true});
   const fileName = supplierQuotationFileName(snapshot.provider.providerName, snapshot.number);

@@ -317,6 +317,86 @@ test('closing summary paginates many suppliers and keeps full long conditions', 
   } finally {await rm(directory, {recursive: true, force: true});}
 });
 
+test('screen data and all quotation PDFs order names in Portuguese without changing item prices or approvals', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'quotation-alphabetical-'));
+  try {
+    await build({
+      entryPoints: {
+        api: resolve('modules/cotacao/services/quoteApi.ts'),
+        negotiation: resolve('modules/cotacao/reporting/quotationNegotiationPdf.ts'),
+        request: resolve('modules/cotacao/reporting/quotationRequestPdf.ts'),
+        award: resolve('modules/cotacao/reporting/quotationAwardPdf.ts'),
+      },
+      outdir: directory, outExtension: {'.js': '.mjs'}, bundle: true, platform: 'node', format: 'esm', logLevel: 'silent',
+      plugins: [{name: 'quotation-screen-rpc', setup(builder) {
+        builder.onResolve({filter: /^@\/shared\/supabase\/(rpc|client|workspace)$/}, args => ({path: args.path, namespace: 'quotation-order'}));
+        builder.onLoad({filter: /.*/, namespace: 'quotation-order'}, args => ({loader: 'js', contents:
+          args.path.endsWith('/rpc') ? 'export class RpcError extends Error{}; export async function rpcRequest(){return {quote:globalThis.__alphabeticalQuote}};' :
+            args.path.endsWith('/client') ? 'export const getSupabaseBrowserClient=()=>{throw new Error("Unexpected storage request")};' :
+              'export const fetchWorkspaceId=()=>{throw new Error("Unexpected workspace request")};',
+        }));
+      }}],
+    });
+    await build({
+      entryPoints: [resolve('modules/cotacao/components/QuoteComparisonTab.tsx')], outfile: join(directory, 'comparison.cjs'),
+      bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent',
+      plugins: [{name: 'shared-react-instance', setup(builder) {
+        builder.onResolve({filter: /^react(?:\/.*)?$/}, args => ({path: require.resolve(args.path), external: true}));
+      }}],
+    });
+    const modules = await Promise.all(['api','negotiation','request','award'].map(name => import(pathToFileURL(join(directory, `${name}.mjs`)).href)));
+    const [api, negotiation, request, award] = modules;
+    const comparison = require(join(directory, 'comparison.cjs'));
+    const names = ['Trena 5 metros', 'Chave 12 mm', 'alicate universal', 'Chave 2 mm', 'Álcool de limpeza'];
+    const items = Object.freeze(names.map((name, index) => Object.freeze({...item(`item-${index}`, `material-${index}`, name), quantity: '1'})));
+    const offers = Object.fromEntries(items.map((entry, index) => [entry.id, {
+      unitPrice: `${index + 1}.00`, availableQuantity: '1', discountType: 'none', discountValue: '0',
+      lineSubtotal: `${index + 1}.00`, discountAmount: '0', lineTotal: `${index + 1}.00`, netUnitPrice: `${index + 1}.00`,
+    }]));
+    const supplier = {
+      id: 'supplier-a', providerId: 'provider-a', providerName: 'Fornecedor teste', values: Object.fromEntries(items.map(i => [i.id, offers[i.id].unitPrice])),
+      offers, notes: '', sentAt: null, quotedItemCount: 5, awardedItemCount: 5, grossTotal: '15', total: '15', awardedGrossTotal: '15', awardedTotal: '15',
+    };
+    globalThis.__alphabeticalQuote = {
+      id: 'quote', title: 'Cotação ordenada', number: 'COT-ALFA', requestDate: '2026-11-18', requester: 'Edmilson', notes: '', attachmentKey: null,
+      items, providers: [supplier], negotiations: [], status: 'open',
+      itemAwards: items.map(i => ({itemId: i.id, providerId: supplier.id, ...offers[i.id], awardedAt: '', updatedAt: ''})),
+      awardedItemCount: 5, awardedGrossTotal: '15', awardedTotal: '15', pendingAwardCount: 0, awardComplete: true, purchaseOrders: [],
+    };
+    const before = JSON.stringify(globalThis.__alphabeticalQuote);
+    const displayed = await api.fetchQuote('quote', new AbortController().signal);
+    const expected = ['Álcool de limpeza', 'alicate universal', 'Chave 2 mm', 'Chave 12 mm', 'Trena 5 metros'];
+    assert.deepEqual(displayed.items.map(i => i.materialName), expected, 'every detail tab receives the same sorted items');
+    assert.equal(JSON.stringify(globalThis.__alphabeticalQuote), before, 'sorting must not change the cached RPC payload');
+    assert.deepEqual(displayed.itemAwards, globalThis.__alphabeticalQuote.itemAwards);
+    for (const entry of displayed.items) assert.equal(supplier.offers[entry.id].unitPrice, offers[entry.id].unitPrice);
+    const {renderToStaticMarkup} = await import('react-dom/server');
+    const {createElement} = await import('react');
+    const html = renderToStaticMarkup(createElement(comparison.QuoteComparisonTab, {quote: globalThis.__alphabeticalQuote, busy: false, finalizing: false, finalizeError: '', onFinalize: async()=>{}, onGoToNegotiation: ()=>{}}));
+    let position = -1;
+    for (const name of expected) {const next = html.indexOf(name); assert.ok(next > position, `comparison order: ${name}`); position = next;}
+    const brand = {company: null, header: {variant: 'compact', logoAlignment: 'left', showCnpj: true, showContact: true}, watermark: {imageUrl: null, opacity: 15, size: 60}, issuer: {id: '', name: 'Teste', email: ''}, issuedAt: new Date('2026-11-18T12:00:00-03:00')};
+    const source = globalThis.__alphabeticalQuote;
+    const results = [
+      await negotiation.createQuotationNegotiationPdf(negotiation.createQuotationNegotiationSnapshot(source, new Map()), brand),
+      await request.createQuotationRequestPdf({...source, provider: supplier}, brand),
+      await award.createQuotationAwardPdf(award.createQuotationAwardSnapshot(source, supplier, new Map()), brand),
+    ];
+    const {getDocument} = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    for (const result of results) {
+      const loading = getDocument({data: new Uint8Array(result.doc.output('arraybuffer')), useSystemFonts: true});
+      try {
+        const pdf = await loading.promise;
+        let text = '';
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {const page = await pdf.getPage(pageNumber);text += (await page.getTextContent()).items.map(i => i.str).join(' ') + ' ';}
+        text = text.replace(/\s+/g, ' ');position = -1;
+        for (const name of expected) {const next = text.indexOf(name);assert.ok(next > position, `PDF order in ${result.fileName}: ${name}`);position = next;}
+      } finally {await loading.destroy();}
+    }
+    assert.equal(JSON.stringify(source), before, 'all exports preserve original quantities, offers and awards');
+  } finally {delete globalThis.__alphabeticalQuote;await rm(directory, {recursive: true, force: true});}
+});
+
 test('negotiation tab exposes the complete landscape report with preview and download', async () => {
   const [report, tab, exportDialog] = await Promise.all([
     readFile(reportUrl, 'utf8'), readFile(tabUrl, 'utf8'),
